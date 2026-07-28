@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Fabulari — Group Admin Panel</title>
+<link rel="stylesheet" href="wireframe.css">
+</head>
+<body>
+<h1 class="page-title">Screen 04 — Manage Group (role: Group Admin)</h1>
+<div class="frames">
+
+  <div>
+    <div class="frame-label">Mobile — &lt;600px (accordion sections)</div>
+    <div class="frame mobile">
+      <div class="nav-bar">
+        <div style="font-size:11px;">&larr; Back</div>
+        <div class="wf-line" style="width:100px;"></div>
+        <div></div>
+      </div>
+      <div class="body-pad">
+        <div class="section-title">▾ Group Settings</div>
+        <div class="wf-input" style="margin-bottom:6px;">Name</div>
+        <div class="wf-input" style="margin-bottom:6px;">Description</div>
+        <div style="display:flex; gap:6px; margin-bottom:6px;">
+          <div class="wf-swatch" style="width:30px; height:30px;"></div>
+          <div class="wf-input" style="flex:1;">Age limit: 16</div>
+        </div>
+        <div class="wf-btn primary small">Save</div>
+
+        <div class="section-title">▸ Members (14)</div>
+        <div class="section-title">▸ Banned Users (2)</div>
+
+        <div class="section-title">▾ Channel Requests</div>
+        <div class="list-item">
+          <div style="flex:1;"><div class="wf-line" style="width:60%;"></div><div style="font-size:9px;color:#777;">by @sam</div></div>
+        </div>
+        <div style="display:flex; gap:6px; padding:0 12px 10px;">
+          <div class="wf-btn small primary">Approve</div>
+          <div class="wf-btn small danger">Reject (reason)</div>
+        </div>
+
+        <div class="wf-btn danger" style="margin-top:16px; text-align:center;">Request Group Deletion →</div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="frame-label">Desktop — ≥1024px (tab rail + panel)</div>
+    <div class="frame desktop">
+      <div class="nav-bar">
+        <div class="wf-line" style="width:110px;"></div>
+        <div class="nav-links"><span>Group Settings</span><span>Members</span><span>Banned</span><span>Requests</span></div>
+      </div>
+      <div style="display:flex; height:360px;">
+        <div style="width:160px; border-right:2px solid #333; padding:12px; font-size:11px; color:#555;">
+          <div style="padding:6px 0; font-weight:700; color:#222;">Settings</div>
+          <div style="padding:6px 0;">Members</div>
+          <div style="padding:6px 0;">Banned Users</div>
+          <div style="padding:6px 0;">Channel Requests <span class="wf-badge">3</span></div>
+          <div style="padding:6px 0; color:#a33;">Delete Group…</div>
+        </div>
+        <div style="flex:1; padding:16px;">
+          <div class="section-title">Group Settings</div>
+          <div class="wf-input" style="margin-bottom:6px; width:60%;">Name</div>
+          <div class="wf-input" style="margin-bottom:6px; width:80%;">Description</div>
+          <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
+            <div class="wf-swatch" style="width:30px; height:30px;"></div>
+            <div class="wf-input" style="width:120px;">Age limit: 16</div>
+          </div>
+          <div class="wf-btn primary small">Save changes</div>
+
+          <div class="section-title">Members</div>
+          <div class="list-item"><div style="flex:1;"><div class="wf-line" style="width:40%;"></div></div><span class="wf-badge admin">admin</span><div class="wf-btn small">Demote</div><div class="wf-btn small danger">Ban</div></div>
+          <div class="list-item"><div style="flex:1;"><div class="wf-line" style="width:35%;"></div></div><div class="wf-btn small">Promote</div><div class="wf-btn small danger">Ban</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<div class="note">
+  <b>Responsive rule:</b> mobile collapses each section into an accordion (one open at a time); desktop
+  uses a persistent left tab rail with all sections one click away.<br>
+  <b>Spec notes reflected:</b> settings edits (name/description/theme/age) need no request — saved
+  directly; raising the age limit auto-removes now-under-age members (confirm dialog, not shown here);
+  promote/demote available whenever ≥2 admins exist so the group is never left without one; channel
+  rejections require a reason; group deletion always routes through a request to the Super Admin, never
+  direct.<br>
+  <b>Flow:</b> reached from <code>02-group-channels.html</code> via a "Manage Group" entry point
+  (Group Admin only).
+</div>
+</body>
+</html>

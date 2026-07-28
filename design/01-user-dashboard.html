@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Fabulari — User Dashboard</title>
+<link rel="stylesheet" href="wireframe.css">
+</head>
+<body>
+<h1 class="page-title">Screen 01 — Dashboard (role: User)</h1>
+<div class="frames">
+
+  <div>
+    <div class="frame-label">Mobile — &lt;600px</div>
+    <div class="frame mobile">
+      <div class="nav-bar">
+        <div class="wf-box" style="width:70px; height:20px;">Fabulari</div>
+        <div class="hamburger"><span></span><span></span><span></span></div>
+      </div>
+      <div class="body-pad">
+        <div class="section-title">My Groups</div>
+        <div class="list-item">
+          <div class="wf-swatch" style="width:28px; height:28px;"></div>
+          <div style="flex:1;">
+            <div class="wf-line" style="width:70%;"></div>
+            <div class="wf-line" style="width:40%; margin-top:6px;"></div>
+          </div>
+        </div>
+        <div class="list-item">
+          <div class="wf-swatch" style="width:28px; height:28px;"></div>
+          <div style="flex:1;">
+            <div class="wf-line" style="width:55%;"></div>
+            <div class="wf-line" style="width:35%; margin-top:6px;"></div>
+          </div>
+        </div>
+
+        <div class="section-title">Discover Groups</div>
+        <div class="list-item">
+          <div style="flex:1;">
+            <div class="wf-line" style="width:60%;"></div>
+            <span class="wf-badge" style="margin-top:6px; display:inline-block;">age 16+</span>
+          </div>
+          <div class="wf-btn small">Request to Join</div>
+        </div>
+
+        <div class="section-title">My Requests</div>
+        <div class="list-item">
+          <div style="flex:1;"><div class="wf-line" style="width:50%;"></div></div>
+          <span class="wf-badge">pending</span>
+        </div>
+        <div class="list-item">
+          <div style="flex:1;"><div class="wf-line" style="width:65%;"></div></div>
+          <span class="wf-badge" style="border-color:#a33; color:#a33;">rejected — reason ↴</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="frame-label">Desktop — ≥1024px</div>
+    <div class="frame desktop">
+      <div class="nav-bar">
+        <div class="wf-box" style="width:90px; height:22px;">Fabulari</div>
+        <div class="nav-links">
+          <span>My Groups</span><span>Discover</span><span>Requests</span><span>Profile</span><span>Logout</span>
+        </div>
+      </div>
+      <div class="body-pad" style="display:flex; gap:20px;">
+        <div style="flex:1;">
+          <div class="section-title">My Groups</div>
+          <div class="list-item">
+            <div class="wf-swatch" style="width:32px; height:32px;"></div>
+            <div style="flex:1;"><div class="wf-line" style="width:60%;"></div></div>
+          </div>
+          <div class="list-item">
+            <div class="wf-swatch" style="width:32px; height:32px;"></div>
+            <div style="flex:1;"><div class="wf-line" style="width:45%;"></div></div>
+          </div>
+          <div class="section-title">My Requests (pending + past rejected)</div>
+          <div class="list-item"><div style="flex:1;"><div class="wf-line" style="width:50%;"></div></div><span class="wf-badge">pending</span></div>
+          <div class="list-item"><div style="flex:1;"><div class="wf-line" style="width:55%;"></div></div><span class="wf-badge" style="border-color:#a33;color:#a33;">rejected</span></div>
+        </div>
+        <div style="flex:1;">
+          <div class="section-title">Discover Groups</div>
+          <div class="list-item">
+            <div style="flex:1;"><div class="wf-line" style="width:65%;"></div><span class="wf-badge" style="margin-top:6px; display:inline-block;">age 16+</span></div>
+            <div class="wf-btn small">Request to Join</div>
+          </div>
+          <div class="list-item">
+            <div style="flex:1;"><div class="wf-line" style="width:50%;"></div><span class="wf-badge" style="margin-top:6px; display:inline-block;">age 18+</span></div>
+            <div class="wf-btn small">Request to Join</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<div class="note">
+  <b>Responsive rule:</b> mobile stacks sections vertically behind a hamburger drawer nav; desktop shows a
+  full nav bar and a two-column layout (My Groups + Requests | Discover).<br>
+  <b>Spec notes reflected:</b> groups a user is below the age limit for still show under Discover (would be
+  auto-rejected on request); rejected requests display their reason; requests can't be cancelled once made.<br>
+  <b>Flow:</b> tap a group in "My Groups" → <code>02-group-channels.html</code>.
+</div>
+</body>
+</html>

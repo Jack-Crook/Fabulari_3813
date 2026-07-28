@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Fabulari — Group Channels</title>
+<link rel="stylesheet" href="wireframe.css">
+</head>
+<body>
+<h1 class="page-title">Screen 02 — Group → Channel list (role: User, also seen by Group Admin)</h1>
+<div class="frames">
+
+  <div>
+    <div class="frame-label">Mobile — &lt;600px</div>
+    <div class="frame mobile">
+      <div class="nav-bar">
+        <div style="font-size:11px;">&larr; Back</div>
+        <div style="flex:1; text-align:center;">
+          <div class="wf-line" style="width:100px; margin:0 auto;"></div>
+        </div>
+        <div class="wf-swatch" style="width:18px; height:18px;"></div>
+      </div>
+      <div style="padding:6px 12px; font-size:10px; color:#777;">
+        <span class="wf-badge">age 16+</span>
+        <span style="margin-left:6px;">Group Admin: <b style="color:#333;">@jane</b></span>
+      </div>
+      <div class="body-pad">
+        <div class="section-title">Channels</div>
+        <div class="list-item"><div style="flex:1;"><div class="wf-line" style="width:50%;"></div></div><span class="wf-badge">3 online</span></div>
+        <div class="list-item"><div style="flex:1;"><div class="wf-line" style="width:40%;"></div></div><span class="wf-badge">0 online</span></div>
+        <div class="list-item"><div style="flex:1;"><div class="wf-line" style="width:60%;"></div></div><span class="wf-badge">7 online</span></div>
+        <div class="wf-btn" style="margin-top:10px; text-align:center;">+ Propose New Channel</div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="frame-label">Desktop — ≥1024px</div>
+    <div class="frame desktop">
+      <div class="nav-bar">
+        <div class="wf-box" style="width:90px; height:22px;">Fabulari</div>
+        <div class="nav-links"><span>My Groups</span><span>Discover</span><span>Requests</span><span>Profile</span></div>
+      </div>
+      <div style="display:flex; height:340px;">
+        <div style="width:280px; border-right:2px solid #333; padding:14px;">
+          <div class="wf-swatch" style="width:100%; height:50px; margin-bottom:8px;"></div>
+          <div class="wf-line" style="width:70%; margin-bottom:4px;"></div>
+          <span class="wf-badge">age 16+</span>
+          <div style="font-size:10px; color:#777; margin:8px 0;">Group Admin: <b style="color:#333;">@jane</b></div>
+          <div class="section-title">Channels</div>
+          <div class="list-item"><div style="flex:1;"><div class="wf-line" style="width:60%;"></div></div><span class="wf-badge">3</span></div>
+          <div class="list-item"><div style="flex:1;"><div class="wf-line" style="width:45%;"></div></div><span class="wf-badge">0</span></div>
+          <div class="wf-btn small" style="margin-top:10px; text-align:center;">+ Propose Channel</div>
+        </div>
+        <div style="flex:1; display:flex; align-items:center; justify-content:center;">
+          <div class="wf-box" style="width:80%; height:70%;">select a channel to open chat →</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<div class="note">
+  <b>Responsive rule:</b> mobile shows the channel list as a full-screen page; desktop shows it as a
+  persistent left column (master–detail pattern) next to the chat panel.<br>
+  <b>Spec notes reflected:</b> age limit is set at the group level and covers every channel in it (no
+  per-channel age limit); the group's colour theme swatch extends to its channels; a badge shows who
+  the group admin is; "Propose New Channel" is user-facing — approval/rejection happens in the Group
+  Admin panel (<code>04-group-admin.html</code>).<br>
+  <b>Flow:</b> tap a channel → <code>03-chat-room.html</code>.
+</div>
+</body>
+</html>

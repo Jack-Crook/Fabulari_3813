@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Fabulari — Chat Room</title>
+<link rel="stylesheet" href="wireframe.css">
+</head>
+<body>
+<h1 class="page-title">Screen 03 — Chat room (real-time, sockets — Phase 2)</h1>
+<div class="frames">
+
+  <div>
+    <div class="frame-label">Mobile — &lt;600px</div>
+    <div class="frame mobile">
+      <div class="nav-bar">
+        <div style="font-size:11px;">&larr;</div>
+        <div class="wf-line" style="width:90px;"></div>
+        <div class="wf-badge">12 online ▾</div>
+      </div>
+      <div style="padding:10px; font-size:10px; color:#999; text-align:center;">— Jane joined the room —</div>
+      <div style="padding:0 10px; display:flex; flex-direction:column; gap:8px;">
+        <div style="align-self:flex-start; max-width:75%;">
+          <div style="font-size:9px; color:#777;">@sam <span class="wf-badge admin">admin</span></div>
+          <div class="wf-box" style="padding:8px 10px; text-align:left; background:#eee; border-style:solid;">text message placeholder</div>
+        </div>
+        <div style="align-self:flex-end; max-width:75%;">
+          <div class="wf-box" style="height:70px; width:140px;">image message</div>
+        </div>
+        <div style="align-self:flex-start; max-width:75%;">
+          <div style="font-size:9px; color:#777;">@lee</div>
+          <div class="wf-box" style="padding:8px 10px; text-align:left; background:#eee; border-style:solid;">another text message</div>
+        </div>
+      </div>
+      <div style="padding:8px; display:flex; gap:6px; border-top:2px solid #333; margin-top:10px;">
+        <div class="wf-input" style="flex:1;">Type a message…</div>
+        <div class="wf-btn small">📷</div>
+        <div class="wf-btn small primary">Send</div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="frame-label">Desktop — ≥1024px (persistent presence sidebar)</div>
+    <div class="frame desktop">
+      <div class="nav-bar">
+        <div class="wf-line" style="width:110px;"></div>
+        <div class="nav-links"><span>#general</span></div>
+      </div>
+      <div style="display:flex; height:340px;">
+        <div style="flex:1; display:flex; flex-direction:column;">
+          <div style="padding:8px; font-size:10px; color:#999; text-align:center;">— Jane joined · Sam left —</div>
+          <div style="flex:1; padding:10px; display:flex; flex-direction:column; gap:8px; overflow:hidden;">
+            <div style="max-width:60%;">
+              <div style="font-size:9px; color:#777;">@sam <span class="wf-badge admin">admin</span></div>
+              <div class="wf-box" style="padding:8px 10px; background:#eee; border-style:solid;">text message placeholder</div>
+            </div>
+            <div style="max-width:40%;">
+              <div class="wf-box" style="height:70px;">image message</div>
+            </div>
+          </div>
+          <div style="padding:8px; display:flex; gap:6px; border-top:2px solid #333;">
+            <div class="wf-input" style="flex:1;">Type a message…</div>
+            <div class="wf-btn small">📷 attach</div>
+            <div class="wf-btn small primary">Send</div>
+          </div>
+        </div>
+        <div style="width:180px; border-left:2px solid #333; padding:10px;">
+          <div class="section-title">Who's here (12)</div>
+          <div class="list-item" style="padding:6px 0;"><div class="wf-avatar" style="width:20px;height:20px;"></div><div class="wf-line" style="width:60px;"></div></div>
+          <div class="list-item" style="padding:6px 0;"><div class="wf-avatar" style="width:20px;height:20px;"></div><div class="wf-line" style="width:50px;"></div></div>
+          <div class="list-item" style="padding:6px 0;"><div class="wf-avatar" style="width:20px;height:20px;"></div><div class="wf-line" style="width:70px;"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<div class="note">
+  <b>Responsive rule:</b> desktop keeps a persistent "who's here" sidebar; mobile hides it behind the
+  "N online ▾" tap target in the header (slide-over panel) to save space.<br>
+  <b>Spec notes reflected:</b> live presence list of everyone currently in the room, <i>plus</i> inline
+  join/leave system messages (both, not one or the other); messages support text and images; a sender's
+  name shows an "admin" badge if they're that group's admin.<br>
+  <b>Flow:</b> mock message data in Phase 1; wired to socket.io events (<code>join-channel</code>,
+  <code>message</code>, <code>leave-channel</code>) in Phase 2.
+</div>
+</body>
+</html>

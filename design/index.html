@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Fabulari — Storyboards / Wireframes index</title>
+<link rel="stylesheet" href="wireframe.css">
+</head>
+<body>
+<h1 class="page-title">Fabulari — Phase 1 storyboards</h1>
+<div class="note" style="max-width:640px;">
+  Low-fidelity wireframes, mobile-first with a desktop breakpoint shown per screen. Grey
+  striped boxes = image/illustration placeholders. These define the layout the Phase 1
+  prototype UI must reflect for each permission level.
+</div>
+
+<div class="flow">
+  <b>User flow:</b><br>
+  <code>00-login</code> → <code>01-user-dashboard</code> → <code>02-group-channels</code> →
+  <code>03-chat-room</code><br><br>
+  <b>Group Admin</b> sees 01–03 plus <code>04-group-admin</code> (settings, members, banned
+  list, channel-request approvals, deletion request).<br><br>
+  <b>Super Admin</b> lands on <code>05-super-admin</code> instead of 01 (pending requests,
+  banned accounts, audit log) and does not use 02–04.
+</div>
+
+<div class="section-title">Screens</div>
+<div style="display:flex; flex-direction:column; gap:6px; font-size:13px;">
+  <a href="00-login.html">00 — Login / Register</a>
+  <a href="01-user-dashboard.html">01 — User dashboard (My Groups / Discover / Requests)</a>
+  <a href="02-group-channels.html">02 — Group → channel list</a>
+  <a href="03-chat-room.html">03 — Chat room (presence, text + image messages)</a>
+  <a href="04-group-admin.html">04 — Group Admin panel</a>
+  <a href="05-super-admin.html">05 — Super Admin console</a>
+</div>
+</body>
+</html>
