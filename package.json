@@ -1,0 +1,20 @@
+{
+  "name": "fabulari_3813",
+  "version": "1.0.0",
+  "description": "Full Stack Chat App",
+  "homepage": "https://github.com/Jack-Crook/Fabulari_3813#readme",
+  "bugs": {
+    "url": "https://github.com/Jack-Crook/Fabulari_3813/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Jack-Crook/Fabulari_3813.git"
+  },
+  "license": "ISC",
+  "author": "Jack Crook",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}
