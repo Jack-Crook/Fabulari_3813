@@ -19,7 +19,7 @@ const usersPath = path.join(__dirname, 'data', 'users.json');       // location 
 
 
 
-
+//register route
 app.post('/register', (req, res) => {       // handles new user signups
   const { email, password } = req.body;     // pull fields out of the request body
   
@@ -38,7 +38,21 @@ app.post('/register', (req, res) => {       // handles new user signups
     res.status(201).json({ message: 'User registered successfully' });
 });
 
+//login route
+app.post('/login', (req, res) => {
+    const { email, password } = req.body;
+    
+        if (!email || !password) {
+            return res.status(400).json({ error: 'Email and password are required' });      // 400 = Bad Request, it tells the client (Angular) it sent invalid input,
+    }
+    const users = JSON.parse(fs.readFileSync(usersPath, 'utf8')); // read and parse the current users list, same as in /register
 
+    const user = users.find(u => u.email === email); // look for a user whose email matches the one submitted; undefined if none found
+
+        if (!user || user.password !== password) {
+            return res.status(401).json({ error: 'Invalid email or password' });
+}
+});
 
 
 const PORT = 3000;
