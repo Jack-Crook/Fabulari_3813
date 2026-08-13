@@ -51,7 +51,8 @@ app.post('/login', (req, res) => {
 
         if (!user || user.password !== password) {
             return res.status(401).json({ error: 'Invalid email or password' });
-}
+    }
+    res.status(200).json({ message: 'Login successful', email: user.email });
 });
 
 
