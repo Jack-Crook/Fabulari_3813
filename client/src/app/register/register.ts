@@ -1,5 +1,6 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { Auth } from '../auth';
 
 
 @Component({
@@ -8,4 +9,10 @@ import { FormsModule } from '@angular/forms';
   templateUrl: './register.html',
   styleUrl: './register.css',
 })
-export class Register {}
+
+export class Register {private auth = inject(Auth);
+
+  email = '';
+  password = '';
+  errorMessage = '';}
+
