@@ -2,5 +2,9 @@
   {
     "email": "test@test.com",
     "password": "pw123"
+  },
+  {
+    "email": "jack@123",
+    "password": "dfdsdfdssdf"
   }
 ]
