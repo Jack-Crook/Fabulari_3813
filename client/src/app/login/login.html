@@ -3,18 +3,32 @@
     <h1 class="logo">Fabulari</h1>
     <h2>Welcome Back!</h2>
 
-    <form>
+    <!-- runs onSubmit() when the form is submitted -->
+    <form (ngSubmit)="onSubmit()">
       <label for="email">Email</label>
-      <input id="email" name="email" type="email" />
+      <!-- keeps this box in sync with the email variable -->
+      <input id="email" name="email" type="email" [(ngModel)]="email" required />
 
       <label for="password">Password</label>
-      <input id="password" name="password" type="password" />
+      <input id="password" name="password" type="password" [(ngModel)]="password" required />
 
+      <!-- just text from the wireframe, doesn't do anything yet -->
       <a class="forgot" href="#">Forgot your password?</a>
 
       <button type="submit">Log In</button>
     </form>
 
+    <!-- shows this only if there's an error message -->
+    @if (errormessage) {
+      <p class="error">{{ errormessage }}</p>
+    }
+
+    <!-- shows this only if login worked -->
+    @if (successmessage) {
+      <p class="success">{{ successmessage }}</p>
+    }
+
     <p class="switch">Don't have an account? <a routerLink="/register">Register</a></p>
   </div>
 </div>
+
