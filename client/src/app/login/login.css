@@ -1,0 +1,31 @@
+body {
+  margin: 0;
+  padding: 0;
+}
+
+.logo-container {
+  position: absolute; /* Keeps it strictly in place */
+  top: 10px;          /* Distance from top edge */
+  left: 10px;         /* Distance from left edge */
+}
+
+.logo-container img {
+  height: 50px;       /* Set your logo size */
+  width: auto;
+}
+
+.page {
+  background: #F7F8FA;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
+
+.card {
+  background: #FFFFFF;
+  border: 1px solid #E2E4E9;
+  border-radius: 8px;
+  padding: 24px;
+  width: 400px;
+}
