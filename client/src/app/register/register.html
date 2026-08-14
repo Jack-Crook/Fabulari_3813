@@ -1,0 +1,23 @@
+<h1>Register</h1>
+
+<!-- ngSubmit fires onSubmit() in register.ts when the form is submitted -->
+<form (ngSubmit)="onSubmit()">
+  <label for="email">Email</label>
+  <!-- [(ngModel)] keeps this input in sync with the email property on the Register class -->
+  <input id="email" name="email" type="email" [(ngModel)]="email" required />
+
+  <label for="password">Password</label>
+  <input id="password" name="password" type="password" [(ngModel)]="password" required />
+
+  <button type="submit">Register</button>
+</form>
+
+<!-- only shown when errorMessage is a non-empty string -->
+@if (errorMessage) {
+  <p class="error">{{ errorMessage }}</p>
+}
+
+<!-- only shown when successMessage is a non-empty string -->
+@if (successMessage) {
+  <p class="success">{{ successMessage }}</p>
+}
