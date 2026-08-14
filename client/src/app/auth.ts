@@ -9,5 +9,8 @@ export class Auth {
   register(email: string, password: string) {       // send a POST request to the Express /register route with email + password as the JSON body
   return this.http.post(`${this.apiUrl}/register`, { email, password });
 }
+  login(email: string, password: string) {          // send a POST request to the Express /login route with email + password as the JSON body
+  return this.http.post(`${this.apiUrl}/login`, { email, password });
+}
 }
 

@@ -11,7 +11,7 @@ import { Auth } from '../auth';
   styleUrl: './login.css',
 })
 export class Login {
-  private auth = inject(auth);
+  private auth = inject(Auth);
 
   email = '';
   password = '';
