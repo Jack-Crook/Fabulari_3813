@@ -1,32 +1,36 @@
 import { Component, inject } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
-import { HttpErrorResponse } from '@angular/common/http';
-import { Auth } from '../auth';
+import { FormsModule } from '@angular/forms';       // lets the html use [(ngModel)] on the inputs
+import { RouterLink } from '@angular/router';        // lets the html use routerLink
+import { HttpErrorResponse } from '@angular/common/http'; // the type of error http requests give back
+import { Auth } from '../auth';                      // the service that actually talks to the backend
 
 @Component({
   selector: 'app-login',
-  imports: [],
+  imports: [FormsModule, RouterLink],
   templateUrl: './login.html',
   styleUrl: './login.css',
 })
 export class Login {
-  private auth = inject(Auth);
+  private auth = inject(Auth); // grabs the Auth service so this component can use it
+//stores email or password typed in
+  email = '';           
+  password = '';        
+  errormessage = '';    // text shown on screen if login fails
+  successmessage = '';  // text shown on screen if login works
 
-  email = '';
-  password = '';
-  errormessage = '';
-  successmessage = '';
-
-  onSubmit() {
-    this.errormessage = '';
+  onSubmit() {                // runs when the login form is submitted
+    this.errormessage = '';   // clear old messages first
     this.successmessage = '';
 
-    this.auth.login(this.email, this.password).subscribe({
+    this.auth.login(this.email, this.password).subscribe({ // send email+password to the backend
       next: () => {
+        // this runs if the backend says login worked
         this.successmessage = 'Logged in successfully.';
+      },
+      error: (err: HttpErrorResponse) => {
+        // this runs if the backend says login failed (wrong password etc)
+        this.errormessage = err.error?.error ?? 'Something went wrong, please try again.';
       },
     });
   }
-
 }
