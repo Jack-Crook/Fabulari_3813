@@ -29,3 +29,15 @@ body {
   padding: 24px;
   width: 400px;
 }
+
+.brand {
+  display: block;
+  margin: 0 auto 12px;
+  height: 48px;
+  width: auto;
+  max-width: 100%;
+}
+
+.card h2 {
+  text-align: center;
+}
