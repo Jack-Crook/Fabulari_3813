@@ -1,18 +1,4 @@
-body {
-  margin: 0;
-  padding: 0;
-}
 
-.logo-container {
-  position: absolute; /* Keeps it strictly in place */
-  top: 10px;          /* Distance from top edge */
-  left: 10px;         /* Distance from left edge */
-}
-
-.logo-container img {
-  height: 50px;       /* Set your logo size */
-  width: auto;
-}
 
 .page {
   background: #F7F8FA;
@@ -33,11 +19,69 @@ body {
 .brand {
   display: block;
   margin: 0 auto 12px;
-  height: 48px;
+  height: 100px;
   width: auto;
   max-width: 100%;
 }
 
 .card h2 {
   text-align: center;
+  margin: 28px 0 48px;
+  font-family: 'Fraunces Variable', Georgia, serif;
+  font-weight: 700;
+  font-variation-settings: 'SOFT' 100, 'WONK' 0, 'opsz' 72;
+  color: #1A1D23;
 }
+
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+button {
+  margin-top: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 12px;
+  border: none;
+  border-radius: 6px;
+  background: #0b68db;
+  color: #FFFFFF;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+button:hover {
+  background: #0A56B5;
+}
+
+
+input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid #E2E4E9;
+  border-radius: 6px;
+  font-size: 16px;
+  font-family: inherit;
+  color: #1A1D23;
+  background: #FFFFFF;
+}
+
+label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #6B7280;
+}
+
