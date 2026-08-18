@@ -1,23 +1,34 @@
-<h1>Register</h1>
+<div class="page">
+  <div class="card">
+    <img class="brand" src="/fabulari-logo.png" alt="Fabulari">
+    <h2>Create Account</h2>
 
-<!-- ngSubmit fires onSubmit() in register.ts when the form is submitted -->
-<form (ngSubmit)="onSubmit()">
-  <label for="email">Email</label>
-  <!-- [(ngModel)] keeps this input in sync with the email property on the Register class -->
-  <input id="email" name="email" type="email" [(ngModel)]="email" required />
+    <!-- ngSubmit fires onSubmit() in register.ts when the form is submitted -->
+    <form (ngSubmit)="onSubmit()">
+      <div class="field">
+        <label for="email">Email</label>
+        <!-- [(ngModel)] keeps this input in sync with the email property on the Register class -->
+        <input id="email" name="email" type="email" [(ngModel)]="email" required />
+      </div>
 
-  <label for="password">Password</label>
-  <input id="password" name="password" type="password" [(ngModel)]="password" required />
+      <div class="field">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" [(ngModel)]="password" required />
+      </div>
 
-  <button type="submit">Register</button>
-</form>
+      <button type="submit">Register</button>
+    </form>
 
-<!-- only shown when errorMessage is a non-empty string -->
-@if (errorMessage) {
-  <p class="error">{{ errorMessage }}</p>
-}
+    <!-- only shown when errorMessage is a non-empty string -->
+    @if (errorMessage) {
+      <p class="error">{{ errorMessage }}</p>
+    }
 
-<!-- only shown when successMessage is a non-empty string -->
-@if (successMessage) {
-  <p class="success">{{ successMessage }}</p>
-}
+    <!-- only shown when successMessage is a non-empty string -->
+    @if (successMessage) {
+      <p class="success">{{ successMessage }}</p>
+    }
+
+    <p class="switch">Already have an account? <a routerLink="/login">Log in</a></p>
+  </div>
+</div>
