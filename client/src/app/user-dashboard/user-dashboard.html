@@ -1,3 +1,25 @@
 <app-navbar></app-navbar>
-<h1>User Dashboard</h1>
-<p>You made it here after login.</p>
+<div class="dashboard-body">
+  <section class="my-groups">
+    <h2>MY GROUPS</h2>
+    <div class="group-row">
+      <div class="group-swatch" style="background:#5FA8D3"></div>
+      <div>
+        <p class="group-name">Book Club</p>
+        <p class="group-desc">Fantasy readers book club...</p>
+      </div>
+    </div>
+    <!-- repeat group-row for each group -->
+  </section>
+
+  <section class="discover">
+    <h2>Discover</h2>
+    <input type="text" placeholder="Search" class="discover-search">
+    <div class="discover-row">
+      <div class="group-swatch" style="background:#D9534F"></div>
+      <div class="discover-desc"></div>
+      <button>Request</button>
+    </div>
+    <!-- repeat discover-row for each group -->
+  </section>
+</div>

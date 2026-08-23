@@ -1,0 +1,23 @@
+
+.dashboard-body {
+  display: flex;
+}
+
+.my-groups, .discover {
+  flex: 1;
+  padding: 24px;
+}
+
+.group-row, .discover-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid #E2E4E9;
+}
+
+.group-swatch {
+  width: 80px;
+  height: 80px;
+  flex-shrink: 0;
+}
