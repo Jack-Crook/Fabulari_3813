@@ -1,8 +1,9 @@
 import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';       // lets the html use [(ngModel)] on the inputs
-import { RouterLink } from '@angular/router';        // lets the html use routerLink
+import { RouterLink, Router } from '@angular/router';        // lets the html use routerLink
 import { HttpErrorResponse } from '@angular/common/http'; // the type of error http requests give back
 import { Auth } from '../auth';                      // the service that actually talks to the backend
+
 
 @Component({
   selector: 'app-login',
@@ -11,8 +12,8 @@ import { Auth } from '../auth';                      // the service that actuall
   styleUrl: './login.css',
 })
 export class Login {
-  private auth = inject(Auth); // grabs the Auth service so this component can use it
-//stores email or password typed in
+  private auth = inject(Auth); // grabs the Auth service so this component can use it //stores email or password typed in
+  private router = inject(Router);
   email = '';           
   password = '';        
   errormessage = '';    // text shown on screen if login fails
@@ -26,11 +27,13 @@ export class Login {
       next: () => {
         // this runs if the backend says login worked
         this.successmessage = 'Logged in successfully.';
+        setTimeout(() => this.router.navigateByUrl('/user-dashboard'), 1000);
       },
       error: (err: HttpErrorResponse) => {
         // this runs if the backend says login failed (wrong password etc)
         this.errormessage = err.error?.error ?? 'Something went wrong, please try again.';
       },
+
     });
   }
 }
