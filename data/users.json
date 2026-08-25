@@ -1,10 +1,12 @@
 [
   {
     "email": "test@test.com",
-    "password": "pw123"
+    "password": "pw123",
+    "role": "super"
   },
   {
     "email": "jack@123",
-    "password": "dfdsdfdssdf"
+    "password": "dfdsdfdssdf",
+    "role": "user"
   }
 ]

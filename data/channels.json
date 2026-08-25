@@ -1,0 +1,6 @@
+[
+  { "id": "c1", "groupId": "g1", "name": "General" },
+  { "id": "c2", "groupId": "g1", "name": "Current Read" },
+  { "id": "c3", "groupId": "g2", "name": "General" },
+  { "id": "c4", "groupId": "g3", "name": "General" }
+]

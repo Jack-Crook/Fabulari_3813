@@ -1,0 +1,29 @@
+[
+  {
+    "id": "g1",
+    "name": "Book Club",
+    "description": "Fantasy readers book club",
+    "ageLimit": 0,
+    "theme": "#5FA8D3",
+    "adminEmails": ["test@test.com"],
+    "memberEmails": ["test@test.com", "jack@123"]
+  },
+  {
+    "id": "g2",
+    "name": "Robotics",
+    "description": "Building things that move",
+    "ageLimit": 16,
+    "theme": "#7FDBC4",
+    "adminEmails": ["jack@123"],
+    "memberEmails": ["jack@123"]
+  },
+  {
+    "id": "g3",
+    "name": "Film Club",
+    "description": "Weekly movie discussion",
+    "ageLimit": 18,
+    "theme": "#7B3FF2",
+    "adminEmails": ["test@test.com"],
+    "memberEmails": ["test@test.com"]
+  }
+]
