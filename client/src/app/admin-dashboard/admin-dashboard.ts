@@ -1,5 +1,7 @@
-import { Component } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { Navbar } from '../navbar/navbar';
+import { GroupService, Group } from '../group';
 
 @Component({
   selector: 'app-admin-dashboard',
@@ -8,25 +10,31 @@ import { Navbar } from '../navbar/navbar';
   styleUrl: './admin-dashboard.css',
 })
 export class AdminDashboard {
-  // all mock data for now. phase 1 allows mock data, so this is here to get the layout
-  // matching the wireframe before it's swapped for real calls to /groups and /channels.
-  group = {
-    name: 'Book Club',
-    ageLimit: 16,
-  };
+  private groupService = inject(GroupService);
+  private route = inject(ActivatedRoute);
 
-  // joinDate and lastLogin aren't stored on a user yet, they're only here because the
-  // wireframe shows those columns. they need adding to the user shape before this is real.
-  members = [
-    { name: 'test@test.com', role: 'Admin',  joinDate: '12/07/2026', lastLogin: '25/08/2026' },
-    { name: 'jack@123',      role: 'Member', joinDate: '14/07/2026', lastLogin: '24/08/2026' },
-    { name: 'hello@hello.com', role: 'Member', joinDate: '20/08/2026', lastLogin: '25/08/2026' },
-  ];
+  group = signal<Group | undefined>(undefined);   // the group whose id is in the url
 
-  // users asking to join this group. the group admin approves or rejects them.
+  // join requests aren't stored anywhere, there's no requests endpoint yet, so these stay mock
   joinRequests = [
     { email: 'newperson@example.com' },
     { email: 'someone@example.com' },
     { email: 'third@example.com' },
   ];
+
+  constructor() {
+    // subscribed rather than read once, so switching between two groups you admin reloads
+    this.route.paramMap.subscribe(params => {
+      const groupId = params.get('groupId') ?? '';
+
+      this.groupService.getGroups().subscribe(groups => {
+        this.group.set(groups.find(g => g.id === groupId));
+      });
+    });
+  }
+
+  // admins are just the members whose email is in adminEmails, there's no role stored per member
+  roleOf(email: string) {
+    return this.group()?.adminEmails.includes(email) ? 'Admin' : 'Member';
+  }
 }

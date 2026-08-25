@@ -14,7 +14,7 @@ export const routes: Routes = [
   { path: '', redirectTo: 'login', pathMatch: 'full' }, // nothing at the root, so send people to the login page
   {path: 'user-dashboard', component: UserDashboard},
   {path: 'profile', component: Profile},
-  {path: 'admin-dashboard', component: AdminDashboard},
+  {path: 'admin-dashboard/:groupId', component: AdminDashboard},
   {path: 'super-admin-dashboard', component: SuperAdminDashboard},
   {path: 'groups/:id', component: GroupView},                                  // :id is the group being opened
   {path: 'groups/:groupId/channels/:channelId', component: ChatRoom}           // one room inside that group

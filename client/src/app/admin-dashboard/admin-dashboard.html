@@ -8,31 +8,29 @@
 
     <!-- the two pills from the wireframe. read only for now, editing them is a later step -->
     <div class="settings-row">
-      <div class="setting-pill">Name: {{ group.name }}</div>
-      <div class="setting-pill">Age Limit: {{ group.ageLimit }}</div>
+      <div class="setting-pill">Name: {{ group()?.name }}</div>
+      <div class="setting-pill">Age Limit: {{ group()?.ageLimit }}</div>
+
     </div>
 
     <h2>Members</h2>
     <table class="members-table">
-      <thead>
+        <thead>
         <tr>
-          <th>Name</th>
+          <th>Email</th>
           <th>Role</th>
-          <th>Join Date</th>
-          <th>Last Login</th>
         </tr>
       </thead>
       <tbody>
-        <!-- @for is angular's built in loop, it doesn't need importing like *ngFor did -->
-        @for (member of members; track member.name) {
+        <!-- members are stored as emails on the group, so that's what the table lists -->
+        @for (email of group()?.memberEmails ?? []; track email) {
           <tr>
-            <td>{{ member.name }}</td>
-            <td>{{ member.role }}</td>
-            <td>{{ member.joinDate }}</td>
-            <td>{{ member.lastLogin }}</td>
+            <td>{{ email }}</td>
+            <td>{{ roleOf(email) }}</td>
           </tr>
         }
       </tbody>
+
     </table>
   </section>
 

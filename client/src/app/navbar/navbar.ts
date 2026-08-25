@@ -21,7 +21,8 @@ export class Navbar {
   private me = this.auth.getUser()?.email ?? '';
 
   private groups = signal<Group[]>([]);      // every group, fetched once
-  private currentGroupId = signal('');       // the group in the url, empty when we aren't on a group page
+  // not private, the template reads it to build the group admin link
+  currentGroupId = signal('');               // the group in the url, empty when we aren't on a group page
 
 
   // computed works out its own value from other signals, and re-runs whenever any of them
@@ -50,10 +51,13 @@ export class Navbar {
   }
 
 
-  // urls are /groups/g1 or /groups/g1/channels/c2, so the group id is the third segment
+  // urls are /groups/g1, /groups/g1/channels/c2 or /admin-dashboard/g1, so in all of them
+  // the group id is the third segment. admin-dashboard is included so the link stays visible
+  // and highlighted once you're actually on the admin page.
   private readGroupFromUrl() {
     const segments = this.router.url.split('/');
-    this.currentGroupId.set(segments[1] === 'groups' ? (segments[2] ?? '') : '');
+    const onAGroupPage = segments[1] === 'groups' || segments[1] === 'admin-dashboard';
+    this.currentGroupId.set(onAGroupPage ? (segments[2] ?? '') : '');
   }
 
 
