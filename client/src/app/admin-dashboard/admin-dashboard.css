@@ -1,0 +1,118 @@
+.admin-body {
+  display: flex;              /* two columns side by side, same idea as the user dashboard */
+  align-items: flex-start;
+  min-height: calc(100vh - 74px);   /* fills what's left of the screen under the navbar */
+  background: #FAFAFA;
+}
+
+.admin-main {
+  flex: 2;                    /* the members table gets twice the width of the requests panel */
+  padding: 24px;
+}
+
+.admin-side {
+  flex: 1;
+  padding: 24px;
+  border-left: 1px solid #E2E4E9;   /* splits the two columns, like the divider in the wireframe */
+  align-self: stretch;
+}
+
+h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0 0 16px;
+}
+
+.admin-main h2 + h2,
+.admin-main .settings-row + h2 {
+  margin-top: 32px;           /* space above the Members heading so it isn't jammed under the pills */
+}
+
+/* group settings pills */
+
+.settings-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;            /* the pills drop onto a second line instead of overflowing on a narrow screen */
+}
+
+.setting-pill {
+  background: #FFFFFF;
+  border: 1px solid #E2E4E9;
+  border-radius: 6px;
+  padding: 10px 16px;
+  font-size: 14px;
+}
+
+/* members table */
+
+.members-table {
+  width: 100%;
+  border-collapse: collapse;  /* stops each cell drawing its own separate border */
+  background: #FFFFFF;
+  border: 1px solid #E2E4E9;
+  border-radius: 6px;
+  overflow: hidden;           /* keeps the header's square corners inside the rounded table */
+}
+
+.members-table th {
+  background: #5FA8D3;        /* the blue header row from the wireframe */
+  color: #1A1D23;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  padding: 12px 16px;
+}
+
+.members-table td {
+  padding: 12px 16px;
+  font-size: 14px;
+  border-top: 1px solid #E2E4E9;
+}
+
+/* join requests */
+
+.request-row {
+  background: #FFFFFF;
+  border: 1px solid #E2E4E9;
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+
+.request-email {
+  font-size: 14px;
+  word-break: break-all;      /* long emails wrap instead of pushing the panel wider */
+}
+
+.request-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* the global button style in styles.css is a full width blue block, which is wrong here,
+   so both buttons get reset back to something that fits in a small panel */
+.request-actions button {
+  width: auto;
+  min-height: 0;
+  margin: 0;
+  flex: 1;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.request-actions .reject {
+  background: #FFFFFF;
+  color: #6B7280;
+  border: 1px solid #E2E4E9;
+}
+
+.request-actions .reject:hover {
+  background: #F3F4F6;
+}
+
+.empty {
+  font-size: 14px;
+  color: #6B7280;
+}

@@ -1,1 +1,60 @@
-<p>admin-dashboard works!</p>
+<app-navbar></app-navbar>
+
+<div class="admin-body">
+
+  <!-- left hand column, everything about the group this admin runs -->
+  <section class="admin-main">
+    <h2>Group Settings</h2>
+
+    <!-- the two pills from the wireframe. read only for now, editing them is a later step -->
+    <div class="settings-row">
+      <div class="setting-pill">Name: {{ group.name }}</div>
+      <div class="setting-pill">Age Limit: {{ group.ageLimit }}</div>
+    </div>
+
+    <h2>Members</h2>
+    <table class="members-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Role</th>
+          <th>Join Date</th>
+          <th>Last Login</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- @for is angular's built in loop, it doesn't need importing like *ngFor did -->
+        @for (member of members; track member.name) {
+          <tr>
+            <td>{{ member.name }}</td>
+            <td>{{ member.role }}</td>
+            <td>{{ member.joinDate }}</td>
+            <td>{{ member.lastLogin }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </section>
+
+  <!-- right hand column, people waiting to be let into the group -->
+  <aside class="admin-side">
+    <h2>Join Requests</h2>
+
+    @for (request of joinRequests; track request.email) {
+      <div class="request-row">
+        <span class="request-email">{{ request.email }}</span>
+        <!-- buttons don't do anything yet, the approve/reject endpoints aren't built -->
+        <div class="request-actions">
+          <button type="button" class="approve">Approve</button>
+          <button type="button" class="reject">Reject</button>
+        </div>
+      </div>
+    }
+
+    <!-- @empty runs when the list has nothing in it, so the panel isn't just blank -->
+    @if (joinRequests.length === 0) {
+      <p class="empty">No pending requests.</p>
+    }
+  </aside>
+
+</div>
