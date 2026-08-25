@@ -110,3 +110,22 @@ label {
 .switch a:hover {
   text-decoration: underline;
 }
+
+
+/* phones and narrow windows. the desktop layout above is the default, this reduces it */
+@media (max-width: 768px) {
+  .page {
+    align-items: flex-start;    /* stop centering vertically, the form should start at the top */
+    padding: 16px;
+  }
+
+  .card {
+    width: 100%;                /* 400px is wider than a phone screen, which caused sideways scrolling */
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .brand {
+    height: 90px;               /* 150px logo takes up too much of a small screen */
+  }
+}

@@ -92,3 +92,16 @@
   font-size: 14px;
   color: #6B7280;
 }
+
+
+@media (max-width: 768px) {
+  .group-body {
+    flex-direction: column;
+  }
+
+  .group-sidebar {
+    width: auto;                /* the fixed 240px sidebar eats most of a phone screen */
+    border-right: none;
+    border-bottom: 1px solid #E2E4E9;   /* the divider moves to the bottom now they're stacked */
+  }
+}

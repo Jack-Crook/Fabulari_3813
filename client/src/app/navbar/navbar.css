@@ -49,3 +49,13 @@
   background: none;     /* the global :hover turns it dark blue, which we don't want here */
   color: #3B5BFF;
 }
+
+
+
+@media (max-width: 768px) {
+  .nav-links {
+    gap: 12px;
+    flex-wrap: wrap;            /* links drop onto a second line instead of squashing together */
+    justify-content: flex-end;
+  }
+}

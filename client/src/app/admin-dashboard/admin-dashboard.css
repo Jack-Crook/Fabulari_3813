@@ -116,3 +116,21 @@ h2 {
   font-size: 14px;
   color: #6B7280;
 }
+
+
+
+@media (max-width: 768px) {
+  .admin-body {
+    flex-direction: column;
+  }
+
+  .admin-side {
+    border-left: none;
+    border-top: 1px solid #E2E4E9;      /* divider moves to the top now the panels are stacked */
+  }
+
+  .members-table th, .members-table td {
+    padding: 8px 10px;
+    font-size: 13px;                    /* four columns are tight, so the cells shrink to fit */
+  }
+}

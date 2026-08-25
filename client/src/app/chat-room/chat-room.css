@@ -135,3 +135,18 @@
   color: #1A1D23;
   opacity: 0.7;
 }
+
+
+
+@media (max-width: 768px) {
+  /* three columns don't fit on a phone, so the messages get the whole width.
+     the room list is still reachable through the group view. */
+  .rooms-sidebar, .presence-sidebar {
+    display: none;
+  }
+
+  .messages, .composer {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
