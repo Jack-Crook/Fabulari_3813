@@ -8,5 +8,10 @@
     "email": "jack@123",
     "password": "dfdsdfdssdf",
     "role": "user"
+  },
+  {
+    "email": "hello@hello.com",
+    "password": "pw123",
+    "role": "user"
   }
 ]
