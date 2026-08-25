@@ -3,8 +3,9 @@
   <section class="my-groups">
     <h2>MY GROUPS</h2>
 
-    <!-- clicking a group opens its room list -->
-    @for (group of myGroups; track group.id) {
+    <!-- a signal is read by calling it, so it's myGroups() and not myGroups -->
+    @for (group of myGroups(); track group.id) {
+      <!-- clicking a group opens its room list -->
       <a class="group-row" [routerLink]="['/groups', group.id]">
         <div class="group-swatch" [style.background]="group.theme"></div>
         <div>
@@ -14,7 +15,7 @@
       </a>
     }
 
-    @if (myGroups.length === 0) {
+    @if (myGroups().length === 0) {
       <p class="group-desc">You aren't in any groups yet. Find one in Discover.</p>
     }
   </section>
@@ -24,7 +25,7 @@
     <input type="text" placeholder="Search" class="discover-search">
 
     <!-- groups the user isn't in yet. requesting to join isn't built, that endpoint doesn't exist -->
-    @for (group of discover; track group.id) {
+    @for (group of discover(); track group.id) {
       <div class="discover-row">
         <div class="group-swatch" [style.background]="group.theme"></div>
         <div class="discover-desc">
@@ -35,7 +36,7 @@
       </div>
     }
 
-    @if (discover.length === 0) {
+    @if (discover().length === 0) {
       <p class="group-desc">No other groups to join right now.</p>
     }
   </section>

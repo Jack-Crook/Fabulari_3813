@@ -25,14 +25,14 @@
 
 
     <!-- shows this only if there's an error message -->
-    @if (errormessage) {
-      <p class="error">{{ errormessage }}</p>
-    }
+    @if (errormessage()) {
+  <p class="error">{{ errormessage() }}</p>
+}
 
-    <!-- shows this only if login worked -->
-    @if (successmessage) {
-      <p class="success">{{ successmessage }}</p>
-    }
+@if (successmessage()) {
+  <p class="success">{{ successmessage() }}</p>
+}
+
 
     <p class="switch">Don't have an account? <a routerLink="/register">Register</a></p>
   </div>

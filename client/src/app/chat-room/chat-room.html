@@ -6,16 +6,17 @@
   <aside class="rooms-sidebar">
     <h2>Rooms</h2>
 
-    @for (item of channels; track item.id) {
+    <!-- signals are read by calling them, so channels() and channel() -->
+    @for (item of channels(); track item.id) {
       <a class="room-link"
-         [class.selected]="item.id === channel?.id"
-         [routerLink]="['/groups', group?.id, 'channels', item.id]">
+         [class.selected]="item.id === channel()?.id"
+         [routerLink]="['/groups', group()?.id, 'channels', item.id]">
         {{ item.name }}
       </a>
     }
 
     <!-- back out to the group's room list -->
-    <a class="back-link" [routerLink]="['/groups', group?.id]">Back to group</a>
+    <a class="back-link" [routerLink]="['/groups', group()?.id]">Back to group</a>
   </aside>
 
   <!-- middle, the conversation itself -->
@@ -37,7 +38,7 @@
 
     <!-- the input bar. it doesn't send anything yet, sending needs socket.io in phase 2 -->
     <div class="composer">
-      <input type="text" placeholder="Message {{ channel?.name }}" />
+      <input type="text" placeholder="Message {{ channel()?.name }}" />
     </div>
   </section>
 

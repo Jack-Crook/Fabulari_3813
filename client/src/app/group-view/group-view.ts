@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';   // ActivatedRoute = details about the url that opened this component
 import { Navbar } from '../navbar/navbar';
 import { GroupService, Group, Channel } from '../group';
@@ -13,9 +13,11 @@ export class GroupView {
   private groupService = inject(GroupService);
   private route = inject(ActivatedRoute);
 
-  groups: Group[] = [];       // every group, used for the sidebar down the left
-  group?: Group;              // just the one whose id is in the url, shown in the banner
-  channels: Channel[] = [];   // the rooms inside that group
+  // signals, because this app is zoneless. angular only knows to redraw when a signal changes,
+  // so setting a plain property inside a subscribe would leave the page showing nothing.
+  groups = signal<Group[]>([]);            // every group, used for the sidebar down the left
+  group = signal<Group | undefined>(undefined);   // just the one whose id is in the url, shown in the banner
+  channels = signal<Channel[]>([]);        // the rooms inside that group
 
   constructor() {
     // paramMap is subscribed to rather than read once, because clicking a different group in
@@ -28,12 +30,12 @@ export class GroupView {
 
   private loadGroup(groupId: string) {
     this.groupService.getGroups().subscribe(groups => {   // fill the sidebar, and pick out the one being viewed
-      this.groups = groups;
-      this.group = groups.find(g => g.id === groupId);
+      this.groups.set(groups);
+      this.group.set(groups.find(g => g.id === groupId));
     });
 
     this.groupService.getChannels(groupId).subscribe(channels => {
-      this.channels = channels;
+      this.channels.set(channels);
     });
   }
 }

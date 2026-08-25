@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Auth } from '../auth';
@@ -17,21 +17,25 @@ export class Register {
 
   email = '';
   password = '';
-  errorMessage = '';    // shown in the template when the request fails
-  successMessage = '';  // shown in the template when the request succeeds
+  
+  // signals, not plain strings. the app is zoneless so angular only redraws when a signal changes,
+  // and these get set inside the subscribe below, which is after the submit event has finished.
+  errormessage = signal('');    // text shown on screen if login fails
+  successmessage = signal('');  // text shown on screen if login works
+
 
   onSubmit() {              // called when the register form is submitted
-    this.errorMessage = ''; // clear any message from a previous attempt
-    this.successMessage = '';
+    this.errormessage.set(''); // clear any message from a previous attempt
+    this.successmessage.set('');
 
     this.auth.register(this.email, this.password).subscribe({ // send email+password to the backend
       next: () => {                     // runs if the backend responds with success
-        this.successMessage = 'Registered successfully. You can now log in.';
+        this.successmessage.set('Registered successfully. You can now log in.');
         this.email = '';    // clear the form
         this.password = '';
       },
       error: (err: HttpErrorResponse) => {         // err.error is the JSON body the Express route sent, e.g. { error: 'Email is already registered' }
-        this.errorMessage = err.error?.error ?? 'Something went wrong, please try again.';
+        this.errormessage.set(err.error?.error ?? 'Something went wrong, please try again.');
       },
     });
   }

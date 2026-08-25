@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';       // lets the html use [(ngModel)] on the inputs
 import { RouterLink, Router } from '@angular/router';        // lets the html use routerLink
 import { HttpErrorResponse } from '@angular/common/http'; // the type of error http requests give back
@@ -16,19 +16,23 @@ export class Login {
   private router = inject(Router);
   email = '';           
   password = '';        
-  errormessage = '';    // text shown on screen if login fails
-  successmessage = '';  // text shown on screen if login works
+
+  // signals, not plain strings. the app is zoneless so angular only redraws when a signal changes,
+  // and these get set inside the subscribe below, which is after the submit event has finished.
+  errormessage = signal('');    // text shown on screen if login fails
+  successmessage = signal('');  // text shown on screen if login works
+
 
   onSubmit() {                // runs when the login form is submitted
-    this.errormessage = '';   // clear old messages first
-    this.successmessage = '';
+    this.errormessage.set('');   // clear old messages first
+    this.successmessage.set('');
 
     this.auth.login(this.email, this.password).subscribe({ // send email+password to the backend
             next: (res: LoginResponse) => {
 
         // this runs if the backend says login worked
         this.auth.saveUser(res.email, res.role);      // remember who logged in before leaving this page
-        this.successmessage = 'Logged in successfully.';
+        this.successmessage.set('Logged in successfully.');
 
 
         // the super admin gets their own dashboard, everyone else starts on the normal user one
@@ -37,9 +41,9 @@ export class Login {
       },
 
       error: (err: HttpErrorResponse) => {
-        
+
         // this runs if the backend says login failed (wrong password etc)
-        this.errormessage = err.error?.error ?? 'Something went wrong, please try again.';
+        this.errormessage.set(err.error?.error ?? 'Something went wrong, please try again.');
       },
 
     });

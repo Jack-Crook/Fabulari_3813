@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Navbar } from '../navbar/navbar';
 import { Auth } from '../auth';
@@ -15,9 +15,11 @@ export class ChatRoom {
   private route = inject(ActivatedRoute);
   private auth = inject(Auth);
 
-  group?: Group;
-  channels: Channel[] = [];       // every room in this group, listed down the left
-  channel?: Channel;              // the room actually open
+  // signals because the app is zoneless, same reason as the dashboard and group view
+  group = signal<Group | undefined>(undefined);
+  channels = signal<Channel[]>([]);                 // every room in this group, listed down the left
+  channel = signal<Channel | undefined>(undefined); // the room actually open
+
   me = this.auth.getUser()?.email ?? '';   // used to work out which messages are mine
 
   // messages aren't stored anywhere yet, there's no /messages endpoint and no socket.io.
@@ -40,18 +42,18 @@ export class ChatRoom {
       const channelId = params.get('channelId') ?? '';
 
       this.groupService.getGroups().subscribe(groups => {
-        this.group = groups.find(g => g.id === groupId);
+        this.group.set(groups.find(g => g.id === groupId));
       });
 
       this.groupService.getChannels(groupId).subscribe(channels => {
-        this.channels = channels;
-        this.channel = channels.find(c => c.id === channelId);
+        this.channels.set(channels);
+        this.channel.set(channels.find(c => c.id === channelId));
       });
     });
   }
 
   // group admins get an indicator next to their name in chat, the spec asks for this
   isAdmin(email: string) {
-    return this.group?.adminEmails.includes(email) ?? false;
+    return this.group()?.adminEmails.includes(email) ?? false;
   }
 }

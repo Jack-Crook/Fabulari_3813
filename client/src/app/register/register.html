@@ -20,13 +20,13 @@
     </form>
 
     <!-- only shown when errorMessage is a non-empty string -->
-    @if (errorMessage) {
-      <p class="error">{{ errorMessage }}</p>
+    @if (errormessage()) {
+      <p class="error">{{ errormessage() }}</p>
     }
 
     <!-- only shown when successMessage is a non-empty string -->
-    @if (successMessage) {
-      <p class="success">{{ successMessage }}</p>
+    @if (successmessage()) {
+      <p class="success">{{ successmessage() }}</p>
     }
 
     <p class="switch">Already have an account? <a routerLink="/login">Log in</a></p>
