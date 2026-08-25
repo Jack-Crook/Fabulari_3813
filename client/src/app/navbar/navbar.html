@@ -1,8 +1,10 @@
 <header class="navbar">
-  <img src="/fabulari-logo.png" alt="Fabulari logo" class="nav-logo">
+  <!-- the logo doubles as a way back to the dashboard, same as most sites -->
+  <a class="nav-logo-link" routerLink="/user-dashboard">
+    <img src="/fabulari-logo.png" alt="Fabulari logo" class="nav-logo">
+  </a>
     <ul class="nav-links">
     <li><a routerLink="/user-dashboard" routerLinkActive="active">Dashboard</a></li>
-    <li><a href="#Groups">My Groups</a></li>
     <li><a routerLink="/profile" routerLinkActive="active">Profile</a></li>   
     <li><button type="button" (click)="onLogout()">Logout</button></li>
   </ul>
