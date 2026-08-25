@@ -5,6 +5,11 @@
   </a>
     <ul class="nav-links">
     <li><a routerLink="/user-dashboard" routerLinkActive="active">Dashboard</a></li>
+    <!-- only shown when the group being viewed is one this user admins -->
+    @if (isGroupAdmin()) {
+      <li><a routerLink="/admin-dashboard" routerLinkActive="active">Group Admin</a></li>
+    }
+
     <li><a routerLink="/profile" routerLinkActive="active">Profile</a></li>   
     <li><button type="button" (click)="onLogout()">Logout</button></li>
   </ul>
