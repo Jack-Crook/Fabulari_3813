@@ -1,1 +1,34 @@
-<p>profile works!</p>
+<app-navbar></app-navbar>
+
+<div class="profile-page">
+  <div class="card">
+    <h2>Profile</h2>
+
+    <!-- avatar circle + name, same as the little user box on the dashboard wireframe -->
+    <div class="profile-top">
+      <div class="avatar"></div>
+      <p class="username">{{ username }}</p>
+    </div>
+
+    <!-- one row per bit of info -->
+    <div class="info-row">
+      <span class="info-label">Email</span>
+      <span class="info-value">{{ email }}</span>
+    </div>
+
+    <div class="info-row">
+      <span class="info-label">Role</span>
+      <span class="info-value">{{ role }}</span>
+    </div>
+
+    <div class="info-row">
+      <span class="info-label">Groups</span>
+      <span class="info-value">{{ groups }}</span>
+    </div>
+
+    <!-- doesn't do anything yet, just the wireframe button -->
+    <button type="button">Edit Profile</button>
+
+    <p class="switch"><a routerLink="/user-dashboard">Back to Dashboard</a></p>
+  </div>
+</div>

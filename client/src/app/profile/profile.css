@@ -1,0 +1,46 @@
+.profile-page {
+  background: #fafafa;
+  display: flex;
+  justify-content: center;
+  padding: 48px 16px;
+  min-height: calc(100vh - 74px);   /* fills the rest of the screen under the navbar */
+  box-sizing: border-box;
+}
+
+.profile-top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #5FA8D3;
+  flex-shrink: 0;
+}
+
+.username {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid #E2E4E9;
+}
+
+.info-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #6B7280;
+}
+
+.info-value {
+  font-size: 14px;
+}
