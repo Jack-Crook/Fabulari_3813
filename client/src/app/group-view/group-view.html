@@ -1,0 +1,46 @@
+<app-navbar></app-navbar>
+
+<div class="group-body">
+
+  <!-- every group the user can see, down the left. the one being viewed is outlined -->
+  <aside class="group-sidebar">
+    <h2>Groups</h2>
+
+    @for (item of groups; track item.id) {
+      <a class="group-tile"
+         [class.selected]="item.id === group?.id"
+         [style.background]="item.theme"
+         [routerLink]="['/groups', item.id]">
+        {{ item.name }}
+      </a>
+    }
+  </aside>
+
+  <section class="group-main">
+
+    <!-- banner across the top in the group's own theme colour -->
+    @if (group) {
+      <header class="group-banner" [style.background]="group.theme">
+        <h1>{{ group.name }}</h1>
+      </header>
+    }
+
+    <div class="rooms">
+      <h2>Rooms</h2>
+
+      @for (channel of channels; track channel.id) {
+        <!-- clicking a room opens the chat room view for it -->
+        <a class="room-row" [routerLink]="['/groups', group?.id, 'channels', channel.id]">
+          <span class="room-name">{{ channel.name }}</span>
+          <!-- there's no presence tracking yet, that needs socket.io in phase 2 -->
+          <span class="room-count">Currently in: 0</span>
+        </a>
+      }
+
+      @if (channels.length === 0) {
+        <p class="empty">This group has no rooms yet.</p>
+      }
+    </div>
+  </section>
+
+</div>

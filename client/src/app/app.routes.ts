@@ -5,6 +5,8 @@ import { UserDashboard } from './user-dashboard/user-dashboard';
 import { Profile } from './profile/profile';
 import { AdminDashboard } from './admin-dashboard/admin-dashboard';
 import { SuperAdminDashboard } from './super-admin-dashboard/super-admin-dashboard';
+import { GroupView } from './group-view/group-view';
+import { ChatRoom } from './chat-room/chat-room';
 
 export const routes: Routes = [
   { path: 'register', component: Register },      // localhost:4200/register -> Register component
@@ -13,6 +15,8 @@ export const routes: Routes = [
   {path: 'user-dashboard', component: UserDashboard},
   {path: 'profile', component: Profile},
   {path: 'admin-dashboard', component: AdminDashboard},
-  {path: 'super-admin-dashboard', component: SuperAdminDashboard}
+  {path: 'super-admin-dashboard', component: SuperAdminDashboard},
+  {path: 'groups/:id', component: GroupView},                                  // :id is the group being opened
+  {path: 'groups/:groupId/channels/:channelId', component: ChatRoom}           // one room inside that group
 
 ];

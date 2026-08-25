@@ -1,0 +1,57 @@
+import { Component, inject } from '@angular/core';
+import { ActivatedRoute, RouterLink } from '@angular/router';
+import { Navbar } from '../navbar/navbar';
+import { Auth } from '../auth';
+import { GroupService, Group, Channel } from '../group';
+
+@Component({
+  selector: 'app-chat-room',
+  imports: [Navbar, RouterLink],
+  templateUrl: './chat-room.html',
+  styleUrl: './chat-room.css',
+})
+export class ChatRoom {
+  private groupService = inject(GroupService);
+  private route = inject(ActivatedRoute);
+  private auth = inject(Auth);
+
+  group?: Group;
+  channels: Channel[] = [];       // every room in this group, listed down the left
+  channel?: Channel;              // the room actually open
+  me = this.auth.getUser()?.email ?? '';   // used to work out which messages are mine
+
+  // messages aren't stored anywhere yet, there's no /messages endpoint and no socket.io.
+  // these are hardcoded purely so the chat layout can be seen. real messages are phase 2.
+  messages = [
+    { sender: 'test@test.com', body: 'Has everyone finished chapter 4 yet?' },
+    { sender: 'jack@123',      body: 'Just started it last night, no spoilers please' },
+    { sender: 'test@test.com', body: 'No promises' },
+    { sender: 'hello@hello.com', body: 'I finished the whole book already sorry' },
+  ];
+
+  // who is currently in the room. socket.io gives a live list in phase 2, this is a placeholder
+  currentlyIn = ['test@test.com', 'jack@123'];
+
+  constructor() {
+    // subscribed rather than read once, because clicking another room in the sidebar reuses
+    // this component and only swaps the :channelId in the url
+    this.route.paramMap.subscribe(params => {
+      const groupId = params.get('groupId') ?? '';
+      const channelId = params.get('channelId') ?? '';
+
+      this.groupService.getGroups().subscribe(groups => {
+        this.group = groups.find(g => g.id === groupId);
+      });
+
+      this.groupService.getChannels(groupId).subscribe(channels => {
+        this.channels = channels;
+        this.channel = channels.find(c => c.id === channelId);
+      });
+    });
+  }
+
+  // group admins get an indicator next to their name in chat, the spec asks for this
+  isAdmin(email: string) {
+    return this.group?.adminEmails.includes(email) ?? false;
+  }
+}

@@ -21,3 +21,39 @@
   height: 80px;
   flex-shrink: 0;
 }
+/* the group rows are links now, so the anchor styling has to be undone */
+a.group-row {
+  text-decoration: none;
+  color: #1A1D23;
+}
+
+a.group-row:hover {
+  background: #F3F4F6;
+}
+
+.group-name {
+  margin: 0 0 4px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.group-desc {
+  margin: 0;
+  font-size: 13px;
+  color: #6B7280;
+}
+
+/* the global button style is a full width blue block, too big for a row like this */
+.discover-row button {
+  width: auto;
+  min-height: 0;
+  margin: 0;
+  flex-shrink: 0;
+  padding: 8px 16px;
+  font-size: 13px;
+}
+
+.discover-desc {
+  flex: 1;
+  min-width: 0;
+}

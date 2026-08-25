@@ -1,0 +1,137 @@
+.chat-body {
+  display: flex;
+  height: calc(100vh - 74px);   /* a fixed height, not a minimum, so the message area can scroll on its own */
+  background: #FAFAFA;
+}
+
+/* left and right sidebars */
+
+.rooms-sidebar,
+.presence-sidebar {
+  width: 200px;
+  flex-shrink: 0;
+  padding: 24px 16px;
+  overflow-y: auto;
+}
+
+.rooms-sidebar {
+  border-right: 1px solid #E2E4E9;
+}
+
+.presence-sidebar {
+  border-left: 1px solid #E2E4E9;
+}
+
+.rooms-sidebar h2,
+.presence-sidebar h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 16px;
+  text-align: center;
+}
+
+.room-link {
+  display: block;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  color: #1A1D23;
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.room-link:hover {
+  background: #F3F4F6;
+}
+
+.room-link.selected {
+  background: #E8EDFB;          /* the room you're already in is highlighted */
+  font-weight: 600;
+}
+
+.back-link {
+  display: block;
+  margin-top: 24px;
+  font-size: 13px;
+  color: #6B7280;
+  text-decoration: none;
+}
+
+.back-link:hover {
+  text-decoration: underline;
+}
+
+.person {
+  margin: 0 0 8px;
+  font-size: 14px;
+  text-align: center;
+  word-break: break-all;        /* long emails wrap rather than widening the panel */
+}
+
+/* middle column */
+
+.chat-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;       /* messages take the space left over, composer sits underneath */
+}
+
+.messages {
+  flex: 1;
+  overflow-y: auto;             /* only this part scrolls, the composer stays put */
+  padding: 24px;
+}
+
+.message {
+  max-width: 60%;
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: #FFFFFF;
+  border: 1px solid #E2E4E9;
+}
+
+.message.mine {
+  margin-left: auto;            /* auto left margin pushes my own messages over to the right */
+  background: #E8EDFB;
+}
+
+.message-sender {
+  margin: 0 0 4px;
+  font-size: 12px;
+  color: #6B7280;
+}
+
+.admin-tag {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #5FA8D3;
+  color: #1A1D23;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.message-body {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* the message box along the bottom */
+
+.composer {
+  padding: 16px 24px 24px;
+}
+
+.composer input {
+  border-radius: 999px;         /* the rounded blue bar from the wireframe */
+  border: none;
+  background: #5FA8D3;
+  padding: 14px 20px;
+}
+
+.composer input::placeholder {
+  color: #1A1D23;
+  opacity: 0.7;
+}

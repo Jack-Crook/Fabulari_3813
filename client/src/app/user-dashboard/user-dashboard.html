@@ -2,24 +2,41 @@
 <div class="dashboard-body">
   <section class="my-groups">
     <h2>MY GROUPS</h2>
-    <div class="group-row">
-      <div class="group-swatch" style="background:#5FA8D3"></div>
-      <div>
-        <p class="group-name">Book Club</p>
-        <p class="group-desc">6767.</p>
-      </div>
-    </div>
-    <!-- repeat group-row for each group -->
+
+    <!-- clicking a group opens its room list -->
+    @for (group of myGroups; track group.id) {
+      <a class="group-row" [routerLink]="['/groups', group.id]">
+        <div class="group-swatch" [style.background]="group.theme"></div>
+        <div>
+          <p class="group-name">{{ group.name }}</p>
+          <p class="group-desc">{{ group.description }}</p>
+        </div>
+      </a>
+    }
+
+    @if (myGroups.length === 0) {
+      <p class="group-desc">You aren't in any groups yet. Find one in Discover.</p>
+    }
   </section>
 
   <section class="discover">
     <h2>Discover</h2>
     <input type="text" placeholder="Search" class="discover-search">
-    <div class="discover-row">
-      <div class="group-swatch" style="background:#D9534F"></div>
-      <div class="discover-desc"></div>
-      <button>Request</button>
-    </div>
-    <!-- repeat discover-row for each group -->
+
+    <!-- groups the user isn't in yet. requesting to join isn't built, that endpoint doesn't exist -->
+    @for (group of discover; track group.id) {
+      <div class="discover-row">
+        <div class="group-swatch" [style.background]="group.theme"></div>
+        <div class="discover-desc">
+          <p class="group-name">{{ group.name }}</p>
+          <p class="group-desc">{{ group.description }}</p>
+        </div>
+        <button type="button">Request</button>
+      </div>
+    }
+
+    @if (discover.length === 0) {
+      <p class="group-desc">No other groups to join right now.</p>
+    }
   </section>
 </div>
