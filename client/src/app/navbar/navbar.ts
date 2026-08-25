@@ -1,6 +1,6 @@
-import { Component } from '@angular/core';
-import { RouterLink } from '@angular/router';
-import { RouterLinkActive } from '@angular/router';
+import { Component, inject } from '@angular/core';
+import { RouterLink, RouterLinkActive, Router } from '@angular/router';
+import { Auth } from '../auth';
 
 @Component({
   selector: 'app-navbar',
@@ -8,4 +8,14 @@ import { RouterLinkActive } from '@angular/router';
   templateUrl: './navbar.html',
   styleUrl: './navbar.css',
 })
-export class Navbar {}
+
+
+export class Navbar {
+  private auth = inject(Auth);
+  private router = inject(Router);
+
+  onLogout() {                          // runs when the logout button is clicked
+    this.auth.logout();                 // clear the stored user first
+    this.router.navigateByUrl('/login');// then send them back to the login page
+  }
+}

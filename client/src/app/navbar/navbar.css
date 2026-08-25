@@ -30,3 +30,22 @@
   color: #3B5BFF;
   font-weight: 600;
 }
+
+.nav-links button {
+  width: auto;          /* the global button style is full width, which would push the navbar apart */
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #1A1D23;       /* match the other nav links */
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.nav-links button:hover {
+  background: none;     /* the global :hover turns it dark blue, which we don't want here */
+  color: #3B5BFF;
+}
