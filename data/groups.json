@@ -6,7 +6,7 @@
     "ageLimit": 0,
     "theme": "#5FA8D3",
     "adminEmails": ["jack@123"],
-    "memberEmails": ["jack@123"]
+    "memberEmails": ["jack@123", "hello@hello.com"]
   },
   {
     "id": "g2",

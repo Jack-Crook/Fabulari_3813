@@ -24,15 +24,18 @@ export class ChatRoom {
 
   // messages aren't stored anywhere yet, there's no /messages endpoint and no socket.io.
   // these are hardcoded purely so the chat layout can be seen. real messages are phase 2.
+  // the senders are deliberately real members of Book Club — the super admin isn't used here,
+  // because they can't be a member of any group (server.js rejects it), so showing them
+  // chatting would contradict the role model.
   messages = [
-    { sender: 'test@test.com', body: 'Has everyone finished chapter 4 yet?' },
-    { sender: 'jack@123',      body: 'Just started it last night, no spoilers please' },
-    { sender: 'test@test.com', body: 'No promises' },
+    { sender: 'jack@123',        body: 'Has everyone finished chapter 4 yet?' },
+    { sender: 'hello@hello.com', body: 'Just started it last night, no spoilers please' },
+    { sender: 'jack@123',        body: 'No promises' },
     { sender: 'hello@hello.com', body: 'I finished the whole book already sorry' },
   ];
 
   // who is currently in the room. socket.io gives a live list in phase 2, this is a placeholder
-  currentlyIn = ['test@test.com', 'jack@123'];
+  currentlyIn = ['jack@123', 'hello@hello.com'];
 
   constructor() {
     // subscribed rather than read once, because clicking another room in the sidebar reuses

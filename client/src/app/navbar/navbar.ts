@@ -19,15 +19,15 @@ export class Navbar {
 
 
   private me = this.auth.getUser()?.email ?? '';
-  private myRole = this.auth.getUser()?.role ?? 'user';   // back to private, only isSuperAdmin needs to read it now
+
+  // not a computed like isGroupAdmin below, because it doesn't depend on which page you're on.
+  // super admin authority is system wide rather than tied to one group, so the link is always
+  // there for them, the same as Dashboard and Profile are for everyone.
+  isSuperAdmin = this.auth.getUser()?.role === 'super';
 
   private groups = signal<Group[]>([]);      // every group, fetched once
   // not private, the template reads it to build the group admin link
   currentGroupId = signal('');               // the group in the url, empty when we aren't on a group page
-
-  private onSuperAdminPage = signal(false);
-
-  isSuperAdmin = computed(() => this.myRole === 'super' && (!!this.currentGroupId() || this.onSuperAdminPage()));
 
 
   // computed works out its own value from other signals, and re-runs whenever any of them
@@ -62,7 +62,6 @@ export class Navbar {
     const segments = this.router.url.split('/');
     const onAGroupPage = segments[1] === 'groups' || segments[1] === 'admin-dashboard';
     this.currentGroupId.set(onAGroupPage ? (segments[2] ?? '') : '');
-    this.onSuperAdminPage.set(segments[1] === 'super-admin-dashboard');
   }
 
 

@@ -35,7 +35,9 @@ export class Login {
         this.successmessage.set('Logged in successfully.');
 
 
-        // the super admin gets their own dashboard, everyone else starts on the normal user one
+        // everyone lands on the same dashboard whatever their role, the navbar is what offers
+        // the super admin / group admin pages. the 1s delay lets the success message be read
+        // before the page changes.
         setTimeout(() => this.router.navigateByUrl('/user-dashboard'), 1000);
       },
 

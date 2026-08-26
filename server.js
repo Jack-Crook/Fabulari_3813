@@ -111,8 +111,11 @@ app.post('/groups', (req, res) => {     // creates a group
 
     const users = readData(usersPath);
     const creatorUser = users.find(u => u.email === creator);
-    if (creatorUser?.role === 'super') {
-        return res.status(409).json({ error: 'The super admin cannot create or admin a group' });
+        if (!creatorUser) {     // same rule as adding a member, a group can't be owned by an email that was never registered
+            return res.status(404).json({ error: 'User not found' });
+    }
+        if (creatorUser.role === 'super') {
+            return res.status(409).json({ error: 'The super admin cannot create or admin a group' });
     }
 
     const newGroup = {

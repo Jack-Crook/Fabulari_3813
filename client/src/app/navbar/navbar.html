@@ -9,10 +9,11 @@
     @if (isGroupAdmin()) {
       <li><a [routerLink]="['/admin-dashboard', currentGroupId()]" routerLinkActive="active">Group Admin</a></li>
     }
-    @if (isSuperAdmin()) {
+    <!-- a plain boolean, not a signal, so it isn't called like isGroupAdmin() above -->
+    @if (isSuperAdmin) {
       <li><a routerLink="/super-admin-dashboard" routerLinkActive="active">Super Admin</a></li>
-}
-    <li><a routerLink="/profile" routerLinkActive="active">Profile</a></li>   
+    }
+    <li><a routerLink="/profile" routerLinkActive="active">Profile</a></li>
     <li><button type="button" (click)="onLogout()">Logout</button></li>
   </ul>
 </header>
