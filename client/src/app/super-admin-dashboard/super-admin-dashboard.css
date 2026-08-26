@@ -61,6 +61,7 @@ h2 {
 
 /* members list scrolls instead of growing the panel, matches the scrollbar drawn in the wireframe */
 .scroll-list {
+  max-height: 260px;             /* without a height, overflow-y: auto has nothing to scroll — it just grows */
   overflow-y: auto;
   border: 1px solid #E2E4E9;
   border-radius: 6px;

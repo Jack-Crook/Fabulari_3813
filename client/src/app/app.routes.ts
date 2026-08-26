@@ -17,6 +17,7 @@ export const routes: Routes = [
   {path: 'admin-dashboard/:groupId', component: AdminDashboard},
   {path: 'super-admin-dashboard', component: SuperAdminDashboard},
   {path: 'groups/:id', component: GroupView},                                  // :id is the group being opened
-  {path: 'groups/:groupId/channels/:channelId', component: ChatRoom}           // one room inside that group
+  {path: 'groups/:groupId/channels/:channelId', component: ChatRoom},          // one room inside that group
 
+  { path: '**', redirectTo: 'login' }          // any unmatched url, e.g. a typo, otherwise renders a blank page — router-outlet has nothing to put there. must stay last, first match wins.
 ];

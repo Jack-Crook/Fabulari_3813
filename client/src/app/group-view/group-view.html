@@ -24,24 +24,29 @@
       <header class="group-banner" [style.background]="current.theme">
         <h1>{{ current.name }}</h1>
       </header>
+
+      <div class="rooms">
+        <h2>Rooms</h2>
+
+        @for (channel of channels(); track channel.id) {
+          <!-- clicking a room opens the chat room view for it -->
+          <a class="room-row" [routerLink]="['/groups', group()?.id, 'channels', channel.id]">
+            <span class="room-name">{{ channel.name }}</span>
+            <!-- there's no presence tracking yet, that needs socket.io in phase 2 -->
+            <span class="room-count">Currently in: 0</span>
+          </a>
+        }
+
+        @if (channels().length === 0) {
+          <p class="empty">This group has no rooms yet.</p>
+        }
+      </div>
+    } @else {
+      <!-- a bad/stale :id in the url — without this it silently looked the same as a real group with zero rooms -->
+      <div class="rooms">
+        <p class="empty">Group not found.</p>
+      </div>
     }
-
-    <div class="rooms">
-      <h2>Rooms</h2>
-
-      @for (channel of channels(); track channel.id) {
-        <!-- clicking a room opens the chat room view for it -->
-        <a class="room-row" [routerLink]="['/groups', group()?.id, 'channels', channel.id]">
-          <span class="room-name">{{ channel.name }}</span>
-          <!-- there's no presence tracking yet, that needs socket.io in phase 2 -->
-          <span class="room-count">Currently in: 0</span>
-        </a>
-      }
-
-      @if (channels().length === 0) {
-        <p class="empty">This group has no rooms yet.</p>
-      }
-    </div>
   </section>
 
 </div>
