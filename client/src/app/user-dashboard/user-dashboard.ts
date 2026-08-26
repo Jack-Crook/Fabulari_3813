@@ -15,6 +15,7 @@ export class UserDashboard {
   private auth = inject(Auth);
 
   private me = this.auth.getUser()?.email ?? '';   // whoever is logged in, used to split the two lists
+  isSuper = this.auth.getUser()?.role === 'super';   // the super admin can't be a member of any group (see server.js), so the member-split below doesn't apply to them
 
   // these are signals, not plain arrays. this app is zoneless (there's no zone.js), so angular only
   // rerenders when a signal changes. setting a normal property inside a subscribe would update the
@@ -24,6 +25,13 @@ export class UserDashboard {
 
   constructor() {
     this.groupService.getGroups().subscribe(groups => {
+      if (this.isSuper) {
+        // the super admin oversees every group, not just ones they've joined, so they see
+        // all of them here instead of a member/non-member split
+        this.myGroups.set(groups);
+        this.discover.set([]);
+        return;
+      }
       // one call to /groups fills both panels, the difference is just whether the
       // logged in user's email is in that group's member list
       this.myGroups.set(groups.filter(g => g.memberEmails.includes(this.me)));

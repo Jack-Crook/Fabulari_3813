@@ -1,7 +1,8 @@
 <app-navbar></app-navbar>
 <div class="dashboard-body">
   <section class="my-groups">
-    <h2>MY GROUPS</h2>
+    <!-- the super admin isn't a member of anything, they oversee every group instead -->
+    <h2>{{ isSuper ? 'ALL GROUPS' : 'MY GROUPS' }}</h2>
 
     <!-- a signal is read by calling it, so it's myGroups() and not myGroups -->
     @for (group of myGroups(); track group.id) {
@@ -20,24 +21,27 @@
     }
   </section>
 
-  <section class="discover">
-    <h2>Discover</h2>
-    <input type="text" placeholder="Search" class="discover-search">
+  <!-- nothing to discover/request as the super admin, they can already see everything above -->
+  @if (!isSuper) {
+    <section class="discover">
+      <h2>Discover</h2>
+      <input type="text" placeholder="Search" class="discover-search">
 
-    <!-- groups the user isn't in yet. requesting to join isn't built, that endpoint doesn't exist -->
-    @for (group of discover(); track group.id) {
-      <div class="discover-row">
-        <div class="group-swatch" [style.background]="group.theme"></div>
-        <div class="discover-desc">
-          <p class="group-name">{{ group.name }}</p>
-          <p class="group-desc">{{ group.description }}</p>
+      <!-- groups the user isn't in yet. requesting to join isn't built, that endpoint doesn't exist -->
+      @for (group of discover(); track group.id) {
+        <div class="discover-row">
+          <div class="group-swatch" [style.background]="group.theme"></div>
+          <div class="discover-desc">
+            <p class="group-name">{{ group.name }}</p>
+            <p class="group-desc">{{ group.description }}</p>
+          </div>
+          <button type="button">Request</button>
         </div>
-        <button type="button">Request</button>
-      </div>
-    }
+      }
 
-    @if (discover().length === 0) {
-      <p class="group-desc">No other groups to join right now.</p>
-    }
-  </section>
+      @if (discover().length === 0) {
+        <p class="group-desc">No other groups to join right now.</p>
+      }
+    </section>
+  }
 </div>
