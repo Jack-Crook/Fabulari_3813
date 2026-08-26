@@ -1,1 +1,67 @@
-<p>super-admin-dashboard works!</p>
+<app-navbar></app-navbar>
+
+<div class="super-admin-body">
+
+  <section class="panel">
+    <h2>Pending Requests</h2>
+    @for (request of pendingRequests; track $index) {
+      <div class="request-row">
+        <span class="request-detail">{{ request.detail }} - requested by admin {{ request.requestedBy }}</span>
+        <div class="request-actions">
+          <button type="button" class="approve">Approve</button>
+          <button type="button" class="reject">Reject</button>
+        </div>
+      </div>
+    }
+    @if (pendingRequests.length === 0) {
+      <p class="empty">No pending requests.</p>
+    }
+  </section>
+
+  <section class="panel">
+    <h2>Members</h2>
+    <div class="scroll-list">
+      @for (member of members; track member.email) {
+        <div class="member-row">{{ member.email }}</div>
+      }
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Permanently Banned</h2>
+    <table class="data-table">
+      <thead>
+        <tr><th>Email</th><th>Reason</th><th>Ban date</th></tr>
+      </thead>
+      <tbody>
+        @for (user of bannedUsers; track user.email) {
+          <tr>
+            <td>{{ user.email }}</td>
+            <td>{{ user.reason }}</td>
+            <td>{{ user.bannedAt }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </section>
+
+  <section class="panel">
+    <h2>Audit Log</h2>
+    <table class="data-table">
+      <thead>
+        <tr><th>Date</th><th>Type</th><th>Actor</th><th>Detail</th></tr>
+      </thead>
+      <tbody>
+        @for (entry of auditLog; track $index) {
+          <tr>
+            <td>{{ entry.date }}</td>
+            <td>{{ entry.type }}</td>
+            <td>{{ entry.actor }}</td>
+            <td>{{ entry.detail }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </section>
+
+</div>

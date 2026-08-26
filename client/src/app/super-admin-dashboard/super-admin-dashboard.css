@@ -1,0 +1,109 @@
+.super-admin-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;   /* the four-quadrant layout from the wireframe */
+  gap: 24px;
+  padding: 24px;
+  min-height: calc(100vh - 74px);
+  background: #FAFAFA;
+}
+
+h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0 0 16px;
+}
+
+/* pending requests — same row/button pattern as admin-dashboard's join requests */
+.request-row {
+  background: #FFFFFF;
+  border: 1px solid #E2E4E9;
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.request-detail {
+  font-size: 14px;
+}
+
+.request-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.request-actions button {
+  width: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.request-actions .reject {
+  background: #FFFFFF;
+  color: #6B7280;
+  border: 1px solid #E2E4E9;
+}
+
+.request-actions .reject:hover {
+  background: #F3F4F6;
+}
+
+.empty {
+  font-size: 14px;
+  color: #6B7280;
+}
+
+/* members list scrolls instead of growing the panel, matches the scrollbar drawn in the wireframe */
+.scroll-list {
+  overflow-y: auto;
+  border: 1px solid #E2E4E9;
+  border-radius: 6px;
+  background: #FFFFFF;
+}
+
+.member-row {
+  padding: 12px 16px;
+  font-size: 14px;
+  border-bottom: 1px solid #E2E4E9;
+}
+
+.member-row:last-child {
+  border-bottom: none;
+}
+
+/* shared table style for banned list + audit log, same pattern as admin-dashboard's members-table */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #FFFFFF;
+  border: 1px solid #E2E4E9;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.data-table th {
+  background: #5FA8D3;
+  color: #1A1D23;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  padding: 12px 16px;
+}
+
+.data-table td {
+  padding: 12px 16px;
+  font-size: 14px;
+  border-top: 1px solid #E2E4E9;
+}
+
+@media (max-width: 768px) {
+  .super-admin-body {
+    grid-template-columns: 1fr;
+  }
+}
