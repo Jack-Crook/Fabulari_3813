@@ -20,11 +20,14 @@
   width: 80px;
   height: 80px;
   flex-shrink: 0;
+  border-radius: 8px;      /* softens the flat colour block a little */
 }
 /* the group rows are links now, so the anchor styling has to be undone */
 a.group-row {
   text-decoration: none;
   color: #1A1D23;
+  border-radius: 6px;
+  transition: background-color 0.15s;
 }
 
 a.group-row:hover {

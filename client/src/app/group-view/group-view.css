@@ -28,6 +28,12 @@
   color: #1A1D23;
   text-decoration: none;
   font-weight: 600;
+  transition: filter 0.15s;
+}
+
+/* was missing entirely — every other clickable row in the app has a hover state, this one didn't */
+.group-tile:hover {
+  filter: brightness(0.95);         /* darkens whatever theme colour the tile already has, rather than a fixed overlay colour that would look wrong against every theme */
 }
 
 .group-tile.selected {
@@ -76,6 +82,7 @@
   color: #FFFFFF;
   text-decoration: none;
   font-weight: 500;
+  transition: background-color 0.15s;
 }
 
 .room-row:hover {

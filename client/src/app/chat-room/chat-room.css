@@ -38,6 +38,7 @@
   color: #1A1D23;
   text-decoration: none;
   font-size: 14px;
+  transition: background-color 0.15s;
 }
 
 .room-link:hover {

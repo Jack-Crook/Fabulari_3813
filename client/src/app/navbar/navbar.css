@@ -20,6 +20,7 @@
   text-decoration: none;
   color: #1A1D23;
   font-weight: 500;
+  transition: color 0.15s;
 }
 
 .nav-links a:hover {
