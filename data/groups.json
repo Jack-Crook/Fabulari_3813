@@ -5,8 +5,8 @@
     "description": "Fantasy readers book club",
     "ageLimit": 0,
     "theme": "#5FA8D3",
-    "adminEmails": ["test@test.com"],
-    "memberEmails": ["test@test.com", "jack@123"]
+    "adminEmails": ["jack@123"],
+    "memberEmails": ["jack@123"]
   },
   {
     "id": "g2",
@@ -23,7 +23,7 @@
     "description": "Weekly movie discussion",
     "ageLimit": 18,
     "theme": "#7B3FF2",
-    "adminEmails": ["test@test.com"],
-    "memberEmails": ["test@test.com"]
+    "adminEmails": ["jack@123"],
+    "memberEmails": ["jack@123"]
   }
 ]

@@ -36,8 +36,7 @@ export class Login {
 
 
         // the super admin gets their own dashboard, everyone else starts on the normal user one
-        const target = res.role === 'super' ? '/super-admin-dashboard' : '/user-dashboard';
-        setTimeout(() => this.router.navigateByUrl(target), 1000);
+        setTimeout(() => this.router.navigateByUrl('/user-dashboard'), 1000);
       },
 
       error: (err: HttpErrorResponse) => {

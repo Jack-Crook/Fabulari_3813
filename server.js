@@ -109,6 +109,12 @@ app.post('/groups', (req, res) => {     // creates a group
 
     const creator = normaliseEmail(creatorEmail);
 
+    const users = readData(usersPath);
+    const creatorUser = users.find(u => u.email === creator);
+    if (creatorUser?.role === 'super') {
+        return res.status(409).json({ error: 'The super admin cannot create or admin a group' });
+    }
+
     const newGroup = {
         id: makeId('g'),
         name: name.trim(),
@@ -132,7 +138,8 @@ app.post('/groups/:id/members', (req, res) => {     // assigns an existing user 
     }
 
     const users = readData(usersPath);
-        if (!users.find(u => u.email === email)) {      // don't let a group hold an email that was never registered
+    const user = users.find(u => u.email === email);          // was: if (!users.find(...))
+        if (!user) {                        // don't let a group hold an email that was never registered
             return res.status(404).json({ error: 'User not found' });
     }
 
@@ -142,10 +149,14 @@ app.post('/groups/:id/members', (req, res) => {     // assigns an existing user 
             return res.status(404).json({ error: 'Group not found' });
     }
 
+    if (user.role === 'super') {                              
+        return res.status(409).json({ error: 'The super admin cannot be added to a group' });
+    }
         if (group.memberEmails.includes(email)) {
             return res.status(409).json({ error: 'User is already in this group' });
     }
 
+    
     group.memberEmails.push(email);     // group is a reference into the groups array, so pushing here changes the array that gets written below
     writeData(groupsPath, groups);
     res.status(200).json(group);
