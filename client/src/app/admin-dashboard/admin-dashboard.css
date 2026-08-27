@@ -23,9 +23,15 @@ h2 {
   margin: 0 0 16px;
 }
 
-.admin-main h2 + h2,
-.admin-main .settings-row + h2 {
-  margin-top: 32px;           /* space above the Members heading so it isn't jammed under the pills */
+/* space above each section heading so it isn't jammed under whatever came before it.
+   was a pair of sibling selectors, but there are three sections in this column now and the
+   thing before a heading isn't always the same element. */
+.admin-main h2 {
+  margin-top: 32px;
+}
+
+.admin-main h2:first-child {
+  margin-top: 0;              /* except the very first one, which already has the panel padding */
 }
 
 /* group settings pills */
@@ -42,6 +48,47 @@ h2 {
   border-radius: 6px;
   padding: 10px 16px;
   font-size: 14px;
+}
+
+/* rooms */
+
+/* the global form rule stacks fields in a column, but this one is a single input plus a
+   button, so it reads better on one line */
+.add-room {
+  flex-direction: row;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.add-room input {
+  flex: 1;
+  min-width: 0;               /* lets the input shrink instead of pushing the button off the row */
+}
+
+.add-room button {
+  width: auto;
+  min-height: 0;
+  margin: 0;
+  flex-shrink: 0;
+  padding: 8px 16px;
+  font-size: 13px;
+}
+
+.room-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: #FFFFFF;
+  border: 1px solid #E2E4E9;
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin-bottom: 8px;
+}
+
+.room-name {
+  font-size: 14px;
+  font-weight: 500;
 }
 
 /* members table */
@@ -68,6 +115,23 @@ h2 {
   padding: 12px 16px;
   font-size: 14px;
   border-top: 1px solid #E2E4E9;
+}
+
+/* destructive actions, deleting a room and removing a member. outlined rather than solid so
+   they don't compete with the blue primary buttons for attention. */
+.danger {
+  width: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 6px 12px;
+  font-size: 13px;
+  background: #FFFFFF;
+  color: #B91C1C;
+  border: 1px solid #E2E4E9;
+}
+
+.danger:hover {
+  background: #FEF2F2;
 }
 
 /* join requests */
@@ -117,6 +181,25 @@ h2 {
   color: #6B7280;
 }
 
+/* feedback bar, same pattern as the user dashboard */
+
+.banner {
+  margin: 0;
+  padding: 12px 24px;
+  font-size: 14px;
+  border-bottom: 1px solid #E2E4E9;
+}
+
+.banner.error {
+  background: #FEF2F2;
+  color: #B91C1C;
+}
+
+.banner.success {
+  background: #F0FDF4;
+  color: #15803D;
+}
+
 
 
 @media (max-width: 768px) {
@@ -132,5 +215,9 @@ h2 {
   .members-table th, .members-table td {
     padding: 8px 10px;
     font-size: 13px;                    /* four columns are tight, so the cells shrink to fit */
+  }
+
+  .banner {
+    padding: 12px 16px;
   }
 }

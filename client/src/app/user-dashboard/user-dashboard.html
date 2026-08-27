@@ -1,8 +1,55 @@
 <app-navbar></app-navbar>
+
+<!-- one message bar for the whole page, so creating a group and joining one both report
+     back in the same place instead of each panel having its own -->
+@if (formError()) {
+  <p class="banner error">{{ formError() }}</p>
+}
+@if (formSuccess()) {
+  <p class="banner success">{{ formSuccess() }}</p>
+}
+
 <div class="dashboard-body">
   <section class="my-groups">
-    <!-- the super admin isn't a member of anything, they oversee every group instead -->
-    <h2>{{ isSuper ? 'ALL GROUPS' : 'MY GROUPS' }}</h2>
+    <div class="section-head">
+      <!-- the super admin isn't a member of anything, they oversee every group instead -->
+      <h2>{{ isSuper ? 'ALL GROUPS' : 'MY GROUPS' }}</h2>
+
+      <!-- server.js rejects a group whose creator is the super admin, so they don't get the button -->
+      @if (!isSuper) {
+        <button type="button" class="new-group" (click)="toggleForm()">
+          {{ showForm() ? 'Cancel' : 'New Group' }}
+        </button>
+      }
+    </div>
+
+    @if (showForm()) {
+      <!-- creating a group makes you its first admin, which is why there's no approval step here -->
+      <form class="create-group" (ngSubmit)="onCreateGroup()">
+        <div class="field">
+          <label for="new-name">Group name</label>
+          <input id="new-name" name="new-name" type="text" [(ngModel)]="newName" required />
+        </div>
+
+        <div class="field">
+          <label for="new-description">Description</label>
+          <input id="new-description" name="new-description" type="text" [(ngModel)]="newDescription" />
+        </div>
+
+        <div class="field">
+          <label for="new-age">Age limit (0 for no limit)</label>
+          <input id="new-age" name="new-age" type="number" min="0" [(ngModel)]="newAgeLimit" />
+        </div>
+
+        <div class="field">
+          <label for="new-theme">Theme colour</label>
+          <!-- a colour picker because theme is a hex string, and it carries into this group's rooms -->
+          <input id="new-theme" name="new-theme" type="color" [(ngModel)]="newTheme" />
+        </div>
+
+        <button type="submit">Create Group</button>
+      </form>
+    }
 
     <!-- a signal is read by calling it, so it's myGroups() and not myGroups -->
     @for (group of myGroups(); track group.id) {
@@ -21,13 +68,14 @@
     }
   </section>
 
-  <!-- nothing to discover/request as the super admin, they can already see everything above -->
+  <!-- nothing to discover as the super admin, they can already see everything above -->
   @if (!isSuper) {
     <section class="discover">
       <h2>Discover</h2>
       <input type="text" placeholder="Search" class="discover-search">
 
-      <!-- groups the user isn't in yet. requesting to join isn't built, that endpoint doesn't exist -->
+      <!-- groups the user isn't in yet. joining is direct rather than a request, because the
+           spec only puts an age check on it, and there's no age field on a user in phase 1 -->
       @for (group of discover(); track group.id) {
         <div class="discover-row">
           <div class="group-swatch" [style.background]="group.theme"></div>
@@ -35,7 +83,7 @@
             <p class="group-name">{{ group.name }}</p>
             <p class="group-desc">{{ group.description }}</p>
           </div>
-          <button type="button">Request</button>
+          <button type="button" (click)="onJoin(group)">Join</button>
         </div>
       }
 

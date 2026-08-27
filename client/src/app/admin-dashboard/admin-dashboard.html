@@ -1,5 +1,13 @@
 <app-navbar></app-navbar>
 
+<!-- one message bar for every action on this page, same idea as the user dashboard -->
+@if (actionError()) {
+  <p class="banner error">{{ actionError() }}</p>
+}
+@if (actionSuccess()) {
+  <p class="banner success">{{ actionSuccess() }}</p>
+}
+
 <div class="admin-body">
 
   <!-- left hand column, everything about the group this admin runs -->
@@ -13,12 +21,35 @@
 
     </div>
 
+    <h2>Rooms</h2>
+
+    <!-- adding a room posts to /channels, the same records the group view reads back.
+         the server rejects a duplicate name inside this group with a 409. -->
+    <form class="add-room" (ngSubmit)="onAddRoom()">
+      <input id="new-room" name="new-room" type="text" placeholder="New room name"
+             [(ngModel)]="newRoomName" required />
+      <button type="submit">Add Room</button>
+    </form>
+
+    <!-- signals are read by calling them, hence channels() -->
+    @for (channel of channels(); track channel.id) {
+      <div class="room-row">
+        <span class="room-name">{{ channel.name }}</span>
+        <button type="button" class="danger" (click)="onDeleteRoom(channel)">Delete</button>
+      </div>
+    }
+
+    @if (channels().length === 0) {
+      <p class="empty">This group has no rooms yet.</p>
+    }
+
     <h2>Members</h2>
     <table class="members-table">
         <thead>
         <tr>
           <th>Email</th>
           <th>Role</th>
+          <th>Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -27,6 +58,11 @@
           <tr>
             <td>{{ email }}</td>
             <td>{{ roleOf(email) }}</td>
+            <td>
+              <!-- removes them from this group only, the account still exists. trying this on
+                   the last remaining admin comes back as a 409 and shows in the bar up top. -->
+              <button type="button" class="danger" (click)="onRemoveMember(email)">Remove</button>
+            </td>
           </tr>
         }
       </tbody>

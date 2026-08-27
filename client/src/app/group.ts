@@ -31,4 +31,31 @@ export class GroupService {
   getChannels(groupId: string) {    // GET /channels?groupId=g1, just the rooms inside one group
     return this.http.get<Channel[]>(`${this.apiUrl}/channels`, { params: { groupId } });
   }
+
+  // POST /groups. the server puts creatorEmail into both adminEmails and memberEmails, so
+  // whoever fills in the form becomes that group's first admin, which is what the spec asks for.
+  createGroup(name: string, description: string, ageLimit: number, theme: string, creatorEmail: string) {
+    return this.http.post<Group>(`${this.apiUrl}/groups`, { name, description, ageLimit, theme, creatorEmail });
+  }
+
+  // POST /groups/:id/members, assigns an already registered user to an existing group
+  joinGroup(groupId: string, email: string) {
+    return this.http.post<Group>(`${this.apiUrl}/groups/${groupId}/members`, { email });
+  }
+
+  // DELETE /groups/:id/members/:email. this is the group level removal, the account itself
+  // still exists. the server answers 409 if removing them would leave the group with no admin.
+  // the email is encoded because it goes in the url rather than the body, and characters like
+  // + and # would otherwise change what the path means.
+  removeMember(groupId: string, email: string) {
+    return this.http.delete<Group>(`${this.apiUrl}/groups/${groupId}/members/${encodeURIComponent(email)}`);
+  }
+
+  createChannel(groupId: string, name: string) {    // POST /channels, a new room inside a group
+    return this.http.post<Channel>(`${this.apiUrl}/channels`, { groupId, name });
+  }
+
+  deleteChannel(channelId: string) {                // DELETE /channels/:id
+    return this.http.delete<{ message: string }>(`${this.apiUrl}/channels/${channelId}`);
+  }
 }
