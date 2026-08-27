@@ -49,10 +49,10 @@ Specification Update documents.
 | Feature | Requirement |
 |---|---|
 | Super admin | Exactly one exists only. |
-| Group admin | A group must always have at least one. A group can have several. |
-| Promotion | A group admin can promote any existing member of that group to admin. |
+| Group admin | A group must always have at least one, but can have several. |
+| Promotion | A group admin can promote any member of that group to admin. |
 | Demotion | A group admin can demote another admin, only if at least one admin remains. |
-| Stepping down | An admin can demote themself under the same rule — another admin must remain. |
+| Stepping down | An admin can demote themself, as long as atleast one other remains. |
 | Admin scope | There is no limit on how many groups one user can be a group admin of. |
 | Contacting super admin | Regular users cannot contact the super admin directly. |
 | Super admin limits | Only actions requests. Cannot create groups directly, cannot approve a request they raised, cannot ban a user without a prior report. |
@@ -104,7 +104,7 @@ Specification Update documents.
 - **An age limit of `0`** means the group has no age restriction.
 - **Passwords are stored in plain text** in the JSON file for Phase 1. This is not acceptable
   for a real system; hashing belongs with the move to MongoDB in Phase 2.
-  - **Users have no age field yet**, so the age limit is stored but not enforced in Phase 1.
+- **Users have no age field yet**, so the age limit is stored but not enforced in Phase 1.
   Collecting date of birth will be done for phase 2.
 
 
@@ -178,17 +178,6 @@ hand in `users.json` rather than through `/register`.
 
 Channels reference their group with `groupId` rather than groups holding a nested array of
 channels. Keeping it flat makes channels easier to query on their own.
-
-### Planned structures — Phase 2
-
-Defined here but not implemented in Phase 1:
-
-| Structure | Fields | Purpose |
-|---|---|---|
-| `Request` | `id`, `type` (group creation / group deletion / channel creation / ban), `raisedBy`, `groupId`, `payload`, `status` (pending / approved / rejected), `reason`, `createdAt` | Backs the request and approval flows. `reason` is required on rejection. |
-| `AuditLogEntry` | `id`, `type`, `actorEmail`, `targetEmail`, `groupId`, `detail`, `createdAt` | The super admin's filterable, date-ordered audit log. |
-| `Message` | `id`, `channelId`, `senderEmail`, `body`, `imageUrl`, `sentAt` | Chat messages, text and images, delivered over socket.io. |
-| `BannedEmail` | `email`, `bannedAt`, `reason`, `requestId` | System-wide bans are permanent and the email can never be reused, so banned emails outlive the deleted account and are checked at registration. |
 
 ## 5. Angular Architecture
 
@@ -286,15 +275,13 @@ runs on port 4200, so `cors()` is enabled to allow requests across the two origi
 
 Validation is enforced by these routes: a group can never lose its last admin, an unregistered
 email cannot be added to a group, a channel cannot exist without a real group, group names are
-unique system-wide, channel names are unique within their group, super admins can neither create nor be added to one, since they only action requests.
+unique system-wide, channel names are unique within their group, super admins can neither create or be added to a group.
 
 ## 7. Design Docs
 
-Wireframes were drawn in  Freeform on iPad, exported as images, and
-committed to the `design/` folder.
-
-The seven  cover login, user dashboard, group and channel view, chat room,
- group admin panel, the super admin panel as well as the moobile views for the login page and dashboard.
+Wireframes were drawn in Freeform on iPad, exported as images, and
+committed to the `design/` folder. They cover login, user dashboard, group and channel view, chat room,
+ group admin panel, the super admin panel as well as the mobile views for the login page and dashboard.
 
 
 
@@ -306,8 +293,7 @@ are reused at both sizes rather than building separate mobile screens:
 
 - **Login and register** are a fixed 400px card centred on the page at desktop width. On mobile
   the card goes full width with 24px padding and the shadow and border are dropped.
-- **The user dashboard** is My Groups and Discover side by side using flexbox at desktop width.
-  Below the breakpoint the two panels stack vertically, My Groups first.
+- **The user dashboard** is My Groups and Discover side by side using flexbox at desktop width. For mobile they stack one on top of the other
 - **The navbar** keeps the logo on the left and the links on the right at desktop width.
 - **Touch targets** are at least 44px high, which is why the buttons and inputs share a minimum
   height in the global stylesheet.
