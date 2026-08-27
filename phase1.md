@@ -26,6 +26,11 @@ could make major changes without breaking the working version of the project.
 
 Each branch was merged back into `main` once the feature works, so `main` always holds the working version and so that the history shows the order things were actually built in.
 
+There were over 20 branches used for this assignmet, mostly one per feature or component added/fixed, which were merged back into main once it was functional. All of these branches were under feature, except one: group_channel_endpoints.
+
+There was a stale branch bug. I checked out feature/login-auth, which branched weeks earlier, before auth.ts existed. Work was started on it, and ng build failed with: Cannot find module '../auth'. It was not a typo, the file  wasn't on that branch. It was fixed by committing the in-progress work, then merging main
+
+
 ## 3. Functional Requirements
 
 Requirements come from the assignment spec, the client briefing, and the numbered
@@ -60,7 +65,7 @@ Specification Update documents.
 | Creation | A user requests a group from the super admin, supplying title, description, age limit and colour theme up front. On approval the requesting user becomes the group's first admin. |
 | Editing | A group admin can change name, description, theme colour and age limit at any time, with no request needed. |
 | Deletion | The group admin requests deletion from the super admin. A group admin cannot delete their own group directly. |
-| Disbanding | A group left without a working admin (last admin leaves, nobody to promote) is deleted the same way — via a request to the super admin. |
+| Disbanding | A group left without a working admin (last admin leaves, nobody to promote) is deleted the same way Via a request to the super admin. |
 | Age limit | Set at group level and applies to every channel in that group. Channels do not get their own limit. |
 | Raising the age limit | Existing members below the new threshold are automatically removed. |
 | Joining | Users can see every group regardless of age, but are auto-rejected if they try to join one they don't meet the age requirement for. |
@@ -93,17 +98,15 @@ Specification Update documents.
 
 
 - **Group admin is a relationship, not a role on the user.** A user's `role` field is only
-  `user` or `super`. Whether someone is a group admin is derived from whether their email
-  appears in that group's `adminEmails`. This is because the spec allows a user to admin any
-  number of groups while remaining an ordinary member of others, which a single role string on
-  the user cannot express.
+  `user` or `super`. 
 - **Email is normalised** to lowercase and trimmed everywhere before being compared or stored,
   since the spec makes email the unique identifier.
 - **An age limit of `0`** means the group has no age restriction.
-- **Users have no age field yet**, so the age limit is stored but not enforced in Phase 1.
-  Collecting date of birth at registration is Phase 2 work.
 - **Passwords are stored in plain text** in the JSON file for Phase 1. This is not acceptable
   for a real system; hashing belongs with the move to MongoDB in Phase 2.
+  - **Users have no age field yet**, so the age limit is stored but not enforced in Phase 1.
+  Collecting date of birth will be done for phase 2.
+
 
 ## 4. Data Structures
 
@@ -121,13 +124,13 @@ Data is stored in JSON files under `data/` on the server with one file per type.
 
 | Field | Type | Notes |
 |---|---|---|
-| `email` | string | Unique identifier for the account. Trimmed and lowercased. Cannot be changed by the user. |
-| `password` | string | Plain text in for Phase 1, hashed in Phase 2. |
-| `role` | string | `user` or `super`. Everyone who self-registers gets `user`. |
+| `email` | string | Unique identifier for the account. Cannot be changed by the user. |
+| `password` | string | Plain text for Phase 1, will be hashed in Phase 2. |
+| `role` | string | `user` or `super`. Everyone who registers gets `user`. |
 
-There is deliberately no `group-admin` value. Because the spec allows a user to admin several
+There is deliberately no `group-admin` value. Because a user can be an admin for several
 groups while being an ordinary member of others, group-admin status is held on the **group**
-rather than the user — see the assumption in §3.
+rather than the user.
 
 Since exactly one super admin must always exist and no one can create that account, it is set by
 hand in `users.json` rather than through `/register`.
@@ -148,7 +151,7 @@ hand in `users.json` rather than through `/register`.
 
 | Field | Type | Notes |
 |---|---|---|
-| `id` | string | Generated as a prefix plus a timestamp. Replaced by MongoDB's `_id` in Phase 2. |
+| `id` | string | Generated as a prefix plus a timestamp|
 | `name` | string | Unique across all groups, compared case-insensitively. |
 | `description` | string | Shown on the dashboard and in Discover. |
 | `ageLimit` | number | Applies to every channel in the group. `0` means no limit. |
@@ -156,8 +159,6 @@ hand in `users.json` rather than through `/register`.
 | `adminEmails` | string[] | Must never be empty. The creator is added on creation. |
 | `memberEmails` | string[] | Includes the admins. |
 
-Members are stored as **emails rather than ids** because the spec makes email the unique
-identifier for a user, and users have no separate id field.
 
 ### Channel — `data/channels.json`
 
@@ -173,11 +174,10 @@ identifier for a user, and users have no separate id field.
 |---|---|---|
 | `id` | string | Same generation scheme as groups. |
 | `groupId` | string | The group this channel belongs to. |
-| `name` | string | Unique within its group, but the same name may repeat across different groups — this is why every group can have its own "General". |
+| `name` | string | Unique within its group |
 
 Channels reference their group with `groupId` rather than groups holding a nested array of
-channels. Keeping it flat makes channels easier to query on their own and matches how it will be
-modelled as a separate collection in Phase 2.
+channels. Keeping it flat makes channels easier to query on their own.
 
 ### Planned structures — Phase 2
 
@@ -192,29 +192,54 @@ Defined here but not implemented in Phase 1:
 
 ## 5. Angular Architecture
 
-The client is a standalone-component Angular app in `client/`, with no NgModules. Routing is
-configured in `app.routes.ts` and the matched component renders into the `<router-outlet>` in
-`app.html`.
+The client is a standalone-component Angular app in `client/`, with no NgModules. Every
+component declares its own `imports` array, routing is configured in `app.routes.ts`, and the matched component renders into the `<router-outlet>` in `app.html`.
+
+Change detection is driven by signals rather than by patched async APIs. Any value set inside a `subscribe` callback is held in a `signal()` and is read in the template by calling it. Values bound with `[(ngModel)]` stay as plain properties, because a DOM event already schedules a redraw.
+
 
 ### Components
 
-| Component | Selector | Purpose | Status |
-|---|---|---|---|
-| `App` | `app-root` | Root shell holding the `<router-outlet>`. | Done |
-| `Navbar` | `app-navbar` | Persistent top bar with logo and navigation. Uses `routerLink` and `routerLinkActive` so the current page is highlighted. | Done |
-| `Login` | `app-login` | Email and password form, posts to the API and routes onward on success. | Done |
-| `Register` | `app-register` | Self-registration form. | Done |
-| `UserDashboard` | `app-user-dashboard` | My Groups list plus the Discover panel with search and request buttons. | Layout done, static data |
-| `Profile` | `app-profile` | The signed-in user's details. | Layout done, static data |
-| `AdminDashboard` | `app-admin-dashboard` | Group admin view — members, banned users, rooms, and incoming channel requests for the groups they run. | 
+| Component | Selector | Purpose |
+|---|---|---|
+| `App` | `app-root` | Root shell holding the `<router-outlet>`. |
+| `Navbar` | `app-navbar` | Persistent top bar. Uses `routerLink` and `routerLinkActive` to highlight the current page. The Group Admin link is a `computed` that reads the group id out of the URL, so it only appears on a group this user admins. |
+| `Login` | `app-login` | Email and password form. Saves the session and redirects on success. |
+| `Register` | `app-register` | Self-registration form. |
+| `UserDashboard` | `app-user-dashboard` | My Groups and Discover, both filled from one `GET /groups` call. Creates a group and joins one. |
+| `Profile` | `app-profile` | The signed-in user's details, read from the stored session. Edit Profile is not wired. |
+| `GroupView` | `app-group-view` | Group sidebar, banner in the group's theme colour, and its room list. |
+| `ChatRoom` | `app-chat-room` | Room sidebar, conversation, presence list, and the group-admin indicator on a sender. Messages are mock until socket.io. |
+| `AdminDashboard` | `app-admin-dashboard` | Group admin view for the group in the URL: settings, rooms, and the member list with a Remove action. Join Requests is mock. |
+| `SuperAdminDashboard` | `app-super-admin-dashboard` | Pending requests, all members, permanently banned accounts, and the audit log. All four panels are mock. |
+
+
+Mock data is used for the features were the endpoints are unimplimented.
 
 
 ### Services
 
-| Service | Purpose | Status |
+| Service | Purpose | 
+|---|---|
+| `Auth` (`auth.ts`) | Wraps `HttpClient` calls to `/register` and `/login`, and owns the session. `saveUser()`, `getUser()` and `logout()` against `localStorage`. Injected with `inject()` rather than a constructor parameter. |
+| `GroupService` (`group.ts`) | Every groups and channels call: `getGroups`, `getChannels`, `createGroup`, `joinGroup`, `removeMember`, `createChannel`, `deleteChannel`. | 
+
+There are two services because they own differant things. `Auth` owns who is signed in,
+`GroupService` owns the group and channel data. Both are `@Service()` classes injected with `inject(HttpClient)`, so the API's base URL is written down in one place per concern instead of being repeated in every component.
+
+### Models
+
+Interfaces rather than classes, since they only describe the shape of JSON crossing the wire.
+
+| Model | File | Fields |
 |---|---|---|
-| `Auth` | Wraps `HttpClient` calls to `/register` and `/login`. Injected with `inject()` rather than a constructor parameter. | Done |
-| `Auth` (session) | Saving the signed-in user to `localStorage`, reading it back, and clearing it on logout. |
+| `Group` | `group.ts` | `id`, `name`, `description`, `ageLimit`, `theme`, `adminEmails[]`, `memberEmails[]` |
+| `Channel` | `group.ts` | `id`, `groupId`, `name` |
+| `LoginResponse` | `auth.ts` | `message`, `email`, `role` |
+| `StoredUser` | `auth.ts` | `email`, `role` |
+
+
+
 
 ### Routes
 
@@ -223,12 +248,21 @@ configured in `app.routes.ts` and the matched component renders into the `<route
 | `''` | — | Redirects to `login`. |
 | `login` | `Login` | |
 | `register` | `Register` | |
-| `user-dashboard` | `UserDashboard` | |
+| `user-dashboard` | `UserDashboard` | Where every role lands after logging in. |
 | `profile` | `Profile` | |
-| `admin-dashboard` | `AdminDashboard` | 
-| `super-admin-dashboard` | `SuperAdminDashboard` | 
+| `groups/:id` | `GroupView` | `:id` is the group being opened. |
+| `groups/:groupId/channels/:channelId` | `ChatRoom` | One room inside that group. |
+| `admin-dashboard/:groupId` | `AdminDashboard` | Parameterised because a user can admin any number of groups, so the page has to know which one. |
+| `super-admin-dashboard` | `SuperAdminDashboard` | |
+| `**` | — | Redirects to `login`. Must stay last, first match wins. |
 
-Phase 2 adds `groups/:id` and `groups/:id/channels/:channelId`, both behind a route guard.
+The routes above are everything implimented for Phase 1. For phase 2, group and channel editing,
+admin promotion and demotion, the request and approval flow, the audit log, profile editing,
+system-wide bans, and image upload will all be added.
+
+
+
+
 
 ## 6. Server Endpoints
 
@@ -250,58 +284,31 @@ runs on port 4200, so `cors()` is enabled to allow requests across the two origi
 | POST | `/channels` | Create a channel inside an existing group. |
 | DELETE | `/channels/:id` | Delete a channel. |
 
-Validation enforced by these routes: a group can never lose its last admin, an unregistered
+Validation is enforced by these routes: a group can never lose its last admin, an unregistered
 email cannot be added to a group, a channel cannot exist without a real group, group names are
-unique system-wide, and channel names are unique within their group.
-
-### Defined but not implemented
-
-
-| Method | Route | Purpose |
-|---|---|---|
-| PUT | `/groups/:id` | Group admin edits name, description, theme or age limit. Raising the age limit removes members below it. |
-| POST | `/groups/:id/admins` | Promote an existing member to group admin. |
-| DELETE | `/groups/:id/admins/:email` | Demote an admin, refused if they are the last one. |
-| PUT | `/channels/:id` | Rename or edit a channel. |
-| GET | `/requests` | List requests, filtered by the requester or by the group being administered. |
-| POST | `/requests` | Raise a request — group creation, group deletion, channel creation, or a ban report. |
-| PUT | `/requests/:id` | Approve or reject. A rejection must carry a reason. |
-| GET | `/audit` | Super admin's audit log, filterable by type, in date order. |
-| DELETE | `/users/:email` | Super admin permanently bans an account. Requires an approved request, and a replacement group admin if the user admins any group. |
-| GET | `/users/:email` | Profile details for the signed-in user. |
-| PUT | `/users/:email` | Edit profile. Every field except email. |
-| POST | `/upload` | Image upload for chat messages (Phase 2). |
+unique system-wide, channel names are unique within their group, super admins can neither create nor be added to one, since they only action requests.
 
 ## 7. Design Docs
 
-Wireframes were drawn in Apple Freeform on iPad with an Apple Pencil, exported as images, and
-committed to the `design/` folder before any application code was written.
+Wireframes were drawn in  Freeform on iPad, exported as images, and
+committed to the `design/` folder.
 
-| File | Screen |
-|---|---|
-| `design/Initial_wireframes.png` | First pass — desktop login and desktop user dashboard together |
-| `design/Login_wireframe.png` | Login |
-| `design/User_Dashboard_Wireframe.png` | User dashboard — My Groups and Discover |
-| `design/Group_Channel_view_wireframe.png` | Group with its channel list |
-| `design/In_chatroom_wireframe.png` | Chat room |
-| `design/admin_view_wireframe.png` | Group admin panel |
+The seven  cover login, user dashboard, group and channel view, chat room,
+ group admin panel, the super admin panel as well as the moobile views for the login page and dashboard.
 
 
 
 ### Responsive methodology
 
-<!-- TODO: rewrite this once the mobile wireframes exist so it describes what you actually drew. -->
 
-The layout is designed desktop-first and then reduced for mobile, since the dashboard's
-two-panel layout is the hardest case and everything else is simpler than it. The same components
+The layout was designed fro desktop first and then reduced for mobile. The same components
 are reused at both sizes rather than building separate mobile screens:
 
 - **Login and register** are a fixed 400px card centred on the page at desktop width. On mobile
   the card goes full width with 24px padding and the shadow and border are dropped.
 - **The user dashboard** is My Groups and Discover side by side using flexbox at desktop width.
   Below the breakpoint the two panels stack vertically, My Groups first.
-- **The navbar** keeps the logo on the left and the links on the right at desktop width. On
-  mobile the links collapse.
+- **The navbar** keeps the logo on the left and the links on the right at desktop width.
 - **Touch targets** are at least 44px high, which is why the buttons and inputs share a minimum
   height in the global stylesheet.
 
