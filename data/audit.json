@@ -1,0 +1,16 @@
+[
+  {
+    "id": "a178856716944641u8",
+    "at": "2026-09-05T00:12:49.446Z",
+    "type": "Request Raised",
+    "actor": "hello@hello.com",
+    "detail": "Create group \"Chess Club\""
+  },
+  {
+    "id": "a17885671694502bht",
+    "at": "2026-09-05T00:12:49.450Z",
+    "type": "Request Raised",
+    "actor": "hello@hello.com",
+    "detail": "Create room \"Spoilers\" in \"Book Club\""
+  }
+]

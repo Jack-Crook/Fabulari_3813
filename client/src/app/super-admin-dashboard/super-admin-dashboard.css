@@ -13,7 +13,52 @@ h2 {
   margin: 0 0 16px;
 }
 
-/* pending requests — same row/button pattern as admin-dashboard's join requests */
+/* the feedback bar across the top, same pattern as the other two dashboards */
+.banner {
+  margin: 0;
+  padding: 12px 24px;
+  font-size: 14px;
+  border-bottom: 1px solid #E2E4E9;
+}
+
+.banner.error {
+  background: #FEF2F2;
+  color: #B91C1C;
+}
+
+.banner.success {
+  background: #F0FDF4;
+  color: #15803D;
+}
+
+/* the short explanation under a panel heading. these carry the spec rules that would
+   otherwise only exist as an absence — no unban button, no join requests, and so on. */
+.side-note {
+  font-size: 13px;
+  color: #6B7280;
+  margin: -8px 0 16px;
+}
+
+/* heading on the left, the audit filter dropdown on the right */
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.section-head h2 {
+  margin-bottom: 0;
+}
+
+.audit-filter {
+  width: auto;
+  font-size: 13px;
+  padding: 6px 10px;
+}
+
+/* pending requests — same row/button pattern as admin-dashboard's proposals panel */
 .request-row {
   background: #FFFFFF;
   border: 1px solid #E2E4E9;
@@ -27,8 +72,55 @@ h2 {
   flex-wrap: wrap;
 }
 
+/* the detail column takes the leftover width so the buttons stay on the right until the row
+   genuinely runs out of room */
+.request-body {
+  flex: 1;
+  min-width: 200px;
+}
+
 .request-detail {
   font-size: 14px;
+  font-weight: 500;
+}
+
+.request-meta {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #6B7280;
+}
+
+/* the reason a group admin gave when reporting someone. it's the whole basis for a permanent
+   ban, so it's shown in red rather than as grey metadata. */
+.request-reason {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: #B91C1C;
+}
+
+/* the requested group's colour, shown next to its description so the super admin can see what
+   they're approving without opening anything */
+.theme-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  vertical-align: middle;
+  margin-right: 4px;
+}
+
+/* the reason box, which has to be filled in before a rejection is accepted */
+.reject-box {
+  width: 100%;
+}
+
+.reject-box label {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.reject-box input {
+  margin-bottom: 8px;
 }
 
 .request-actions {
@@ -74,6 +166,18 @@ h2 {
   border-bottom: 1px solid #E2E4E9;
 }
 
+.member-email {
+  display: block;
+  word-break: break-all;      /* a long email wraps instead of widening the panel */
+}
+
+.member-meta {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: #6B7280;
+}
+
 .member-row:last-child {
   border-bottom: none;
 }
@@ -103,8 +207,34 @@ h2 {
   border-top: 1px solid #E2E4E9;
 }
 
+/* the audit log grows without limit, so it scrolls inside its panel rather than stretching
+   the page. the header stays put while the rows move. */
+.scroll-list .data-table th {
+  position: sticky;
+  top: 0;
+}
+
+.empty {
+  margin-top: 12px;
+}
+
 @media (max-width: 768px) {
   .super-admin-body {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr;   /* the four quadrants stack into one column */
+    padding: 16px;
+  }
+
+  .banner {
+    padding: 12px 16px;
+  }
+
+  .section-head {
+    flex-direction: column;       /* the filter drops under the heading instead of squashing it */
+    align-items: stretch;
+  }
+
+  .data-table th, .data-table td {
+    padding: 8px 10px;
+    font-size: 13px;              /* four columns are tight on a phone, so the cells shrink */
   }
 }

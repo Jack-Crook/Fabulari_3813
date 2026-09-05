@@ -36,6 +36,40 @@ h2 {
 
 /* group settings pills */
 
+/* heading on the left, the Edit button pushed to the right of it */
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.section-head h2 {
+  margin-bottom: 0;
+}
+
+/* the global button style is a full width blue block. every button that sits inside a row or
+   a heading is reset to this instead, so the reset isn't repeated per panel. */
+.inline {
+  width: auto;
+  min-height: 0;
+  margin: 0;
+  flex-shrink: 0;
+  padding: 8px 14px;
+  font-size: 13px;
+}
+
+/* Cancel, Rename, Lift Ban — actions that shouldn't compete with the blue primary one */
+.secondary {
+  background: #FFFFFF;
+  color: #6B7280;
+  border: 1px solid #E2E4E9;
+}
+
+.secondary:hover {
+  background: #F3F4F6;
+}
+
 .settings-row {
   display: flex;
   gap: 16px;
@@ -48,6 +82,56 @@ h2 {
   border-radius: 6px;
   padding: 10px 16px;
   font-size: 14px;
+}
+
+/* the group's colour, shown next to its hex value so the pill isn't just a string */
+.theme-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  vertical-align: middle;
+  margin: 0 4px;
+}
+
+.setting-description {
+  margin: 12px 0 0;
+  font-size: 14px;
+  color: #6B7280;
+}
+
+/* the settings form replaces the pills rather than sitting under them, so there's only ever
+   one copy of each value on screen */
+.settings-form {
+  background: #FFFFFF;
+  border: 1px solid #E2E4E9;
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 8px;
+  max-width: 480px;
+}
+
+.settings-form input[type="color"] {
+  width: 60px;
+  height: 40px;
+  padding: 2px;
+}
+
+/* requesting deletion is the one group level action an admin can't carry out themself, so it
+   gets boxed off from the settings above it rather than sitting in the same group of controls */
+.danger-zone {
+  margin-top: 24px;
+  padding: 16px;
+  background: #FFFFFF;
+  border: 1px solid #FECACA;
+  border-radius: 8px;
+  max-width: 480px;
+}
+
+.danger-text {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #6B7280;
 }
 
 /* rooms */
@@ -91,6 +175,28 @@ h2 {
   font-weight: 500;
 }
 
+/* the rename input takes over the whole row while it's open */
+.rename-room {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+}
+
+.rename-room input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* the pair of buttons at the right hand end of a room or member row */
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 /* members table */
 
 .members-table {
@@ -117,6 +223,39 @@ h2 {
   border-top: 1px solid #E2E4E9;
 }
 
+/* three or four buttons per member row, so they're allowed to wrap on a narrow screen rather
+   than forcing the table wider than the page */
+.actions-cell {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* marks your own row in the member list, which matters because Demote reads as Step Down there */
+.you-tag {
+  margin-left: 6px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #E7F0FE;
+  color: #0b68db;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* the ban box drops in as a full width row under the member it's about */
+.ban-row td {
+  background: #FEF2F2;
+}
+
+.ban-row label {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.ban-row input {
+  margin-bottom: 12px;
+}
+
 /* destructive actions, deleting a room and removing a member. outlined rather than solid so
    they don't compete with the blue primary buttons for attention. */
 .danger {
@@ -134,7 +273,39 @@ h2 {
   background: #FEF2F2;
 }
 
-/* join requests */
+/* the global disabled style is a grey block, which is wrong for an outlined button. these are
+   disabled on a group's last admin, because the group must always keep one. */
+.danger:disabled, .secondary:disabled {
+  background: #FFFFFF;
+  color: #D1D5DB;
+  border-color: #E2E4E9;
+}
+
+/* room proposals */
+
+/* explains why there's no join requests panel here: joining is direct, the only check on it
+   is the group's age limit and the server does that */
+.side-note {
+  font-size: 13px;
+  color: #6B7280;
+  margin: -8px 0 16px;
+}
+
+.request-meta {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #6B7280;
+}
+
+/* the reason box, which has to be filled in before a rejection is accepted */
+.reject-box {
+  margin-top: 12px;
+}
+
+.reject-box label {
+  display: block;
+  margin-bottom: 6px;
+}
 
 .request-row {
   background: #FFFFFF;

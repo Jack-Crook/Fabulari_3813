@@ -1,0 +1,35 @@
+[
+  {
+    "id": "r178856716944692wd",
+    "type": "group-create",
+    "status": "pending",
+    "summary": "Create group \"Chess Club\"",
+    "requestedBy": "hello@hello.com",
+    "groupId": "",
+    "payload": {
+      "name": "Chess Club",
+      "description": "Casual games and puzzles",
+      "ageLimit": 0,
+      "theme": "#7FDBC4"
+    },
+    "createdAt": "2026-09-05T00:12:49.446Z",
+    "resolvedAt": "",
+    "resolvedBy": "",
+    "reason": ""
+  },
+  {
+    "id": "r17885671694508s5l",
+    "type": "channel-create",
+    "status": "pending",
+    "summary": "Create room \"Spoilers\" in \"Book Club\"",
+    "requestedBy": "hello@hello.com",
+    "groupId": "g1",
+    "payload": {
+      "name": "Spoilers"
+    },
+    "createdAt": "2026-09-05T00:12:49.450Z",
+    "resolvedAt": "",
+    "resolvedBy": "",
+    "reason": ""
+  }
+]

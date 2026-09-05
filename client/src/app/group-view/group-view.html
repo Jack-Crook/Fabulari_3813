@@ -1,5 +1,12 @@
 <app-navbar></app-navbar>
 
+@if (formError()) {
+  <p class="banner error">{{ formError() }}</p>
+}
+@if (formSuccess()) {
+  <p class="banner success">{{ formSuccess() }}</p>
+}
+
 <div class="group-body">
 
   <!-- every group the user can see, down the left. the one being viewed is outlined -->
@@ -22,8 +29,23 @@
     <!-- banner across the top in the group's own theme colour -->
     @if (group(); as current) {
       <header class="group-banner" [style.background]="current.theme">
-        <h1>{{ current.name }}</h1>
+        <div>
+          <h1>{{ current.name }}</h1>
+          <p class="banner-desc">{{ current.description }}</p>
+        </div>
+        <div class="banner-meta">
+          <!-- the age limit lives on the group and covers every room inside it, so it belongs
+               here rather than on any individual room -->
+          <span class="banner-pill">{{ current.ageLimit ? current.ageLimit + '+' : 'All ages' }}</span>
+          <span class="banner-pill">{{ current.memberEmails.length }} member(s)</span>
+        </div>
       </header>
+
+      <!-- only shown on a group this user admins, and it's the same check the route guard on
+           the admin page makes: is my email in this group's adminEmails -->
+      @if (isGroupAdmin()) {
+        <a class="manage-link" [routerLink]="['/admin-dashboard', current.id]">Manage this group →</a>
+      }
 
       <div class="rooms">
         <h2>Rooms</h2>
@@ -33,12 +55,32 @@
           <a class="room-row" [routerLink]="['/groups', group()?.id, 'channels', channel.id]">
             <span class="room-name">{{ channel.name }}</span>
             <!-- there's no presence tracking yet, that needs socket.io in phase 2 -->
-            <span class="room-count">Currently in: 0</span>
+            <span class="room-count">Open</span>
           </a>
         }
 
         @if (channels().length === 0) {
           <p class="empty">This group has no rooms yet.</p>
+        }
+
+        <!-- rooms already proposed and waiting on an admin, so a member can see theirs is in
+             the queue instead of it disappearing until someone actions it -->
+        @if (proposals().length) {
+          <h3 class="proposed-head">Proposed, awaiting an admin</h3>
+          @for (request of proposals(); track request.id) {
+            <p class="proposed-row">{{ request.payload.name }} — proposed by {{ request.requestedBy }}</p>
+          }
+        }
+
+        <!-- the spec says a regular user proposes a room and the group admin approves it. an
+             admin doesn't need this, they create rooms outright from the admin dashboard, and
+             the super admin isn't a member of any group. -->
+        @if (isMember() && !isGroupAdmin() && !isSuper) {
+          <form class="propose-room" (ngSubmit)="onPropose()">
+            <input name="proposed" type="text" placeholder="Propose a new room"
+                   [(ngModel)]="proposedName" required />
+            <button type="submit">Propose</button>
+          </form>
         }
       </div>
     } @else {

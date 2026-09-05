@@ -46,7 +46,10 @@
 }
 
 .room-link.selected {
-  background: #E8EDFB;          /* the room you're already in is highlighted */
+  /* the background is set inline from the group's theme colour, because the spec says the
+     theme extends into the group's chat rooms. this is only the fallback and the weight. */
+  background: #E8EDFB;
+  color: #FFFFFF;
   font-weight: 600;
 }
 
@@ -70,6 +73,29 @@
 }
 
 /* middle column */
+
+/* the room header, in the group's colour. it also answers "which room am I in" now that the
+   sidebar is hidden on a phone. */
+.chat-banner {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 16px 24px;
+  color: #FFFFFF;
+  flex-wrap: wrap;
+}
+
+.chat-banner h1 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-family: 'Fraunces Variable', Georgia, serif;
+  font-weight: 700;
+}
+
+.chat-group {
+  font-size: 13px;
+  opacity: 0.85;
+}
 
 .chat-main {
   flex: 1;
@@ -137,6 +163,22 @@
   opacity: 0.7;
 }
 
+/* disabled until socket.io lands in phase 2, so it shouldn't look like a live input */
+.composer input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.empty, .presence-note {
+  font-size: 13px;
+  color: #6B7280;
+}
+
+.presence-note {
+  margin-top: 24px;
+  text-align: center;
+}
+
 
 
 @media (max-width: 768px) {
@@ -149,5 +191,13 @@
   .messages, .composer {
     padding-left: 16px;
     padding-right: 16px;
+  }
+
+  .chat-banner {
+    padding: 12px 16px;
+  }
+
+  .message {
+    max-width: 85%;             /* 60% of a phone width leaves the bubbles too narrow to read */
   }
 }

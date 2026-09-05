@@ -23,7 +23,16 @@ export class Login {
   successmessage = signal('');  // text shown on screen if login works
 
 
+  // disables the button while a login is in flight. without it a double click fires two
+  // requests and two setTimeout redirects.
+  submitting = signal(false);
+
+
   onSubmit() {                // runs when the login form is submitted
+    if (this.submitting()) {
+      return;
+    }
+    this.submitting.set(true);
     this.errormessage.set('');   // clear old messages first
     this.successmessage.set('');
 
@@ -31,7 +40,10 @@ export class Login {
             next: (res: LoginResponse) => {
 
         // this runs if the backend says login worked
-        this.auth.saveUser(res.email, res.role);      // remember who logged in before leaving this page
+        // only the three fields the navbar and the guards need are kept. everything else about
+        // the account is fetched fresh by the profile page, because localStorage goes stale the
+        // moment the profile is edited.
+        this.auth.saveUser({ email: res.email, role: res.role, username: res.username });
         this.successmessage.set('Logged in successfully.');
 
 
@@ -45,6 +57,7 @@ export class Login {
 
         // this runs if the backend says login failed (wrong password etc)
         this.errormessage.set(err.error?.error ?? 'Something went wrong, please try again.');
+        this.submitting.set(false);      // let them try again, the button is disabled until this clears
       },
 
     });

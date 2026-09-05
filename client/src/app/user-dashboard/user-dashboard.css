@@ -16,6 +16,38 @@
   border-bottom: 1px solid #E2E4E9;
 }
 
+/* the row is a link to the group, but Leave is a button that must not navigate, so the two
+   sit side by side in a wrapper rather than nesting a button inside an anchor */
+.group-row-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid #E2E4E9;
+}
+
+.group-row-wrap .group-row {
+  flex: 1;
+  min-width: 0;
+  border-bottom: none;        /* the wrapper draws the divider now */
+}
+
+/* leaving is a step down from Remove on the admin page, so it's the same outlined red */
+.leave {
+  width: auto;
+  min-height: 0;
+  margin: 0;
+  flex-shrink: 0;
+  padding: 8px 14px;
+  font-size: 13px;
+  background: #FFFFFF;
+  color: #B91C1C;
+  border: 1px solid #E2E4E9;
+}
+
+.leave:hover {
+  background: #FEF2F2;
+}
+
 .group-swatch {
   width: 80px;
   height: 80px;
@@ -61,7 +93,59 @@ a.group-row:hover {
   min-width: 0;
 }
 
+/* small tags on a group's name. Admin is read off the group's adminEmails rather than the
+   user's role, because that's where group admin actually lives. */
+.admin-badge, .age-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.admin-badge {
+  background: #E7F0FE;
+  color: #0b68db;
+}
+
+/* every group is visible whatever your age, so this is a label rather than a lock — the
+   check happens on the server when you try to join */
+.age-badge {
+  background: #FEF3C7;
+  color: #92400E;
+}
+
+/* their own pending requests, under the group list */
+
+.pending-head {
+  font-size: 13px;
+  font-weight: 600;
+  color: #6B7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 24px 0 8px;
+}
+
+.pending-row {
+  margin: 0 0 6px;
+  padding: 10px 12px;
+  background: #FFFFFF;
+  border: 1px solid #E2E4E9;
+  border-left: 3px solid #0b68db;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
 /* create group form */
+
+/* explains why the button says Request rather than Create, which is the spec's rule */
+.form-note {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: #6B7280;
+}
 
 /* puts the heading and the New Group button on one line, button pushed to the right */
 .section-head {

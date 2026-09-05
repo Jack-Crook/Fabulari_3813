@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, computed } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Navbar } from '../navbar/navbar';
 import { Auth } from '../auth';
@@ -20,19 +20,34 @@ export class ChatRoom {
   channels = signal<Channel[]>([]);                 // every room in this group, listed down the left
   channel = signal<Channel | undefined>(undefined); // the room actually open
 
-  me = this.auth.getUser()?.email ?? '';   // used to work out which messages are mine
+  me = this.auth.email;   // used to work out which messages are mine
 
-  
-  // these are hardcoded purely so the chat layout can be seen. real messages are phase 2.
-  messages = [
-    { sender: 'jack@123',        body: 'Has everyone finished chapter 4 yet?' },
-    { sender: 'hello@hello.com', body: 'Just started it last night, no spoilers please' },
-    { sender: 'jack@123',        body: 'No promises' },
-    { sender: 'hello@hello.com', body: 'I finished the whole book already sorry' },
-  ];
+  // the group's colour, with a fallback for the moment before the fetch comes back. the spec
+  // says the theme is the group's customisation and that it extends into its chat rooms, so
+  // the banner, the selected room and the message bar all read from this.
+  theme = computed(() => this.group()?.theme ?? '#5FA8D3');
 
-  // who is currently in the room. 
-  currentlyIn = ['jack@123', 'hello@hello.com'];
+  // Messages are mock until socket.io in phase 2. They're built from the group's real member
+  // list rather than hardcoded addresses, so the admin indicator below actually has a group
+  // admin to mark — with fixed emails it would mark nobody in most groups.
+  messages = computed(() => {
+    const members = this.group()?.memberEmails ?? [];
+    if (members.length === 0) {
+      return [];
+    }
+    const first = members[0];
+    const second = members[1] ?? members[0];
+    return [
+      { sender: first,  body: 'Has everyone finished chapter 4 yet?' },
+      { sender: second, body: 'Just started it last night, no spoilers please' },
+      { sender: first,  body: 'No promises' },
+      { sender: second, body: 'I finished the whole book already sorry' },
+    ];
+  });
+
+  // who is currently in the room. mock for the same reason — real presence needs socket.io,
+  // which is phase 2. taking the first few members keeps it consistent with the messages above.
+  currentlyIn = computed(() => (this.group()?.memberEmails ?? []).slice(0, 3));
 
   constructor() {
     // subscribed rather than read once, because clicking another room in the sidebar reuses
@@ -52,7 +67,9 @@ export class ChatRoom {
     });
   }
 
-  // group admins get an indicator next to their name in chat, the spec asks for this
+  // group admins get an indicator next to their name in chat, the spec asks for this.
+  // it's a lookup in the group's adminEmails rather than a check on the user's role, because
+  // that's where group admin actually lives.
   isAdmin(email: string) {
     return this.group()?.adminEmails.includes(email) ?? false;
   }

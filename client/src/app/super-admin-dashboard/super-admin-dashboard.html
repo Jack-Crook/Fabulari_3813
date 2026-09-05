@@ -1,67 +1,167 @@
 <app-navbar></app-navbar>
 
+<!-- one message bar for every action, same pattern as the other two dashboards -->
+@if (actionError()) {
+  <p class="banner error">{{ actionError() }}</p>
+}
+@if (actionSuccess()) {
+  <p class="banner success">{{ actionSuccess() }}</p>
+}
+
 <div class="super-admin-body">
 
   <section class="panel">
     <h2>Pending Requests</h2>
-    @for (request of pendingRequests; track $index) {
+    <!-- the spec says the super admin only actions requests: they can't create a group
+         directly, can't ban anyone without a group admin's report first, and can't approve a
+         request they raised — which is moot here because they're blocked from raising any. -->
+    <p class="side-note">
+      Everything the super admin does starts as someone else's request. Room proposals aren't
+      here — those go to the group's own admin.
+    </p>
+
+    @for (request of pendingRequests(); track request.id) {
       <div class="request-row">
-        <span class="request-detail">{{ request.detail }} - requested by admin {{ request.requestedBy }}</span>
-        <div class="request-actions">
-          <button type="button" class="approve">Approve</button>
-          <button type="button" class="reject">Reject</button>
+        <div class="request-body">
+          <span class="request-detail">{{ request.summary }}</span>
+          <p class="request-meta">
+            {{ labelFor(request.type) }} · requested by {{ request.requestedBy }} ·
+            {{ request.createdAt | date:'d MMM yyyy' }}
+          </p>
+          <!-- a ban report carries the reason the group admin gave, and that's the whole basis
+               for the ban, so it's shown rather than hidden in the payload -->
+          @if (request.type === 'user-ban') {
+            <p class="request-reason">Reported for: {{ request.payload.reason }}</p>
+          }
+          <!-- a group request supplies its own title, description, age limit and colour, so
+               there is nothing left for the super admin to fill in on approval -->
+          @if (request.type === 'group-create') {
+            <p class="request-meta">
+              <span class="theme-dot" [style.background]="request.payload.theme"></span>
+              {{ request.payload.description || 'No description' }} ·
+              age limit {{ request.payload.ageLimit || 'none' }}
+            </p>
+          }
         </div>
+
+        @if (rejectingId() === request.id) {
+          <div class="reject-box">
+            <label [attr.for]="'reject-' + request.id">Reason for rejection</label>
+            <!-- required by the spec and enforced by the server with a 400. the requester
+                 reads it back on their own profile page. -->
+            <input [id]="'reject-' + request.id" name="reject-reason" type="text"
+                   [(ngModel)]="rejectReason" placeholder="Required" />
+            <div class="request-actions">
+              <button type="button" class="reject" (click)="onReject(request)">Confirm</button>
+              <button type="button" class="reject" (click)="cancelRejecting()">Cancel</button>
+            </div>
+          </div>
+        } @else {
+          <div class="request-actions">
+            <button type="button" class="approve" (click)="onApprove(request)">Approve</button>
+            <button type="button" class="reject" (click)="startRejecting(request)">Reject</button>
+          </div>
+        }
       </div>
     }
-    @if (pendingRequests.length === 0) {
+
+    @if (pendingRequests().length === 0) {
       <p class="empty">No pending requests.</p>
     }
   </section>
 
   <section class="panel">
     <h2>Members</h2>
+    <p class="side-note">
+      Every registered account. The super admin can't create, edit or deactivate one — only ban
+      it permanently, and only from a group admin's report.
+    </p>
     <div class="scroll-list">
-      @for (member of members; track member.email) {
-        <div class="member-row">{{ member.email }}</div>
+      @for (user of users(); track user.email) {
+        <div class="member-row">
+          <span class="member-email">{{ user.email }}</span>
+          <span class="member-meta">
+            {{ user.username }} ·
+            <!-- 'user' or 'super'. group admin isn't in here, because it's held on the group
+                 rather than the account, so it's counted separately. -->
+            {{ user.role === 'super' ? 'super admin' : 'user' }} ·
+            {{ groupCountFor(user.email) }} group(s)
+            @if (adminCountFor(user.email)) {
+              · admin of {{ adminCountFor(user.email) }}
+            }
+          </span>
+        </div>
       }
     </div>
+    @if (users().length === 0) {
+      <p class="empty">No accounts yet.</p>
+    }
   </section>
 
   <section class="panel">
     <h2>Permanently Banned</h2>
+    <!-- permanent means permanent: the account is deleted, the email goes on this list, and
+         /register refuses it forever. that's why there's no Un Ban button here even though the
+         original wireframe drew one. -->
+    <p class="side-note">
+      A permanent ban deletes the account and blocks the email from ever registering again.
+      There is no unban.
+    </p>
     <table class="data-table">
       <thead>
-        <tr><th>Email</th><th>Reason</th><th>Ban date</th></tr>
+        <tr><th>Email</th><th>Reason</th><th>Reported by</th><th>Ban date</th></tr>
       </thead>
       <tbody>
-        @for (user of bannedUsers; track user.email) {
+        @for (user of bannedUsers(); track user.email) {
           <tr>
             <td>{{ user.email }}</td>
             <td>{{ user.reason }}</td>
-            <td>{{ user.bannedAt }}</td>
+            <td>{{ user.reportedBy }}</td>
+            <td>{{ user.bannedAt | date:'d MMM yyyy' }}</td>
           </tr>
         }
       </tbody>
     </table>
+    @if (bannedUsers().length === 0) {
+      <p class="empty">Nobody is permanently banned.</p>
+    }
   </section>
 
   <section class="panel">
-    <h2>Audit Log</h2>
-    <table class="data-table">
-      <thead>
-        <tr><th>Date</th><th>Type</th><th>Actor</th><th>Detail</th></tr>
-      </thead>
-      <tbody>
-        @for (entry of auditLog; track $index) {
-          <tr>
-            <td>{{ entry.date }}</td>
-            <td>{{ entry.type }}</td>
-            <td>{{ entry.actor }}</td>
-            <td>{{ entry.detail }}</td>
-          </tr>
+    <div class="section-head">
+      <h2>Audit Log</h2>
+      <!-- the spec asks for a log filterable by type and in date order. both happen on the
+           server, and the options come from the log itself so they can't drift out of date. -->
+      <select class="audit-filter" [value]="auditFilter()"
+              (change)="onFilterAudit($any($event.target).value)">
+        <option value="">All types</option>
+        @for (type of auditTypes(); track type) {
+          <option [value]="type">{{ type }}</option>
         }
-      </tbody>
-    </table>
+      </select>
+    </div>
+
+    <div class="scroll-list">
+      <table class="data-table">
+        <thead>
+          <tr><th>Date</th><th>Type</th><th>Actor</th><th>Detail</th></tr>
+        </thead>
+        <tbody>
+          <!-- newest first, sorted on the server -->
+          @for (entry of auditLog(); track entry.id) {
+            <tr>
+              <td>{{ entry.at | date:'d MMM yyyy, HH:mm' }}</td>
+              <td>{{ entry.type }}</td>
+              <td>{{ entry.actor }}</td>
+              <td>{{ entry.detail }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    @if (auditLog().length === 0) {
+      <p class="empty">Nothing logged for this filter.</p>
+    }
   </section>
 
 </div>

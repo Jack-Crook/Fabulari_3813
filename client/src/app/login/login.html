@@ -20,7 +20,8 @@
   <!-- just text from the wireframe, doesn't do anything yet -->
   <a class="forgot" href="#">Forgot your password?</a>
 
-  <button type="submit">Log In</button>
+  <!-- disabled while a request is in flight so a double click can't fire two logins -->
+  <button type="submit" [disabled]="submitting()">{{ submitting() ? 'Logging in…' : 'Log In' }}</button>
 </form>
 
 

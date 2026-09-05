@@ -47,9 +47,15 @@
   min-width: 0;                     /* lets long room names wrap instead of stretching the layout */
 }
 
+/* the banner carries the group's own theme colour, which the spec makes the group's one
+   customisation — there are no group profile pictures */
 .group-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
   padding: 24px;
-  text-align: center;
 }
 
 .group-banner h1 {
@@ -58,6 +64,62 @@
   font-family: 'Fraunces Variable', Georgia, serif;
   font-weight: 800;
   color: #1A1D23;
+}
+
+.banner-desc {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: #1A1D23;
+  opacity: 0.75;
+}
+
+.banner-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* the age limit is set on the group and covers every room in it, so it's shown at group level */
+.banner-pill {
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.55);
+  font-size: 12px;
+  font-weight: 600;
+  color: #1A1D23;
+}
+
+/* only rendered on a group this user admins, so it doubles as a visible answer to "which of
+   my groups do I run" */
+.manage-link {
+  display: inline-block;
+  margin: 16px 24px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0b68db;
+  text-decoration: none;
+}
+
+.manage-link:hover {
+  text-decoration: underline;
+}
+
+/* the feedback bar, same pattern as the dashboards */
+.banner {
+  margin: 0;
+  padding: 12px 24px;
+  font-size: 14px;
+  border-bottom: 1px solid #E2E4E9;
+}
+
+.banner.error {
+  background: #FEF2F2;
+  color: #B91C1C;
+}
+
+.banner.success {
+  background: #F0FDF4;
+  color: #15803D;
 }
 
 .rooms {
@@ -100,6 +162,50 @@
   color: #6B7280;
 }
 
+/* rooms that have been proposed but not yet approved. deliberately not styled like a real
+   room row — they aren't clickable, because the channel doesn't exist yet. */
+.proposed-head {
+  font-size: 13px;
+  font-weight: 600;
+  color: #6B7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 24px 0 8px;
+}
+
+.proposed-row {
+  margin: 0 0 8px;
+  padding: 12px 16px;
+  background: #FFFFFF;
+  border: 1px dashed #E2E4E9;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #6B7280;
+}
+
+/* a member proposes a room, an admin of the group approves or rejects it. one input plus a
+   button, so the global column layout for forms is overridden onto a single row. */
+.propose-room {
+  flex-direction: row;
+  gap: 8px;
+  margin-top: 24px;
+  max-width: 480px;
+}
+
+.propose-room input {
+  flex: 1;
+  min-width: 0;
+}
+
+.propose-room button {
+  width: auto;
+  min-height: 0;
+  margin: 0;
+  flex-shrink: 0;
+  padding: 8px 16px;
+  font-size: 13px;
+}
+
 
 @media (max-width: 768px) {
   .group-body {
@@ -110,5 +216,14 @@
     width: auto;                /* the fixed 240px sidebar eats most of a phone screen */
     border-right: none;
     border-bottom: 1px solid #E2E4E9;   /* the divider moves to the bottom now they're stacked */
+  }
+
+  .group-banner {
+    text-align: left;
+    padding: 16px;
+  }
+
+  .banner {
+    padding: 12px 16px;
   }
 }

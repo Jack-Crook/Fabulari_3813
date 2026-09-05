@@ -32,6 +32,15 @@
   font-weight: 600;
 }
 
+.nav-who {
+  color: #6B7280;
+  font-size: 14px;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;      /* a long email is cut off rather than pushing Logout off the bar */
+  white-space: nowrap;
+}
+
 .nav-links button {
   width: auto;          /* the global button style is full width, which would push the navbar apart */
   min-height: 0;

@@ -1,34 +1,151 @@
 <app-navbar></app-navbar>
 
 <div class="profile-page">
-  <div class="card">
-    <h2>Profile</h2>
+  <div class="profile-column">
 
-    <!-- avatar circle + name, same as the little user box on the dashboard wireframe -->
-    <div class="profile-top">
-      <div class="avatar"></div>
-      <p class="username">{{ username }}</p>
+    <div class="card">
+      <h2>Profile</h2>
+
+      <!-- avatar circle + name, same as the little user box on the dashboard wireframe.
+           the initial is the first letter of the display name so the circle isn't just a blank
+           blob, since the spec rules out profile pictures. -->
+      <div class="profile-top">
+        <div class="avatar">{{ (user()?.username || email).charAt(0).toUpperCase() }}</div>
+        <div>
+          <p class="username">{{ user()?.username }}</p>
+          <!-- role is 'user' or 'super'. group admin isn't a role on the user record, it's
+               whether their email is in a group's adminEmails, which is why it's listed
+               separately below rather than shown here. -->
+          <p class="role-tag">{{ user()?.role === 'super' ? 'Super Admin' : 'User' }}</p>
+        </div>
+      </div>
+
+      @if (formSuccess()) {
+        <p class="success">{{ formSuccess() }}</p>
+      }
+      @if (formError()) {
+        <p class="error">{{ formError() }}</p>
+      }
+
+      <!-- read only view. the edit form replaces it rather than sitting under it, so there's
+           only ever one copy of each value on screen. -->
+      @if (!editing()) {
+        <div class="info-row">
+          <span class="info-label">Email</span>
+          <!-- the one field with no input in the form below, because the spec makes email the
+               account's unique identifier -->
+          <span class="info-value">{{ email }} <span class="locked">can't be changed</span></span>
+        </div>
+
+        <div class="info-row">
+          <span class="info-label">Display name</span>
+          <span class="info-value">{{ user()?.username }}</span>
+        </div>
+
+        <div class="info-row">
+          <span class="info-label">Date of birth</span>
+          <span class="info-value">
+            @if (user()?.dob) {
+              {{ user()?.dob }} <span class="locked">age {{ age() }}</span>
+            } @else {
+              <!-- worth calling out, because joining a group with an age limit is refused
+                   until there's a date of birth to check against -->
+              <span class="locked">Not set — needed to join age restricted groups</span>
+            }
+          </span>
+        </div>
+
+        <div class="info-row">
+          <span class="info-label">Bio</span>
+          <span class="info-value">{{ user()?.bio || '—' }}</span>
+        </div>
+
+        <div class="info-row">
+          <span class="info-label">Groups</span>
+          <span class="info-value">{{ myGroups().length }}</span>
+        </div>
+
+        <div class="info-row">
+          <span class="info-label">Admin of</span>
+          <span class="info-value">
+            @if (adminOf().length) {
+              {{ adminOf().length }} group(s)
+            } @else {
+              <span class="locked">None</span>
+            }
+          </span>
+        </div>
+
+        <button type="button" (click)="startEditing()">Edit Profile</button>
+      }
+
+      <!-- edit form. every field the spec allows a user to change is here, and email isn't -->
+      @if (editing()) {
+        <form (ngSubmit)="onSave()">
+          <div class="field">
+            <label for="edit-username">Display name</label>
+            <input id="edit-username" name="edit-username" type="text" [(ngModel)]="formUsername" required />
+          </div>
+
+          <div class="field">
+            <label for="edit-dob">Date of birth</label>
+            <input id="edit-dob" name="edit-dob" type="date" [(ngModel)]="formDob" />
+            <span class="hint">Checked against a group's age limit when you join.</span>
+          </div>
+
+          <div class="field">
+            <label for="edit-bio">Bio</label>
+            <textarea id="edit-bio" name="edit-bio" [(ngModel)]="formBio"></textarea>
+          </div>
+
+          <div class="field">
+            <label for="edit-password">New password <span class="optional">optional</span></label>
+            <!-- left blank the password isn't sent at all, so saving the rest of the form
+                 doesn't wipe it -->
+            <input id="edit-password" name="edit-password" type="password" [(ngModel)]="formPassword" />
+            <span class="hint">Leave blank to keep your current password.</span>
+          </div>
+
+          <button type="submit" [disabled]="saving()">{{ saving() ? 'Saving…' : 'Save Changes' }}</button>
+          <button type="button" class="secondary" (click)="cancelEditing()">Cancel</button>
+        </form>
+      }
+
+      <p class="switch"><a routerLink="/user-dashboard">Back to Dashboard</a></p>
     </div>
 
-    <!-- one row per bit of info -->
-    <div class="info-row">
-      <span class="info-label">Email</span>
-      <span class="info-value">{{ email }}</span>
+    <!-- the spec says a user can see their own pending requests, and their own past rejected
+         ones with the reason. it doesn't give them any other view of the request queue. -->
+    <div class="card">
+      <h2>My Requests</h2>
+
+      <h3>Pending</h3>
+      @for (request of pendingRequests(); track request.id) {
+        <div class="request-card">
+          <p class="request-summary">{{ request.summary }}</p>
+          <p class="request-meta">{{ labelFor(request.type) }} · raised {{ request.createdAt | date:'d MMM yyyy' }}</p>
+          <!-- no cancel button on purpose: the spec says a pending request can't be withdrawn
+               once submitted, so there's no endpoint for it either -->
+          <p class="request-meta">Waiting on an admin. A request can't be cancelled once sent.</p>
+        </div>
+      }
+      @if (pendingRequests().length === 0) {
+        <p class="empty">Nothing pending.</p>
+      }
+
+      <h3>Rejected</h3>
+      @for (request of rejectedRequests(); track request.id) {
+        <div class="request-card rejected">
+          <p class="request-summary">{{ request.summary }}</p>
+          <!-- a rejection always has a reason, the server refuses to record one without it -->
+          <p class="request-reason">Reason: {{ request.reason }}</p>
+          <p class="request-meta">{{ labelFor(request.type) }} · {{ request.resolvedAt | date:'d MMM yyyy' }}</p>
+        </div>
+      }
+      @if (rejectedRequests().length === 0) {
+        <p class="empty">Nothing rejected.</p>
+      }
     </div>
 
-    <div class="info-row">
-      <span class="info-label">Role</span>
-      <span class="info-value">{{ role }}</span>
-    </div>
-
-    <div class="info-row">
-      <span class="info-label">Groups</span>
-      <span class="info-value">{{ groups() }}</span>
-    </div>
-
-    <!-- doesn't do anything yet, just the wireframe button -->
-    <button type="button">Edit Profile</button>
-
-    <p class="switch"><a routerLink="/user-dashboard">Back to Dashboard</a></p>
   </div>
 </div>

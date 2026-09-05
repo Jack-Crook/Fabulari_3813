@@ -14,6 +14,9 @@
       <li><a routerLink="/super-admin-dashboard" routerLinkActive="active">Super Admin</a></li>
     }
     <li><a routerLink="/profile" routerLinkActive="active">Profile</a></li>
+    <!-- every page in this app looks different depending on who you are, so the bar says which
+         account is signed in rather than leaving it to be worked out from the page -->
+    <li class="nav-who">{{ displayName }}</li>
     <li><button type="button" (click)="onLogout()">Logout</button></li>
   </ul>
 </header>

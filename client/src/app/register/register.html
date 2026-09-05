@@ -12,11 +12,27 @@
       </div>
 
       <div class="field">
-        <label for="password">Password</label>
-        <input id="password" name="password" type="password" [(ngModel)]="password" required />
+        <label for="username">Display name <span class="optional">optional</span></label>
+        <!-- blank is fine, the server falls back to the part of the email before the @ -->
+        <input id="username" name="username" type="text" [(ngModel)]="username" />
       </div>
 
-      <button type="submit">Register</button>
+      <div class="field">
+        <label for="dob">Date of birth <span class="optional">optional</span></label>
+        <!-- groups carry an age limit, and this is what it gets checked against. it can be
+             left blank now and filled in on the profile page later, but joining an age
+             restricted group is refused until it's set. -->
+        <input id="dob" name="dob" type="date" [(ngModel)]="dob" />
+      </div>
+
+      <div class="field">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" [(ngModel)]="password" required minlength="6" />
+        <!-- the server enforces this too, the hint is just so it isn't a surprise -->
+        <span class="hint">At least 6 characters.</span>
+      </div>
+
+      <button type="submit" [disabled]="submitting()">{{ submitting() ? 'Registering…' : 'Register' }}</button>
     </form>
 
     <!-- only shown when errorMessage is a non-empty string -->

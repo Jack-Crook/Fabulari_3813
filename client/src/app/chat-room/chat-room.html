@@ -10,6 +10,7 @@
     @for (item of channels(); track item.id) {
       <a class="room-link"
          [class.selected]="item.id === channel()?.id"
+         [style.background]="item.id === channel()?.id ? theme() : ''"
          [routerLink]="['/groups', group()?.id, 'channels', item.id]">
         {{ item.name }}
       </a>
@@ -21,12 +22,21 @@
 
   <!-- middle, the conversation itself -->
   <section class="chat-main">
+    <!-- the spec says the group's theme colour extends into its chat rooms, so the room header,
+         the selected room in the sidebar and the message bar below all take their colour from
+         the group record rather than the palette -->
+    <header class="chat-banner" [style.background]="theme()">
+      <h1>{{ channel()?.name }}</h1>
+      <span class="chat-group">{{ group()?.name }}</span>
+    </header>
+
     <div class="messages">
-      @for (message of messages; track $index) {
+      @for (message of messages(); track $index) {
         <!-- my own messages sit on the right, everyone else's on the left -->
         <div class="message" [class.mine]="message.sender === me">
           <p class="message-sender">
             {{ message.sender }}
+            <!-- the spec asks for an indicator when the sender is that group's admin -->
             @if (isAdmin(message.sender)) {
               <span class="admin-tag">Admin</span>
             }
@@ -34,11 +44,17 @@
           <p class="message-body">{{ message.body }}</p>
         </div>
       }
+
+      @if (messages().length === 0) {
+        <p class="empty">Nothing here yet.</p>
+      }
     </div>
 
-    <!-- the input bar. it doesn't send anything yet, sending needs socket.io in phase 2 -->
+    <!-- the input bar. it doesn't send anything yet, sending needs socket.io in phase 2, so
+         it's disabled rather than looking like a box that swallows what you type -->
     <div class="composer">
-      <input type="text" placeholder="Message {{ channel()?.name }}" />
+      <input type="text" [style.background]="theme()" disabled
+             placeholder="Messaging arrives with socket.io in Phase 2" />
     </div>
   </section>
 
@@ -46,9 +62,20 @@
   <aside class="presence-sidebar">
     <h2>Currently In</h2>
 
-    @for (person of currentlyIn; track person) {
-      <p class="person">{{ person }}</p>
+    @for (person of currentlyIn(); track person) {
+      <p class="person">
+        {{ person }}
+        @if (isAdmin(person)) {
+          <span class="admin-tag">Admin</span>
+        }
+      </p>
     }
+
+    <!-- said out loud rather than left to look real. the spec wants a live list plus a
+         join/leave notice, and both need socket.io — phase 2. -->
+    <p class="presence-note">
+      Mock list. Live presence and join/leave notices arrive with socket.io in Phase 2.
+    </p>
   </aside>
 
 </div>

@@ -18,12 +18,16 @@ export class Navbar {
   private groupService = inject(GroupService);
 
 
-  private me = this.auth.getUser()?.email ?? '';
+  private me = this.auth.email;
+
+  // shown on the right of the bar so it's always obvious which account you're acting as, which
+  // matters a lot on this app because the same page looks different per role
+  displayName = this.auth.getUser()?.username || this.me;
 
   // not a computed like isGroupAdmin below, because it doesn't depend on which page you're on.
   // super admin authority is system wide rather than tied to one group, so the link is always
   // there for them, the same as Dashboard and Profile are for everyone.
-  isSuperAdmin = this.auth.getUser()?.role === 'super';
+  isSuperAdmin = this.auth.isSuper;
 
   private groups = signal<Group[]>([]);      // every group, fetched once
   // not private, the template reads it to build the group admin link

@@ -1,10 +1,12 @@
 import { TestBed } from '@angular/core/testing';
 import { App } from './app';
+import { testProviders } from './testing';
 
 describe('App', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [App],
+      providers: testProviders(),
     }).compileComponents();
   });
 
@@ -18,6 +20,8 @@ describe('App', () => {
     const fixture = TestBed.createComponent(App);
     await fixture.whenStable();
     const compiled = fixture.nativeElement as HTMLElement;
+    // the root shell is nothing but the outlet — every page component brings its own navbar,
+    // which is why login and register have none
     expect(compiled.querySelector('router-outlet')).toBeTruthy();
   });
 });

@@ -1,6 +1,6 @@
 <app-navbar></app-navbar>
 
-<!-- one message bar for the whole page, so creating a group and joining one both report
+<!-- one message bar for the whole page, so requesting a group and joining one both report
      back in the same place instead of each panel having its own -->
 @if (formError()) {
   <p class="banner error">{{ formError() }}</p>
@@ -15,17 +15,24 @@
       <!-- the super admin isn't a member of anything, they oversee every group instead -->
       <h2>{{ isSuper ? 'ALL GROUPS' : 'MY GROUPS' }}</h2>
 
-      <!-- server.js rejects a group whose creator is the super admin, so they don't get the button -->
+      <!-- the spec says the super admin only actions requests and never raises one, so they
+           don't get the button. server.js refuses it as well. -->
       @if (!isSuper) {
         <button type="button" class="new-group" (click)="toggleForm()">
-          {{ showForm() ? 'Cancel' : 'New Group' }}
+          {{ showForm() ? 'Cancel' : 'Request Group' }}
         </button>
       }
     </div>
 
     @if (showForm()) {
-      <!-- creating a group makes you its first admin, which is why there's no approval step here -->
-      <form class="create-group" (ngSubmit)="onCreateGroup()">
+      <!-- a group isn't created here, it's requested. the spec says the requesting user
+           supplies the title, description, age limit and colour up front and the super admin
+           just approves or rejects, so all four fields are collected now rather than after. -->
+      <form class="create-group" (ngSubmit)="onRequestGroup()">
+        <p class="form-note">
+          New groups are approved by the super admin. If yours is approved you become its first admin.
+        </p>
+
         <div class="field">
           <label for="new-name">Group name</label>
           <input id="new-name" name="new-name" type="text" [(ngModel)]="newName" required />
@@ -47,24 +54,54 @@
           <input id="new-theme" name="new-theme" type="color" [(ngModel)]="newTheme" />
         </div>
 
-        <button type="submit">Create Group</button>
+        <button type="submit" [disabled]="submitting()">
+          {{ submitting() ? 'Sending…' : 'Send Request' }}
+        </button>
       </form>
     }
 
     <!-- a signal is read by calling it, so it's myGroups() and not myGroups -->
     @for (group of myGroups(); track group.id) {
-      <!-- clicking a group opens its room list -->
-      <a class="group-row" [routerLink]="['/groups', group.id]">
-        <div class="group-swatch" [style.background]="group.theme"></div>
-        <div>
-          <p class="group-name">{{ group.name }}</p>
-          <p class="group-desc">{{ group.description }}</p>
-        </div>
-      </a>
+      <div class="group-row-wrap">
+        <!-- clicking a group opens its room list -->
+        <a class="group-row" [routerLink]="['/groups', group.id]">
+          <div class="group-swatch" [style.background]="group.theme"></div>
+          <div>
+            <p class="group-name">
+              {{ group.name }}
+              <!-- group admin is a relationship with this group, not a role on the account,
+                   so it's read straight off the group's adminEmails -->
+              @if (amAdminOf(group)) {
+                <span class="admin-badge">Admin</span>
+              }
+              @if (group.ageLimit) {
+                <span class="age-badge">{{ group.ageLimit }}+</span>
+              }
+            </p>
+            <p class="group-desc">{{ group.description }}</p>
+          </div>
+        </a>
+
+        <!-- the super admin is never a member of a group, so there's nothing for them to leave -->
+        @if (!isSuper) {
+          <!-- the same endpoint an admin uses to remove someone. leaving is refused with a 409
+               if you're the group's last admin — disbanding goes through the super admin. -->
+          <button type="button" class="leave" (click)="onLeave(group)">Leave</button>
+        }
+      </div>
     }
 
     @if (myGroups().length === 0) {
       <p class="group-desc">You aren't in any groups yet. Find one in Discover.</p>
+    }
+
+    <!-- their own pending requests, so a group they just asked for doesn't just vanish.
+         the full list, including past rejections and their reasons, is on the profile page. -->
+    @if (myPending().length) {
+      <h3 class="pending-head">Awaiting approval</h3>
+      @for (request of myPending(); track request.id) {
+        <p class="pending-row">{{ request.summary }}</p>
+      }
     }
   </section>
 
@@ -72,23 +109,35 @@
   @if (!isSuper) {
     <section class="discover">
       <h2>Discover</h2>
-      <input type="text" placeholder="Search" class="discover-search">
+      <!-- writes straight into the signal the filtered list is computed from, so the list
+           narrows as you type -->
+      <input type="text" placeholder="Search groups" class="discover-search"
+             [value]="searchTerm()"
+             (input)="searchTerm.set($any($event.target).value)">
 
-      <!-- groups the user isn't in yet. joining is direct rather than a request, because the
-           spec only puts an age check on it, and there's no age field on a user in phase 1 -->
-      @for (group of discover(); track group.id) {
+      <!-- groups the user isn't in yet. the spec says every group is visible whatever your age,
+           and the age check happens when you try to join — the server answers 403 and the
+           reason appears in the bar at the top of the page. -->
+      @for (group of filteredDiscover(); track group.id) {
         <div class="discover-row">
           <div class="group-swatch" [style.background]="group.theme"></div>
           <div class="discover-desc">
-            <p class="group-name">{{ group.name }}</p>
+            <p class="group-name">
+              {{ group.name }}
+              @if (group.ageLimit) {
+                <span class="age-badge">{{ group.ageLimit }}+</span>
+              }
+            </p>
             <p class="group-desc">{{ group.description }}</p>
           </div>
           <button type="button" (click)="onJoin(group)">Join</button>
         </div>
       }
 
-      @if (discover().length === 0) {
-        <p class="group-desc">No other groups to join right now.</p>
+      @if (filteredDiscover().length === 0) {
+        <p class="group-desc">
+          {{ searchTerm() ? 'No groups match that search.' : 'No other groups to join right now.' }}
+        </p>
       }
     </section>
   }

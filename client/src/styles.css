@@ -76,6 +76,78 @@ button:hover {
   background: #0A56B5;
 }
 
+/* every submit button in the app disables itself while its request is in flight, so the
+   disabled look is defined once here rather than per page */
+button:disabled {
+  background: #9CA3AF;
+  cursor: not-allowed;
+}
+
+button:disabled:hover {
+  background: #9CA3AF;
+}
+
+
+/* the feedback lines under the login, register and profile forms. these were being rendered
+   as plain unstyled paragraphs, so a failed login read the same as ordinary body text.
+   :not(.banner) keeps this off the full width bars the dashboards use, which style themselves. */
+.error:not(.banner), .success:not(.banner) {
+  margin: 16px 0 0;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.error:not(.banner) {
+  background: #FEF2F2;
+  color: #B91C1C;
+  border: 1px solid #FECACA;
+}
+
+.success:not(.banner) {
+  background: #F0FDF4;
+  color: #15803D;
+  border: 1px solid #BBF7D0;
+}
+
+/* small print under an input, e.g. the password length rule */
+.hint {
+  font-size: 12px;
+  color: #6B7280;
+}
+
+/* the grey "optional" tag next to a label on a field that can be left blank */
+.optional {
+  font-weight: 400;
+  font-size: 12px;
+  color: #9CA3AF;
+}
+
+select, textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid #E2E4E9;
+  border-radius: 6px;
+  font-size: 16px;
+  font-family: inherit;
+  color: #1A1D23;
+  background: #FFFFFF;
+}
+
+textarea {
+  resize: vertical;           /* dragging it wider would break the column it sits in */
+  min-height: 80px;
+}
+
+/* keyboard users need to be able to see where they are, and the browser default outline is
+   removed by some of the custom backgrounds below */
+a:focus-visible, button:focus-visible, input:focus-visible,
+select:focus-visible, textarea:focus-visible {
+  outline: 2px solid #0b68db;
+  outline-offset: 2px;
+}
+
 
 input {
   width: 100%;

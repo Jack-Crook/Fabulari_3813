@@ -5,8 +5,14 @@
     "description": "Fantasy readers book club",
     "ageLimit": 0,
     "theme": "#5FA8D3",
-    "adminEmails": ["jack@123"],
-    "memberEmails": ["jack@123", "hello@hello.com"]
+    "adminEmails": [
+      "jack@123"
+    ],
+    "memberEmails": [
+      "jack@123",
+      "hello@hello.com"
+    ],
+    "bannedEmails": []
   },
   {
     "id": "g2",
@@ -14,8 +20,13 @@
     "description": "Building things that move",
     "ageLimit": 16,
     "theme": "#7FDBC4",
-    "adminEmails": ["jack@123"],
-    "memberEmails": ["jack@123"]
+    "adminEmails": [
+      "jack@123"
+    ],
+    "memberEmails": [
+      "jack@123"
+    ],
+    "bannedEmails": []
   },
   {
     "id": "g3",
@@ -23,7 +34,26 @@
     "description": "Weekly movie discussion",
     "ageLimit": 18,
     "theme": "#7B3FF2",
-    "adminEmails": ["jack@123"],
-    "memberEmails": ["jack@123"]
+    "adminEmails": [
+      "jack@123"
+    ],
+    "memberEmails": [
+      "jack@123"
+    ],
+    "bannedEmails": []
+  },
+  {
+    "id": "g1787808118152",
+    "name": "test",
+    "description": "test group",
+    "ageLimit": 0,
+    "theme": "#e66100",
+    "adminEmails": [
+      "jack@123"
+    ],
+    "memberEmails": [
+      "jack@123"
+    ],
+    "bannedEmails": []
   }
 ]

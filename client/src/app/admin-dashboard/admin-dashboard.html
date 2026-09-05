@@ -12,13 +12,66 @@
 
   <!-- left hand column, everything about the group this admin runs -->
   <section class="admin-main">
-    <h2>Group Settings</h2>
+    <div class="section-head">
+      <h2>Group Settings</h2>
+      @if (!editingSettings()) {
+        <button type="button" class="inline" (click)="startEditingSettings()">Edit</button>
+      }
+    </div>
 
-    <!-- the two pills from the wireframe. read only for now, editing them is a later step -->
-    <div class="settings-row">
-      <div class="setting-pill">Name: {{ group()?.name }}</div>
-      <div class="setting-pill">Age Limit: {{ group()?.ageLimit }}</div>
+    <!-- read only pills. editing them needs no request at all — the spec only sends group
+         creation and deletion to the super admin. -->
+    @if (!editingSettings()) {
+      <div class="settings-row">
+        <div class="setting-pill">Name: {{ group()?.name }}</div>
+        <div class="setting-pill">Age Limit: {{ group()?.ageLimit || 'None' }}</div>
+        <div class="setting-pill">
+          Theme:
+          <span class="theme-dot" [style.background]="group()?.theme"></span>
+          {{ group()?.theme }}
+        </div>
+      </div>
+      <p class="setting-description">{{ group()?.description || 'No description.' }}</p>
+    }
 
+    @if (editingSettings()) {
+      <form class="settings-form" (ngSubmit)="onSaveSettings()">
+        <div class="field">
+          <label for="edit-name">Group name</label>
+          <input id="edit-name" name="edit-name" type="text" [(ngModel)]="formName" required />
+        </div>
+
+        <div class="field">
+          <label for="edit-description">Description</label>
+          <input id="edit-description" name="edit-description" type="text" [(ngModel)]="formDescription" />
+        </div>
+
+        <div class="field">
+          <label for="edit-age">Age limit (0 for no limit)</label>
+          <input id="edit-age" name="edit-age" type="number" min="0" [(ngModel)]="formAgeLimit" />
+          <!-- the spec says raising it boots members who no longer qualify, so the admin is
+               warned before they save rather than after -->
+          <span class="hint">Raising this removes members who are now under the limit.</span>
+        </div>
+
+        <div class="field">
+          <label for="edit-theme">Theme colour</label>
+          <input id="edit-theme" name="edit-theme" type="color" [(ngModel)]="formTheme" />
+          <span class="hint">Carries through to this group's chat rooms.</span>
+        </div>
+
+        <button type="submit">Save Changes</button>
+        <button type="button" class="secondary" (click)="editingSettings.set(false)">Cancel</button>
+      </form>
+    }
+
+    <!-- the one group level action an admin can't carry out themself -->
+    <div class="danger-zone">
+      <p class="danger-text">
+        A group admin can't delete their own group. This asks the super admin to do it, and is
+        also how a group with no working admin gets disbanded.
+      </p>
+      <button type="button" class="danger" (click)="onRequestDeletion()">Request Group Deletion</button>
     </div>
 
     <h2>Rooms</h2>
@@ -34,8 +87,20 @@
     <!-- signals are read by calling them, hence channels() -->
     @for (channel of channels(); track channel.id) {
       <div class="room-row">
-        <span class="room-name">{{ channel.name }}</span>
-        <button type="button" class="danger" (click)="onDeleteRoom(channel)">Delete</button>
+        <!-- only one room is ever being renamed, so the open row is the one whose id matches -->
+        @if (renamingChannelId() === channel.id) {
+          <form class="rename-room" (ngSubmit)="onRenameRoom(channel)">
+            <input name="rename" type="text" [(ngModel)]="renameValue" required />
+            <button type="submit" class="inline">Save</button>
+            <button type="button" class="inline secondary" (click)="renamingChannelId.set('')">Cancel</button>
+          </form>
+        } @else {
+          <span class="room-name">{{ channel.name }}</span>
+          <div class="row-actions">
+            <button type="button" class="inline secondary" (click)="startRenaming(channel)">Rename</button>
+            <button type="button" class="danger" (click)="onDeleteRoom(channel)">Delete</button>
+          </div>
+        }
       </div>
     }
 
@@ -57,37 +122,125 @@
         @for (email of group()?.memberEmails ?? []; track email) {
           <tr>
             <td>{{ email }}</td>
-            <td>{{ roleOf(email) }}</td>
             <td>
+              {{ roleOf(email) }}
+              @if (email === me) {
+                <span class="you-tag">you</span>
+              }
+            </td>
+            <td class="actions-cell">
+              <!-- promotion and demotion are the same pair of buttons for everyone, including
+                   yourself: an admin stepping down uses exactly the same endpoint. -->
+              @if (isAdmin(email)) {
+                <!-- disabled on the last admin, because a group must always keep one. the
+                     server returns 409 for this too, the disabled state just says so first. -->
+                <button type="button" class="inline secondary"
+                        [disabled]="isLastAdmin(email)"
+                        (click)="onDemote(email)">
+                  {{ email === me ? 'Step Down' : 'Demote' }}
+                </button>
+              } @else {
+                <button type="button" class="inline" (click)="onPromote(email)">Promote</button>
+              }
+
               <!-- removes them from this group only, the account still exists. trying this on
                    the last remaining admin comes back as a 409 and shows in the bar up top. -->
-              <button type="button" class="danger" (click)="onRemoveMember(email)">Remove</button>
+              <button type="button" class="danger"
+                      [disabled]="isLastAdmin(email)"
+                      (click)="onRemoveMember(email)">Remove</button>
+
+              <!-- opens the box below, which offers both a group ban and a report to the super
+                   admin. you can't ban or report yourself. -->
+              @if (email !== me) {
+                <button type="button" class="danger"
+                        [disabled]="isLastAdmin(email)"
+                        (click)="startBanning(email)">Ban…</button>
+              }
             </td>
           </tr>
+
+          <!-- the ban box drops in under the row it belongs to, so it's obvious who it's about -->
+          @if (banningEmail() === email) {
+            <tr class="ban-row">
+              <td colspan="3">
+                <label [attr.for]="'ban-reason-' + email">Reason</label>
+                <input [id]="'ban-reason-' + email" name="ban-reason" type="text"
+                       placeholder="Why is this happening?" [(ngModel)]="banReason" />
+                <div class="row-actions">
+                  <!-- group level: they lose this group and can't rejoin it, but the account
+                       and their other groups are untouched, and this can be lifted later -->
+                  <button type="button" class="danger" (click)="onBanFromGroup(email)">
+                    Ban from this group
+                  </button>
+                  <!-- system wide: only the super admin can actually do it, and only from a
+                       report like this one. the ban is permanent and the email can never be
+                       registered again, so it's a request rather than an action. -->
+                  <button type="button" class="danger" (click)="onReportUser(email)">
+                    Report for permanent ban
+                  </button>
+                  <button type="button" class="inline secondary" (click)="cancelBanning()">Cancel</button>
+                </div>
+              </td>
+            </tr>
+          }
         }
       </tbody>
 
     </table>
+
+    <!-- the spec says a group admin sees the member list and the banned list for their own
+         group. this is the second half of that. -->
+    <h2>Banned From This Group</h2>
+    @for (email of group()?.bannedEmails ?? []; track email) {
+      <div class="room-row">
+        <span class="room-name">{{ email }}</span>
+        <!-- a group level ban isn't permanent, unlike a system wide one, so it can be undone -->
+        <button type="button" class="inline secondary" (click)="onLiftBan(email)">Lift Ban</button>
+      </div>
+    }
+    @if ((group()?.bannedEmails ?? []).length === 0) {
+      <p class="empty">Nobody is banned from this group.</p>
+    }
   </section>
 
-  <!-- right hand column, people waiting to be let into the group -->
+  <!-- right hand column, the requests this admin is the one who actions -->
   <aside class="admin-side">
-    <h2>Join Requests</h2>
+    <h2>Room Proposals</h2>
+    <p class="side-note">
+      Members propose rooms and an admin of this group approves or rejects them. Joining is
+      direct, so there are no join requests to action here.
+    </p>
 
-    @for (request of joinRequests; track request.email) {
+    @for (request of proposals(); track request.id) {
       <div class="request-row">
-        <span class="request-email">{{ request.email }}</span>
-        <!-- buttons don't do anything yet, the approve/reject endpoints aren't built -->
-        <div class="request-actions">
-          <button type="button" class="approve">Approve</button>
-          <button type="button" class="reject">Reject</button>
-        </div>
+        <span class="request-email">{{ request.summary }}</span>
+        <p class="request-meta">by {{ request.requestedBy }} · {{ request.createdAt | date:'d MMM' }}</p>
+
+        @if (rejectingId() === request.id) {
+          <!-- the spec requires a reason on a rejection, and the server enforces it with a 400,
+               so the box appears before the rejection rather than after -->
+          <div class="reject-box">
+            <label [attr.for]="'reject-' + request.id">Reason for rejection</label>
+            <input [id]="'reject-' + request.id" name="reject-reason" type="text"
+                   [(ngModel)]="rejectReason" placeholder="Required" />
+            <div class="request-actions">
+              <button type="button" class="reject" (click)="onRejectProposal(request)">Confirm</button>
+              <button type="button" class="reject" (click)="cancelRejecting()">Cancel</button>
+            </div>
+          </div>
+        } @else {
+          <div class="request-actions">
+            <!-- you can't approve your own proposal, the server answers 403 -->
+            <button type="button" class="approve" (click)="onApproveProposal(request)">Approve</button>
+            <button type="button" class="reject" (click)="startRejecting(request)">Reject</button>
+          </div>
+        }
       </div>
     }
 
-    <!-- @empty runs when the list has nothing in it, so the panel isn't just blank -->
-    @if (joinRequests.length === 0) {
-      <p class="empty">No pending requests.</p>
+    <!-- so the panel isn't just blank when there's nothing waiting -->
+    @if (proposals().length === 0) {
+      <p class="empty">No pending proposals.</p>
     }
   </aside>
 

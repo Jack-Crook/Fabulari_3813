@@ -7,6 +7,16 @@
   box-sizing: border-box;
 }
 
+/* the profile card and the requests card stack in one 400px column, matching the width the
+   login and register cards already use */
+.profile-column {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 400px;
+  max-width: 100%;
+}
+
 .profile-top {
   display: flex;
   align-items: center;
@@ -14,12 +24,21 @@
   margin-bottom: 24px;
 }
 
+/* the spec rules out profile pictures, so the circle holds the first letter of the display
+   name instead of staying an empty blob */
 .avatar {
   width: 64px;
   height: 64px;
   border-radius: 50%;
   background: #5FA8D3;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFFFFF;
+  font-size: 28px;
+  font-weight: 700;
+  font-family: 'Fraunces Variable', Georgia, serif;
 }
 
 .username {
@@ -28,9 +47,17 @@
   font-weight: 600;
 }
 
+/* 'user' or 'super'. group admin isn't shown here because it isn't a role on the account */
+.role-tag {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #6B7280;
+}
+
 .info-row {
   display: flex;
   justify-content: space-between;
+  gap: 16px;
   padding: 12px 0;
   border-bottom: 1px solid #E2E4E9;
 }
@@ -39,8 +66,94 @@
   font-size: 14px;
   font-weight: 500;
   color: #6B7280;
+  flex-shrink: 0;
 }
 
 .info-value {
   font-size: 14px;
+  text-align: right;
+  word-break: break-word;     /* a long email or bio wraps instead of widening the card */
+}
+
+/* the grey note next to a value that can't be edited, or that isn't set yet */
+.locked {
+  display: block;
+  font-size: 12px;
+  color: #9CA3AF;
+}
+
+/* Cancel sits under Save. outlined rather than blue so it doesn't compete with the action
+   that actually saves. */
+.secondary {
+  background: #FFFFFF;
+  color: #6B7280;
+  border: 1px solid #E2E4E9;
+}
+
+.secondary:hover {
+  background: #F3F4F6;
+}
+
+/* my requests card */
+
+.card h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #6B7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 24px 0 12px;
+}
+
+.request-card {
+  background: #FAFAFA;
+  border: 1px solid #E2E4E9;
+  border-left: 3px solid #0b68db;   /* a pending request is marked in the action colour */
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+}
+
+/* a rejected one is marked in red instead, so the two lists read differently at a glance */
+.request-card.rejected {
+  border-left-color: #B91C1C;
+}
+
+.request-summary {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.request-reason {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: #B91C1C;
+}
+
+.request-meta {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #6B7280;
+}
+
+.empty {
+  font-size: 14px;
+  color: #6B7280;
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .profile-page {
+    padding: 24px 16px;
+  }
+
+  .info-row {
+    flex-direction: column;   /* label above value, the side by side pair is too tight on a phone */
+    gap: 4px;
+  }
+
+  .info-value {
+    text-align: left;
+  }
 }
