@@ -68,7 +68,7 @@ describe('ChatRoom', () => {
     load(makeGroup({ id: '', memberEmails: ['admin@test.com', 'member@test.com'] }));
 
     // messages are mock until socket.io in phase 2, but they're built from the real member
-    // list — with hardcoded addresses the admin indicator would have nobody to mark
+    // list, because with hardcoded addresses the admin indicator would have nobody to mark
     expect(component.messages().length).toBe(4);
     expect(component.messages()[0].sender).toBe('admin@test.com');
     expect(component.currentlyIn()).toEqual(['admin@test.com', 'member@test.com']);

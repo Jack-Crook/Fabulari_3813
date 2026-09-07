@@ -69,7 +69,7 @@ export class GroupView {
   }
 
   // the spec says regular users propose a room and the group admin approves or rejects it.
-  // an admin doesn't need this — they create rooms outright from the admin dashboard.
+  // an admin doesn't need this, because they create rooms outright from the admin dashboard.
   onPropose() {
     this.formError.set('');
     this.formSuccess.set('');

@@ -70,7 +70,7 @@ describe('Navbar', () => {
     mock.expectOne('http://localhost:3000/groups').flush([makeGroup()]);
 
     // group admin isn't a role on the account, it's whether this email is in that group's
-    // adminEmails — which is why the check needs the group as well as the user
+    // adminEmails, which is why the check needs the group as well as the user
     fixture.componentInstance.currentGroupId.set('g1');
     expect(fixture.componentInstance.isGroupAdmin()).toBe(true);
   });

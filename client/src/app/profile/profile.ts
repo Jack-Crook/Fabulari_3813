@@ -22,7 +22,7 @@ export class Profile {
   email = this.auth.email;    // the one field that can't be edited, because it identifies the account
 
   // signals throughout, because every one of these is set inside a subscribe callback and the
-  // app is zoneless — a plain property would hold the right value but leave the screen stale
+  // app is zoneless, so a plain property would hold the right value but leave the screen stale
   user = signal<AppUser | undefined>(undefined);
   myGroups = signal<Group[]>([]);
   myRequests = signal<AppRequest[]>([]);
@@ -113,7 +113,7 @@ export class Profile {
     this.formSuccess.set('');
 
     // email and role aren't in here at all. email is the account's unique identifier so the
-    // spec says it can't change, and role is what makes someone the super admin — letting a
+    // spec says it can't change, and role is what makes someone the super admin, and letting a
     // user PUT their own role would be a way to promote themself.
     const changes: ProfileChanges = {
       username: this.formUsername,

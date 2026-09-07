@@ -86,7 +86,7 @@ export class AdminDashboard {
   }
 
   // the spec says a group must always keep at least one admin, so the last one can't be
-  // demoted, removed or banned. the server enforces it with a 409 either way — this just
+  // demoted, removed or banned. the server enforces it with a 409 either way, and this just
   // greys the buttons out so it isn't a surprise.
   isLastAdmin(email: string) {
     const group = this.group();
@@ -116,7 +116,7 @@ export class AdminDashboard {
   }
 
   // no request needed for this. the spec is explicit that a group admin can change the name,
-  // description, theme and age limit whenever they like — only creating and deleting a group
+  // description, theme and age limit whenever they like. only creating and deleting a group
   // go to the super admin.
   onSaveSettings() {
     this.clearMessages();
@@ -227,7 +227,7 @@ export class AdminDashboard {
     });
   }
 
-  // the same call whether an admin is demoting someone else or stepping down themself — the
+  // the same call whether an admin is demoting someone else or stepping down themself, because the
   // spec treats both the same way, and both are refused if they'd leave the group adminless
   onDemote(email: string) {
     this.clearMessages();
@@ -281,7 +281,7 @@ export class AdminDashboard {
   }
 
   // a system wide ban is permanent and only the super admin can do it, and only from a group
-  // admin's report — the spec says an admin can't ban directly without a prior report. this is
+  // admin's report, since the spec says an admin can't ban directly without a prior report. this is
   // that report. the server refuses one without a reason, and refuses one against a user who is
   // some other group's only admin until a replacement is assigned there.
   onReportUser(email: string) {
@@ -322,7 +322,7 @@ export class AdminDashboard {
   }
 
   // the reason isn't optional. the server answers 400 without one, so the box has to be filled
-  // in before this does anything — which is the spec's rule, enforced rather than suggested.
+  // in before this does anything, which is the spec's rule, enforced rather than suggested.
   onRejectProposal(request: AppRequest) {
     this.clearMessages();
 

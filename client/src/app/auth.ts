@@ -1,7 +1,7 @@
 import { Service, inject } from '@angular/core';    // Service = injectable decorator; inject() = grabs a dependency
 import { HttpClient } from '@angular/common/http';  // lets this service make HTTP requests
 
-// one account as the server sends it back. the password is never in here — server.js strips it
+// one account as the server sends it back. the password is never in here, because server.js strips it
 // off every user it returns, so there's nothing to leak into the client.
 export interface AppUser {
   email: string;
@@ -17,7 +17,7 @@ export interface LoginResponse extends AppUser {
   message: string;
 }
 
-// what gets kept in localStorage once someone is logged in. deliberately smaller than AppUser —
+// what gets kept in localStorage once someone is logged in. deliberately smaller than AppUser,
 // only what the navbar and the group pages need to decide what to show. everything else is
 // fetched fresh, because localStorage goes stale the moment the profile is edited elsewhere.
 export interface StoredUser {
@@ -65,7 +65,11 @@ export class Auth {
   // PUT /users/:email. only the fields in `changes` are sent, so leaving password out of the
   // object means "don't touch the password" rather than "set it to empty".
   updateProfile(email: string, changes: ProfileChanges) {
-    return this.http.put<AppUser>(`${this.apiUrl}/users/${encodeURIComponent(email)}`, changes);
+    // actorEmail says who is asking. the server refuses the edit unless it matches the account
+    // in the url, so one signed in user can't PUT another user's password. same "the caller
+    // tells the server who they are" pattern GroupService uses on its write methods.
+    return this.http.put<AppUser>(`${this.apiUrl}/users/${encodeURIComponent(email)}`,
+      { ...changes, actorEmail: this.email });
   }
 
   saveUser(user: StoredUser) {     // called after a successful login so the rest of the app knows who is signed in
@@ -78,7 +82,7 @@ export class Auth {
   }
 
   // used by the route guards and by every component that needs "who am I" as a plain string.
-  // this is state, not security — the server doesn't verify it, it just stops the wrong pages
+  // this is state, not security. the server doesn't verify it, it just stops the wrong pages
   // being rendered by someone typing a url.
   get email(): string {
     return this.getUser()?.email ?? '';

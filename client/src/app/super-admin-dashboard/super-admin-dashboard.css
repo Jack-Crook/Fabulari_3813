@@ -32,7 +32,7 @@ h2 {
 }
 
 /* the short explanation under a panel heading. these carry the spec rules that would
-   otherwise only exist as an absence — no unban button, no join requests, and so on. */
+   otherwise only exist as an absence: no unban button, no join requests, and so on. */
 .side-note {
   font-size: 13px;
   color: #6B7280;
@@ -58,7 +58,7 @@ h2 {
   padding: 6px 10px;
 }
 
-/* pending requests — same row/button pattern as admin-dashboard's proposals panel */
+/* pending requests, same row/button pattern as admin-dashboard's proposals panel */
 .request-row {
   background: #FFFFFF;
   border: 1px solid #E2E4E9;
@@ -153,7 +153,7 @@ h2 {
 
 /* members list scrolls instead of growing the panel, matches the scrollbar drawn in the wireframe */
 .scroll-list {
-  max-height: 260px;             /* without a height, overflow-y: auto has nothing to scroll — it just grows */
+  max-height: 260px;             /* without a height, overflow-y: auto has nothing to scroll, it just grows */
   overflow-y: auto;
   border: 1px solid #E2E4E9;
   border-radius: 6px;

@@ -60,7 +60,7 @@ describe('GroupView', () => {
     await build('stranger@test.com');
     load();
 
-    // every group is visible to everyone, so a non-member can open this page — they just
+    // every group is visible to everyone, so a non-member can open this page, and they just
     // can't propose a room in it
     expect(component.isMember()).toBe(false);
   });
@@ -101,7 +101,7 @@ describe('GroupView', () => {
     load(makeGroup({ id: '' }), [makeRequest({ payload: { name: 'Spoilers' } })]);
 
     // shown so a member can see their proposal is queued rather than lost, but not as a
-    // clickable room — the channel doesn't exist yet
+    // clickable room, because the channel doesn't exist yet
     expect(component.proposals().length).toBe(1);
     expect(component.channels().length).toBe(1);
   });

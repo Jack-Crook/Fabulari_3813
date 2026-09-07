@@ -62,7 +62,7 @@ export class RequestService {
     return this.http.get<AppRequest[]>(`${this.apiUrl}/requests`, { params });
   }
 
-  // POST /requests. the server validates per type — a duplicate group name, a room that already
+  // POST /requests. the server validates per type: a duplicate group name, a room that already
   // exists, a ban report with no reason and a report against a group's only admin are all refused.
   raise(type: RequestType, requestedBy: string, payload: any, groupId = '') {
     return this.http.post<AppRequest>(`${this.apiUrl}/requests`, { type, requestedBy, groupId, payload });
@@ -74,7 +74,7 @@ export class RequestService {
     return this.http.post<AppRequest>(`${this.apiUrl}/requests/${requestId}/approve`, { actorEmail });
   }
 
-  // POST /requests/:id/reject. reason isn't optional — the server answers 400 without one.
+  // POST /requests/:id/reject. reason isn't optional, because the server answers 400 without one.
   reject(requestId: string, actorEmail: string, reason: string) {
     return this.http.post<AppRequest>(`${this.apiUrl}/requests/${requestId}/reject`, { actorEmail, reason });
   }

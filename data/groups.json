@@ -41,19 +41,5 @@
       "jack@123"
     ],
     "bannedEmails": []
-  },
-  {
-    "id": "g1787808118152",
-    "name": "test",
-    "description": "test group",
-    "ageLimit": 0,
-    "theme": "#e66100",
-    "adminEmails": [
-      "jack@123"
-    ],
-    "memberEmails": [
-      "jack@123"
-    ],
-    "bannedEmails": []
   }
 ]

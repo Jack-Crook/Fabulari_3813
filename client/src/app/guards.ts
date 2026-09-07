@@ -32,8 +32,8 @@ export const superAdminGuard: CanActivateFn = () => {
   return auth.isSuper ? true : router.createUrlTree(['/user-dashboard']);
 };
 
-// group admin isn't a role on the user — it's whether their email is in that group's
-// adminEmails — so this one has to fetch the group before it can answer. Returning the
+// group admin isn't a role on the user, it's whether their email is in that group's
+// adminEmails, so this one has to fetch the group before it can answer. Returning the
 // observable is fine: the router waits for it to emit before deciding.
 export const groupAdminGuard: CanActivateFn = (route) => {
   const auth = inject(Auth);

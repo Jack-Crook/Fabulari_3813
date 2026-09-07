@@ -43,7 +43,7 @@ export class Register {
         // rather than editing users.json by hand, the very first account to register on an
         // empty system becomes it, and the server sends the role back so this page can say so.
         this.successmessage.set(res.role === 'super'
-          ? 'Registered as the super admin — this was the first account on the system. You can now log in.'
+          ? 'Registered as the super admin. This was the first account on the system. You can now log in.'
           : 'Registered successfully. You can now log in.');
         this.email = '';    // clear the form
         this.password = '';

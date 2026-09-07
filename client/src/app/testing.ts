@@ -88,8 +88,8 @@ export function makeUser(overrides: Partial<AppUser> = {}): AppUser {
   };
 }
 
-// Several components fire more than one request the moment they're built — groups, channels
-// and requests all at once — and the order isn't something a test should depend on. This
+// Several components fire more than one request the moment they're built: groups, channels
+// and requests all at once, and the order isn't something a test should depend on. This
 // answers whichever of them are open by matching on the URL, and ignores any that aren't.
 export function flushByUrl(mock: HttpTestingController, answers: Record<string, any>) {
   Object.entries(answers).forEach(([urlPart, body]) => {

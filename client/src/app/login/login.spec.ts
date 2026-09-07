@@ -40,7 +40,7 @@ describe('Login', () => {
     });
 
     // localStorage is what every other page reads to work out who is signed in. it's state,
-    // not security — the server never checks it.
+    // not security, because the server never checks it.
     expect(TestBed.inject(Auth).getUser()).toEqual({ email: 'a@b.com', role: 'user', username: 'ab' });
     expect(component.successmessage()).toBe('Logged in successfully.');
   });

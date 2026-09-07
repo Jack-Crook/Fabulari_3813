@@ -21,7 +21,7 @@ export class SuperAdminDashboard {
   me = this.auth.email;   // sent as actorEmail on every approve and reject so the server can check the role
 
   // all four panels are signals, because every one is filled from a subscribe callback and the
-  // app is zoneless — a plain array would be set but never drawn
+  // app is zoneless, so a plain array would be set but never drawn
   pendingRequests = signal<AppRequest[]>([]);
   users = signal<AppUser[]>([]);
   groups = signal<Group[]>([]);
@@ -45,7 +45,7 @@ export class SuperAdminDashboard {
   }
 
   private load() {
-    // scope: 'super' returns only the three types the super admin actions — group creations,
+    // scope: 'super' returns only the three types the super admin actions: group creations,
     // group deletions and ban reports. room proposals go to the group's own admin instead.
     this.requestService.getRequests({ status: 'pending', scope: 'super' })
       .subscribe(requests => this.pendingRequests.set(requests));

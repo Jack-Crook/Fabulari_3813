@@ -77,8 +77,8 @@ describe('SuperAdminDashboard', () => {
 
     component.onFilterAudit('User Banned');
 
-    // the spec asks for a log filterable by type in date order, and both happen on the server
-    // — so changing the filter refetches rather than hiding rows already on the page
+    // the spec asks for a log filterable by type in date order, and both happen on the server,
+    // so changing the filter refetches rather than hiding rows already on the page
     const req = mock.expectOne(r => r.url === 'http://localhost:3000/audit');
     expect(req.request.params.get('type')).toBe('User Banned');
     req.flush([]);
@@ -91,7 +91,7 @@ describe('SuperAdminDashboard', () => {
 
     component.onApprove(request);
 
-    // approving is what actually carries the request out — the group is created on the
+    // approving is what actually carries the request out, and the group is created on the
     // server, with the requester as its first admin
     const req = mock.expectOne('http://localhost:3000/requests/r1/approve');
     expect(req.request.body.actorEmail).toBe('boss@test.com');

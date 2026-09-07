@@ -110,7 +110,7 @@ a.group-row:hover {
   color: #0b68db;
 }
 
-/* every group is visible whatever your age, so this is a label rather than a lock — the
+/* every group is visible whatever your age, so this is a label rather than a lock, because the
    check happens on the server when you try to join */
 .age-badge {
   background: #FEF3C7;

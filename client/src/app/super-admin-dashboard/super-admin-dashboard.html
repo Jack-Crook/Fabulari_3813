@@ -14,10 +14,10 @@
     <h2>Pending Requests</h2>
     <!-- the spec says the super admin only actions requests: they can't create a group
          directly, can't ban anyone without a group admin's report first, and can't approve a
-         request they raised — which is moot here because they're blocked from raising any. -->
+         request they raised, which is moot here because they're blocked from raising any. -->
     <p class="side-note">
       Everything the super admin does starts as someone else's request. Room proposals aren't
-      here — those go to the group's own admin.
+      here, they go to the group's own admin.
     </p>
 
     @for (request of pendingRequests(); track request.id) {
@@ -73,7 +73,7 @@
   <section class="panel">
     <h2>Members</h2>
     <p class="side-note">
-      Every registered account. The super admin can't create, edit or deactivate one — only ban
+      Every registered account. The super admin can't create, edit or deactivate one, only ban
       it permanently, and only from a group admin's report.
     </p>
     <div class="scroll-list">

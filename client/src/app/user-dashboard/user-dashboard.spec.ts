@@ -44,7 +44,7 @@ describe('UserDashboard', () => {
     await build('member@test.com');
     flushByUrl(mock, { '/groups': groups, '/requests': [] });
 
-    // one call fills both panels — the difference is only whether this email is in the
+    // one call fills both panels, and the difference is only whether this email is in the
     // group's member list
     expect(component.myGroups().map(g => g.id)).toEqual(['g1']);
     expect(component.discover().map(g => g.id)).toEqual(['g2']);
@@ -54,7 +54,7 @@ describe('UserDashboard', () => {
     await build('boss@test.com', 'super');
     flushByUrl(mock, { '/groups': groups });
 
-    // the super admin can't be a member of any group, so the member split doesn't apply —
+    // the super admin can't be a member of any group, so the member split doesn't apply,
     // they oversee all of them instead
     expect(component.myGroups().length).toBe(2);
     expect(component.discover().length).toBe(0);
@@ -80,7 +80,7 @@ describe('UserDashboard', () => {
     component.onRequestGroup();
 
     // the spec says group creation goes to the super admin, and that the requester supplies
-    // the details up front — so this posts a request, not a group
+    // the details up front, so this posts a request, not a group
     const req = mock.expectOne('http://localhost:3000/requests');
     expect(req.request.body.type).toBe('group-create');
     expect(req.request.body.payload.name).toBe('Chess Club');

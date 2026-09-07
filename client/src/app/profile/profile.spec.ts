@@ -36,7 +36,7 @@ describe('Profile', () => {
   it('reads the profile from the server rather than localStorage', async () => {
     await build();
     // localStorage only holds email, role and username, and goes stale the moment the profile
-    // is edited — so the page fetches the stored record instead
+    // is edited, so the page fetches the stored record instead
     flushByUrl(mock, { '/users/': makeUser({ username: 'Stored Name', bio: 'from the server' }), '/groups': [], '/requests': [] });
 
     expect(component.user()?.username).toBe('Stored Name');
@@ -53,7 +53,7 @@ describe('Profile', () => {
       '/groups': [], '/requests': [],
     });
 
-    // age isn't stored, it's derived — the same calculation the server does when it checks a
+    // age isn't stored, it's derived using the same calculation the server does when it checks a
     // group's age limit
     expect(component.age()).toBe(20);
   });
@@ -84,7 +84,7 @@ describe('Profile', () => {
       '/requests': [],
     });
 
-    // group admin is a relationship with a group, not a role on the account — this user is an
+    // group admin is a relationship with a group, not a role on the account, and this user is an
     // admin of one group and a plain member of the other
     expect(component.myGroups().length).toBe(2);
     expect(component.adminOf().map(g => g.id)).toEqual(['g1']);
@@ -99,7 +99,7 @@ describe('Profile', () => {
     component.onSave();
 
     const req = mock.expectOne(r => r.method === 'PUT');
-    // omitting it means "leave the password alone" — sending an empty one would blank it
+    // omitting it means "leave the password alone", because sending an empty one would blank it
     expect(req.request.body.password).toBeUndefined();
     expect(req.request.body.username).toBe('New Name');
     req.flush(makeUser({ username: 'New Name' }));

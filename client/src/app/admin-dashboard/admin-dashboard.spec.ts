@@ -43,7 +43,7 @@ describe('AdminDashboard', () => {
     await build();
     load(makeGroup({ id: '', adminEmails: ['admin@test.com'], memberEmails: ['admin@test.com', 'member@test.com'] }));
 
-    // there is no per-member role stored anywhere — an admin is just an email that appears in
+    // there is no per-member role stored anywhere. an admin is just an email that appears in
     // the group's adminEmails
     expect(component.roleOf('admin@test.com')).toBe('Admin');
     expect(component.roleOf('member@test.com')).toBe('Member');
@@ -74,7 +74,7 @@ describe('AdminDashboard', () => {
     component.formAgeLimit = 18;
     component.onSaveSettings();
 
-    // no request needed to edit a group — the spec only sends creation and deletion to the
+    // no request needed to edit a group, because the spec only sends creation and deletion to the
     // super admin. the server still checks the caller really is an admin here.
     const req = mock.expectOne(r => r.method === 'PATCH');
     expect(req.request.body.actorEmail).toBe('admin@test.com');
@@ -115,7 +115,7 @@ describe('AdminDashboard', () => {
     component.banReason = 'harassment';
     component.onReportUser('bad@test.com');
 
-    // only the super admin can ban system wide, and only from a group admin's report — an
+    // only the super admin can ban system wide, and only from a group admin's report, so an
     // admin can't ban directly without a prior report
     const req = mock.expectOne('http://localhost:3000/requests');
     expect(req.request.body.type).toBe('user-ban');
@@ -130,7 +130,7 @@ describe('AdminDashboard', () => {
     component.banReason = 'spam';
     component.onBanFromGroup('bad@test.com');
 
-    // a group level ban is the admin's own call — the account still exists and keeps its
+    // a group level ban is the admin's own call: the account still exists and keeps its
     // other groups, and this ban can be lifted later
     const req = mock.expectOne(r => r.url.includes('/bans') && r.method === 'POST');
     expect(req.request.body.reason).toBe('spam');

@@ -61,7 +61,7 @@ describe('Register', () => {
   it('shows the server\'s message when the email is permanently banned', () => {
     component.onSubmit();
 
-    // a system wide ban is permanent — the account is deleted and the email blacklisted, so
+    // a system wide ban is permanent: the account is deleted and the email blacklisted, so
     // registering again with it is refused rather than silently creating a new account
     mock.expectOne('http://localhost:3000/register').flush(
       { error: 'This email is permanently banned and cannot be reused' },

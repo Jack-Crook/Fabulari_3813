@@ -118,8 +118,8 @@ function ageProblem(user, group) {
   return null;
 }
 
-// group creation happens from two places — the direct POST /groups route and approving a
-// group-create request — so the record is built in one place rather than written out twice.
+// group creation happens from two places, the direct POST /groups route and approving a
+// group-create request, so the record is built in one place rather than written out twice.
 function createGroupRecord(groups, { name, description, ageLimit, theme }, creatorEmail) {
   const newGroup = {
     id: makeId('g'),
@@ -171,7 +171,7 @@ app.post('/register', (req, res) => {       // handles new user signups
         return res.status(409).json({error: 'Email is already registered'});        //
     }
 
-    // a system wide ban is permanent — the spec says the email can never be reused, so the
+    // a system wide ban is permanent: the spec says the email can never be reused, so the
     // banned list is checked here rather than only at login. deleting the account isn't enough
     // on its own, because nothing would stop them signing up again with the same address.
     const banned = readData(bannedPath).find(b => b.email === cleanEmail);
@@ -244,11 +244,18 @@ app.get('/users/:email', (req, res) => {        // one account, used by the prof
 });
 
 // the spec says a user can edit every profile field except their email, because email is the
-// unique identifier for the account. role isn't editable either — nobody can promote themself
+// unique identifier for the account. role isn't editable either, so nobody can promote themself
 // to super admin by PUTing their own profile.
 app.put('/users/:email', (req, res) => {
     const email = normaliseEmail(req.params.email);
-    const { username, dob, bio, password } = req.body;
+    const { username, dob, bio, password, actorEmail } = req.body;
+
+    // only the account holder can edit their own profile. there is deliberately no admin
+    // override: the spec says the super admin cannot create, edit or deactivate an account,
+    // only permanently ban one. without this check anyone could PUT anyone's password.
+    if (normaliseEmail(actorEmail) !== email) {
+        return res.status(403).json({ error: 'You can only edit your own profile' });
+    }
 
     const users = readData(usersPath);
     const user = users.find(u => u.email === email);
@@ -327,7 +334,7 @@ app.post('/groups', (req, res) => {     // creates a group
 });
 
 // a group admin can change the name, description, theme colour and age limit at any time with
-// no request needed — the spec is explicit that only creating and deleting a group need the
+// no request needed, because the spec is explicit that only creating and deleting a group need the
 // super admin. actorEmail is in the body so the server can check they really are an admin here.
 app.patch('/groups/:id', (req, res) => {
     const { name, description, ageLimit, theme, actorEmail } = req.body;
@@ -370,7 +377,7 @@ app.patch('/groups/:id', (req, res) => {
             group.ageLimit = newLimit;
 
             // the spec says raising the age limit automatically removes members who no longer
-            // meet it. only on a raise — lowering it can't make anyone ineligible.
+            // meet it. only on a raise, because lowering it can't make anyone ineligible.
                 if (raising) {
                     const users = readData(usersPath);
                     booted = group.memberEmails.filter(email => {
@@ -467,6 +474,14 @@ app.delete('/groups/:id/members/:email', (req, res) => {    // removes a user fr
             return res.status(404).json({ error: 'Group not found' });
     }
 
+    // a group admin can remove a member, and a member can remove themself, which is what the
+    // Leave button does. anyone else has no business doing either, so this is the same check
+    // the ban and promote routes already make.
+    const actor = normaliseEmail(req.query.actorEmail);
+        if (actor !== email && !group.adminEmails.includes(actor)) {
+            return res.status(403).json({ error: 'Only an admin of this group can remove a member' });
+    }
+
         if (group.adminEmails.includes(email) && group.adminEmails.length === 1) {   // a group always needs at least one admin left behind
             return res.status(409).json({ error: 'Cannot remove the only admin of this group' });
     }
@@ -474,11 +489,11 @@ app.delete('/groups/:id/members/:email', (req, res) => {    // removes a user fr
     group.memberEmails = group.memberEmails.filter(m => m !== email);   // filter keeps everyone except the removed email
     group.adminEmails = group.adminEmails.filter(a => a !== email);     // if they were an admin as well, drop them from that list too
     writeData(groupsPath, groups);
-    logAudit('Member Removed', normaliseEmail(req.query.actorEmail) || email, `${email} left or was removed from "${group.name}"`);
+    logAudit('Member Removed', actor || email, `${email} left or was removed from "${group.name}"`);
     res.status(200).json(group);
 });
 
-// group level ban. the account still exists and they keep every other group — this only stops
+// group level ban. the account still exists and they keep every other group, so this only stops
 // them being in this one, and unlike a system wide ban it can be lifted.
 app.post('/groups/:id/bans', (req, res) => {
     const email = normaliseEmail(req.body.email);
@@ -505,7 +520,7 @@ app.post('/groups/:id/bans', (req, res) => {
     group.adminEmails = group.adminEmails.filter(a => a !== email);
     group.bannedEmails.push(email);
     writeData(groupsPath, groups);
-    logAudit('Group Ban', actor, `Banned ${email} from "${group.name}"${reason ? ` — ${reason}` : ''}`);
+    logAudit('Group Ban', actor, `Banned ${email} from "${group.name}"${reason ? `, reason: ${reason}` : ''}`);
     res.status(200).json(group);
 });
 
@@ -599,6 +614,7 @@ app.get('/channels', (req, res) => {        // /channels lists them all, /channe
 
 app.post('/channels', (req, res) => {       // creates a channel inside a group
     const { groupId, name } = req.body;
+    const actor = normaliseEmail(req.body.actorEmail);
 
         if (!groupId || !name) {
             return res.status(400).json({ error: 'Group id and channel name are required' });
@@ -608,6 +624,13 @@ app.post('/channels', (req, res) => {       // creates a channel inside a group
     const group = groups.find(g => g.id === groupId);
         if (!group) {      // a channel can't exist on its own, it has to belong to a real group
             return res.status(404).json({ error: 'Group not found' });
+    }
+
+    // only an admin creates a room outright. the spec says a regular member proposes one and
+    // an admin approves it, so without this check the whole propose/approve flow is optional:
+    // a member could just POST the room they were supposed to ask for.
+        if (!group.adminEmails.includes(actor)) {
+            return res.status(403).json({ error: 'Only an admin of this group can create a room. Propose it instead.' });
     }
 
     const channels = readData(channelsPath);
@@ -620,7 +643,7 @@ app.post('/channels', (req, res) => {       // creates a channel inside a group
     const newChannel = { id: makeId('c'), groupId, name: String(name).trim() };
     channels.push(newChannel);
     writeData(channelsPath, channels);
-    logAudit('Room Created', normaliseEmail(req.body.actorEmail) || 'system', `Created room "${newChannel.name}" in "${group.name}"`);
+    logAudit('Room Created', actor, `Created room "${newChannel.name}" in "${group.name}"`);
     res.status(201).json(newChannel);
 });
 
@@ -665,8 +688,16 @@ app.delete('/channels/:id', (req, res) => {     // group admins can delete a roo
             return res.status(404).json({ error: 'Channel not found' });
     }
 
+    // the same check PATCH /channels/:id makes. renaming a room was guarded and deleting it
+    // was not, which meant anyone could delete any room in any group.
+    const actor = normaliseEmail(req.query.actorEmail);
+    const group = readGroups().find(g => g.id === channel.groupId);
+        if (!group || !group.adminEmails.includes(actor)) {
+            return res.status(403).json({ error: 'Only an admin of this group can delete a room' });
+    }
+
     writeData(channelsPath, channels.filter(c => c.id !== channel.id));
-    logAudit('Room Deleted', normaliseEmail(req.query.actorEmail) || 'system', `Deleted room "${channel.name}"`);
+    logAudit('Room Deleted', actor, `Deleted room "${channel.name}"`);
     res.status(200).json({ message: 'Channel deleted' });
 });
 
@@ -802,7 +833,7 @@ app.post('/requests', (req, res) => {
                 if (!group) {
                     return res.status(404).json({ error: 'Group not found' });
             }
-                // "admins cannot ban directly without a prior report" — the report is this
+                // "admins cannot ban directly without a prior report". the report is this
                 // request, and only a group admin can raise it
                 if (!group.adminEmails.includes(requester)) {
                     return res.status(403).json({ error: 'Only a group admin can report a user for a system wide ban' });
@@ -898,6 +929,14 @@ app.post('/requests/:id/approve', (req, res) => {
     // carrying out the request is the whole point of approving it, so each type does its work here
     switch (request.type) {
         case 'group-create': {
+            // re-checked at approval time, not just when the request was raised, because a
+            // group with this name could have been created while the request sat in the queue.
+            // the two cases below re-check their own rules for exactly the same reason, and
+            // without this the "group names are unique" rule breaks on an approval.
+            const wantedName = String(request.payload.name ?? '').trim();
+                if (groups.find(g => g.name.toLowerCase() === wantedName.toLowerCase())) {
+                    return res.status(409).json({ error: 'A group with that name already exists' });
+            }
             const created = createGroupRecord(groups, request.payload, request.requestedBy);
             writeData(groupsPath, groups);
             logAudit('Group Created', actor, `Approved "${created.name}", ${request.requestedBy} is its first admin`);
@@ -918,7 +957,7 @@ app.post('/requests/:id/approve', (req, res) => {
         case 'channel-create': {
             const channels = readData(channelsPath);
             const roomName = String(request.payload.name).trim();
-                // re-checked at approval time, not just when the request was raised — an admin
+                // re-checked at approval time, not just when the request was raised, because an admin
                 // could have created a room with the same name while this sat in the queue
                 if (channels.find(c => c.groupId === request.groupId && c.name.toLowerCase() === roomName.toLowerCase())) {
                     return res.status(409).json({ error: 'That group already has a channel with this name' });
@@ -958,7 +997,7 @@ app.post('/requests/:id/approve', (req, res) => {
                 bannedBy: actor,
             });
             writeData(bannedPath, banned);
-            logAudit('User Banned', actor, `Permanently banned ${target} — ${request.payload.reason ?? 'no reason given'}`);
+            logAudit('User Banned', actor, `Permanently banned ${target}. Reason: ${request.payload.reason ?? 'no reason given'}`);
             break;
         }
     }
@@ -997,7 +1036,7 @@ app.post('/requests/:id/reject', (req, res) => {
             return res.status(404).json({ error: 'User not found' });
     }
 
-    // the same authority check as approve — rejecting is just as much an admin action
+    // the same authority check as approve, because rejecting is just as much an admin action
         if (SUPER_TYPES.includes(request.type)) {
             if (actorUser.role !== 'super') {
                 return res.status(403).json({ error: 'Only the super admin can action this request' });
@@ -1014,7 +1053,7 @@ app.post('/requests/:id/reject', (req, res) => {
     request.resolvedAt = new Date().toISOString();
     request.resolvedBy = actor;
     writeData(requestsPath, requests);
-    logAudit('Request Rejected', actor, `${request.summary} — rejected: ${reason}`);
+    logAudit('Request Rejected', actor, `${request.summary}. Rejected: ${reason}`);
     res.status(200).json(request);
 });
 

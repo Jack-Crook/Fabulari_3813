@@ -2,3 +2,9 @@ node_modules/
 dist/
 .angular/
 .DS_Store
+
+# secrets: the JWT signing key and the mongo connection string live here in phase 2.
+# ignored before the file exists, because a secret that reaches a commit stays in the history.
+.env
+.env.*
+!.env.example

@@ -29,7 +29,7 @@ export class ChatRoom {
 
   // Messages are mock until socket.io in phase 2. They're built from the group's real member
   // list rather than hardcoded addresses, so the admin indicator below actually has a group
-  // admin to mark — with fixed emails it would mark nobody in most groups.
+  // admin to mark, because with fixed emails it would mark nobody in most groups.
   messages = computed(() => {
     const members = this.group()?.memberEmails ?? [];
     if (members.length === 0) {
@@ -45,7 +45,7 @@ export class ChatRoom {
     ];
   });
 
-  // who is currently in the room. mock for the same reason — real presence needs socket.io,
+  // who is currently in the room. mock for the same reason, because real presence needs socket.io,
   // which is phase 2. taking the first few members keeps it consistent with the messages above.
   currentlyIn = computed(() => (this.group()?.memberEmails ?? []).slice(0, 3));
 

@@ -31,7 +31,7 @@
   transition: filter 0.15s;
 }
 
-/* was missing entirely — every other clickable row in the app has a hover state, this one didn't */
+/* was missing entirely, because every other clickable row in the app has a hover state and this one didn't */
 .group-tile:hover {
   filter: brightness(0.95);         /* darkens whatever theme colour the tile already has, rather than a fixed overlay colour that would look wrong against every theme */
 }
@@ -48,7 +48,7 @@
 }
 
 /* the banner carries the group's own theme colour, which the spec makes the group's one
-   customisation — there are no group profile pictures */
+   customisation, because there are no group profile pictures */
 .group-banner {
   display: flex;
   align-items: center;
@@ -163,7 +163,7 @@
 }
 
 /* rooms that have been proposed but not yet approved. deliberately not styled like a real
-   room row — they aren't clickable, because the channel doesn't exist yet. */
+   room row, but they aren't clickable, because the channel doesn't exist yet. */
 .proposed-head {
   font-size: 13px;
   font-weight: 600;

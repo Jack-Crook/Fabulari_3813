@@ -68,7 +68,7 @@
         @if (proposals().length) {
           <h3 class="proposed-head">Proposed, awaiting an admin</h3>
           @for (request of proposals(); track request.id) {
-            <p class="proposed-row">{{ request.payload.name }} — proposed by {{ request.requestedBy }}</p>
+            <p class="proposed-row">{{ request.payload.name }}, proposed by {{ request.requestedBy }}</p>
           }
         }
 
@@ -84,7 +84,7 @@
         }
       </div>
     } @else {
-      <!-- a bad/stale :id in the url — without this it silently looked the same as a real group with zero rooms -->
+      <!-- a bad/stale :id in the url, and without this it silently looked the same as a real group with zero rooms -->
       <div class="rooms">
         <p class="empty">Group not found.</p>
       </div>

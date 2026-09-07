@@ -50,14 +50,14 @@
             } @else {
               <!-- worth calling out, because joining a group with an age limit is refused
                    until there's a date of birth to check against -->
-              <span class="locked">Not set — needed to join age restricted groups</span>
+              <span class="locked">Not set, needed to join age restricted groups</span>
             }
           </span>
         </div>
 
         <div class="info-row">
           <span class="info-label">Bio</span>
-          <span class="info-value">{{ user()?.bio || '—' }}</span>
+          <span class="info-value">{{ user()?.bio || 'None' }}</span>
         </div>
 
         <div class="info-row">

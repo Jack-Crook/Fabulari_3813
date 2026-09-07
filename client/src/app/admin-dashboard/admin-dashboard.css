@@ -59,7 +59,7 @@ h2 {
   font-size: 13px;
 }
 
-/* Cancel, Rename, Lift Ban — actions that shouldn't compete with the blue primary one */
+/* Cancel, Rename, Lift Ban: actions that shouldn't compete with the blue primary one */
 .secondary {
   background: #FFFFFF;
   color: #6B7280;

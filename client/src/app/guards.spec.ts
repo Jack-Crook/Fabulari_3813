@@ -52,7 +52,7 @@ describe('route guards', () => {
     const result = TestBed.runInInjectionContext(() => groupAdminGuard(routeWithGroup('g1'), emptyState));
 
     // group admin isn't a role on the user, so the guard has to fetch the group before it can
-    // answer — which is why this one returns an observable and the other two don't
+    // answer, which is why this one returns an observable and the other two don't
     expect(isObservable(result)).toBe(true);
 
     // HttpClient's observables are cold: nothing is sent until something subscribes, and

@@ -85,7 +85,7 @@
         <!-- the super admin is never a member of a group, so there's nothing for them to leave -->
         @if (!isSuper) {
           <!-- the same endpoint an admin uses to remove someone. leaving is refused with a 409
-               if you're the group's last admin — disbanding goes through the super admin. -->
+               if you're the group's last admin, and disbanding goes through the super admin. -->
           <button type="button" class="leave" (click)="onLeave(group)">Leave</button>
         }
       </div>
@@ -116,7 +116,7 @@
              (input)="searchTerm.set($any($event.target).value)">
 
       <!-- groups the user isn't in yet. the spec says every group is visible whatever your age,
-           and the age check happens when you try to join — the server answers 403 and the
+           and the age check happens when you try to join. the server answers 403 and the
            reason appears in the bar at the top of the page. -->
       @for (group of filteredDiscover(); track group.id) {
         <div class="discover-row">

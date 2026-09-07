@@ -21,12 +21,12 @@ export const routes: Routes = [
 
   // two guards, run in order: signed in at all, then an admin of this particular group.
   // groupAdminGuard has to read :groupId out of the route, which is why the page is
-  // parameterised — a user can admin any number of groups.
+  // parameterised, because a user can admin any number of groups.
   {path: 'admin-dashboard/:groupId', component: AdminDashboard, canActivate: [authGuard, groupAdminGuard]},
 
   {path: 'super-admin-dashboard', component: SuperAdminDashboard, canActivate: [authGuard, superAdminGuard]},
   {path: 'groups/:id', component: GroupView, canActivate: [authGuard]},                                  // :id is the group being opened
   {path: 'groups/:groupId/channels/:channelId', component: ChatRoom, canActivate: [authGuard]},          // one room inside that group
 
-  { path: '**', redirectTo: 'login' }          // any unmatched url, e.g. a typo, otherwise renders a blank page — router-outlet has nothing to put there. must stay last, first match wins.
+  { path: '**', redirectTo: 'login' }          // any unmatched url, e.g. a typo, otherwise renders a blank page, because router-outlet has nothing to put there. must stay last, first match wins.
 ];

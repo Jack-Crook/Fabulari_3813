@@ -28,7 +28,7 @@ export interface GroupEditResponse {
 }
 
 // the fields a group admin can change without asking anyone. the spec is explicit that only
-// creating and deleting a group need the super admin — editing one doesn't.
+// creating and deleting a group need the super admin, and editing one doesn't.
 export interface GroupChanges {
   name?: string;
   description?: string;
@@ -51,7 +51,7 @@ export class GroupService {
 
   // POST /groups. the server puts creatorEmail into both adminEmails and memberEmails, so
   // whoever fills in the form becomes that group's first admin, which is what the spec asks for.
-  // the UI no longer calls this directly — a user raises a group-create request instead and the
+  // the UI no longer calls this directly. a user raises a group-create request instead and the
   // super admin's approval runs the same code on the server. it's kept because approving is
   // exactly this operation, and because the API is documented as having it.
   createGroup(name: string, description: string, ageLimit: number, theme: string, creatorEmail: string) {
@@ -81,7 +81,7 @@ export class GroupService {
       { params: { actorEmail } });
   }
 
-  // POST /groups/:id/bans. stronger than removeMember — it also stops them rejoining. still
+  // POST /groups/:id/bans. stronger than removeMember, because it also stops them rejoining. still
   // group level though, so unlike a system wide ban it can be lifted again below.
   banFromGroup(groupId: string, email: string, reason: string, actorEmail: string) {
     return this.http.post<Group>(`${this.apiUrl}/groups/${groupId}/bans`, { email, reason, actorEmail });
@@ -100,7 +100,7 @@ export class GroupService {
   }
 
   // DELETE /groups/:id/admins/:email. the same call whether an admin is demoting someone else
-  // or stepping down themself — the server refuses either way if they're the last admin left.
+  // or stepping down themself, and the server refuses either way if they're the last admin left.
   demoteAdmin(groupId: string, email: string, actorEmail: string) {
     return this.http.delete<Group>(
       `${this.apiUrl}/groups/${groupId}/admins/${encodeURIComponent(email)}`,

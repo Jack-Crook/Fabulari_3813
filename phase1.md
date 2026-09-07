@@ -1,5 +1,5 @@
 
-# Fabulari — Phase 1
+# Fabulari: Phase 1
 
 **Name:** Jack Crook
 **Student number:** s5389490
@@ -90,7 +90,7 @@ Specification Update documents.
 | Request visibility | A user can see their own pending requests and their own past rejected requests. |
 | Audit log | The super admin has an audit log page, filterable by type, in date order, covering all logs system-wide. |
 | Group-level ban | A group admin removes a user's access to that one group. The account itself still exists. |
-| System-wide ban | Only the super admin, and only from a group admin's request. Permanent — the email can never be reused, so unbanning does not exist. |
+| System-wide ban | Only the super admin, and only from a group admin's request. Permanent, and the email can never be reused, so unbanning does not exist. |
 | Banning an admin | If the user being removed is a group admin, a replacement admin must be assigned first. |
 | Member lists | A group admin sees the full member list and banned-user list for their own group only. The super admin sees all permanently banned accounts system-wide. |
 
@@ -112,7 +112,7 @@ Specification Update documents.
 
 Data is stored in JSON files under `data/` on the server with one file per type. 
 
-### User — `data/users.json`
+### User: `data/users.json`
 
 ```json
 {
@@ -135,7 +135,7 @@ rather than the user.
 Since exactly one super admin must always exist and no one can create that account, it is set by
 hand in `users.json` rather than through `/register`.
 
-### Group — `data/groups.json`
+### Group: `data/groups.json`
 
 ```json
 {
@@ -160,7 +160,7 @@ hand in `users.json` rather than through `/register`.
 | `memberEmails` | string[] | Includes the admins. |
 
 
-### Channel — `data/channels.json`
+### Channel: `data/channels.json`
 
 ```json
 {
@@ -234,7 +234,7 @@ Interfaces rather than classes, since they only describe the shape of JSON cross
 
 | Path | Component | Notes |
 |---|---|---|
-| `''` | — | Redirects to `login`. |
+| `''` | None | Redirects to `login`. |
 | `login` | `Login` | |
 | `register` | `Register` | |
 | `user-dashboard` | `UserDashboard` | Where every role lands after logging in. |
@@ -243,7 +243,7 @@ Interfaces rather than classes, since they only describe the shape of JSON cross
 | `groups/:groupId/channels/:channelId` | `ChatRoom` | One room inside that group. |
 | `admin-dashboard/:groupId` | `AdminDashboard` | Parameterised because a user can admin any number of groups, so the page has to know which one. |
 | `super-admin-dashboard` | `SuperAdminDashboard` | |
-| `**` | — | Redirects to `login`. Must stay last, first match wins. |
+| `**` | None | Redirects to `login`. Must stay last, first match wins. |
 
 The routes above are everything implimented for Phase 1. For phase 2, group and channel editing,
 admin promotion and demotion, the request and approval flow, the audit log, profile editing,

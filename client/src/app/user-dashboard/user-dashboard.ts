@@ -91,7 +91,7 @@ export class UserDashboard {
 
   // group admin is a relationship with a group rather than a role on the account, so "am I an
   // admin here" is a lookup in that group's adminEmails. a method rather than a computed
-  // because it takes an argument — one answer per group row.
+  // because it takes an argument, one answer per group row.
   amAdminOf(group: Group) {
     return group.adminEmails.includes(this.me);
   }
@@ -103,7 +103,7 @@ export class UserDashboard {
   }
 
   // the spec says a group is requested from the super admin rather than created directly, and
-  // that the requesting user supplies the title, description, age limit and colour up front —
+  // that the requesting user supplies the title, description, age limit and colour up front, and
   // the super admin doesn't fill them in after approving. so the whole form goes in the payload
   // and the group only exists once it's approved, at which point the requester becomes its
   // first admin.
@@ -141,8 +141,8 @@ export class UserDashboard {
     });
   }
 
-  // joining is direct, not a request. the spec only puts one check on it — the group's age
-  // limit — and the server does that check, answering 403 when the user is too young or hasn't
+  // joining is direct, not a request. the spec only puts one check on it, the group's age
+  // limit, and the server does that check, answering 403 when the user is too young or hasn't
   // set a date of birth yet.
   onJoin(group: Group) {
     this.formError.set('');
@@ -159,7 +159,7 @@ export class UserDashboard {
     });
   }
 
-  // leaving is the same endpoint as a group admin removing someone — it's a group level
+  // leaving is the same endpoint as a group admin removing someone, because it's a group level
   // removal either way. the server answers 409 if this would leave the group with no admin,
   // which is the case the spec covers by making disbanding a request to the super admin.
   onLeave(group: Group) {
