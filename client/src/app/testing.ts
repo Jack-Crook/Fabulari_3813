@@ -29,8 +29,47 @@ export function httpMock() {
   return TestBed.inject(HttpTestingController);
 }
 
-// components read the signed in user out of localStorage, so tests have to put one there
-// first. jsdom gives the tests a real localStorage, so this is the same code path as the app.
+// Components read the signed in user out of localStorage, so tests have to put one there
+// first. In a browser that's the real thing, but under Node 26 the test run has no working
+// localStorage: Node ships its own experimental global that refuses to work without
+// --localstorage-file, and it wins over the one jsdom would otherwise provide. Touching it
+// throws, which took out every test in a file whose beforeEach called signOut(), including
+// tests that never went near storage.
+//
+// So the suite installs a plain in-memory stand-in when the real one isn't usable. It's the
+// same API the app calls, so Auth is still exercised through its normal code path rather than
+// being mocked out, and nothing in the application had to change to suit the tests.
+function installLocalStorageIfMissing() {
+  try {
+    globalThis.localStorage.getItem('probe');
+    return;                     // a working implementation is already there, leave it alone
+  } catch {
+    // fall through and install the stand-in
+  }
+
+  const store = new Map<string, string>();
+  const shim: Storage = {
+    getItem: (key: string) => store.has(key) ? store.get(key)! : null,   // the real one returns null, not undefined, for a missing key
+    setItem: (key: string, value: string) => void store.set(key, String(value)),
+    removeItem: (key: string) => void store.delete(key),
+    clear: () => store.clear(),
+    key: (index: number) => [...store.keys()][index] ?? null,
+    get length() {
+      return store.size;
+    },
+  };
+
+  // defineProperty rather than assignment, because Node's own localStorage is a getter and
+  // assigning over it is silently ignored
+  Object.defineProperty(globalThis, 'localStorage', {
+    value: shim,
+    configurable: true,
+    writable: true,
+  });
+}
+
+installLocalStorageIfMissing();
+
 export function signIn(email: string, role = 'user', username = 'tester') {
   localStorage.setItem('user', JSON.stringify({ email, role, username }));
 }
