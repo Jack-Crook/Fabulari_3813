@@ -18,7 +18,7 @@ describe('GroupView', () => {
   }
 
   // the test router has no :id, so the component looks for a group whose id is ''
-  function load(group = makeGroup({ id: '' }), proposals: any[] = []) {
+  function load(group = makeGroup({ _id: '' }), proposals: any[] = []) {
     flushByUrl(mock, { '/groups': [group], '/channels': [makeChannel()], '/requests': proposals });
   }
 
@@ -98,7 +98,7 @@ describe('GroupView', () => {
 
   it('lists rooms that are proposed but not yet approved', async () => {
     await build('member@test.com');
-    load(makeGroup({ id: '' }), [makeRequest({ payload: { name: 'Spoilers' } })]);
+    load(makeGroup({ _id: '' }), [makeRequest({ payload: { name: 'Spoilers' } })]);
 
     // shown so a member can see their proposal is queued rather than lost, but not as a
     // clickable room, because the channel doesn't exist yet

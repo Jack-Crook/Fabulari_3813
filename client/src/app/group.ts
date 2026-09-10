@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';  // lets this service make HT
 
 // the shape the express /groups routes send back, matches one record in data/groups.json
 export interface Group {
-  id: string;
+  _id: string;                // mongo generates this, it arrives as a 24 character hex string
   name: string;
   description: string;
   ageLimit: number;
@@ -15,7 +15,7 @@ export interface Group {
 
 // one record from data/channels.json. a channel is a room inside a group
 export interface Channel {
-  id: string;
+  _id: string;                // mongo generates this, it arrives as a 24 character hex string
   groupId: string;
   name: string;
 }

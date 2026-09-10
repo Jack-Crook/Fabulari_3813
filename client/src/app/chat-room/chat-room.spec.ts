@@ -17,7 +17,7 @@ describe('ChatRoom', () => {
     await fixture.whenStable();
   }
 
-  function load(group = makeGroup({ id: '' })) {
+  function load(group = makeGroup({ _id: '' })) {
     flushByUrl(mock, { '/groups': [group], '/channels': [makeChannel()] });
   }
 
@@ -49,7 +49,7 @@ describe('ChatRoom', () => {
 
   it('takes its colour from the group', async () => {
     await build();
-    load(makeGroup({ id: '', theme: '#7B3FF2' }));
+    load(makeGroup({ _id: '', theme: '#7B3FF2' }));
 
     // the spec says the theme colour is the group's customisation and that it extends into
     // that group's chat rooms
@@ -65,7 +65,7 @@ describe('ChatRoom', () => {
 
   it('builds its mock messages from the group\'s real members', async () => {
     await build();
-    load(makeGroup({ id: '', memberEmails: ['admin@test.com', 'member@test.com'] }));
+    load(makeGroup({ _id: '', memberEmails: ['admin@test.com', 'member@test.com'] }));
 
     // messages are mock until socket.io in phase 2, but they're built from the real member
     // list, because with hardcoded addresses the admin indicator would have nobody to mark
@@ -76,7 +76,7 @@ describe('ChatRoom', () => {
 
   it('shows nothing rather than fake senders when the group has no members', async () => {
     await build();
-    load(makeGroup({ id: '', memberEmails: [] }));
+    load(makeGroup({ _id: '', memberEmails: [] }));
 
     expect(component.messages()).toEqual([]);
   });

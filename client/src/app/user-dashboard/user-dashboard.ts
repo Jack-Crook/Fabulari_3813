@@ -148,7 +148,7 @@ export class UserDashboard {
     this.formError.set('');
     this.formSuccess.set('');
 
-    this.groupService.joinGroup(group.id, this.me).subscribe({
+    this.groupService.joinGroup(group._id, this.me).subscribe({
       next: () => {
         this.formSuccess.set(`Joined ${group.name}.`);
         this.loadGroups();    // the group moves out of Discover and into My Groups
@@ -166,7 +166,7 @@ export class UserDashboard {
     this.formError.set('');
     this.formSuccess.set('');
 
-    this.groupService.removeMember(group.id, this.me, this.me).subscribe({
+    this.groupService.removeMember(group._id, this.me, this.me).subscribe({
       next: () => {
         this.formSuccess.set(`Left ${group.name}.`);
         this.loadGroups();

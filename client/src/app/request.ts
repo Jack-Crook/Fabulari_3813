@@ -11,12 +11,12 @@ import { HttpClient } from '@angular/common/http';
 export type RequestType = 'group-create' | 'group-delete' | 'channel-create' | 'user-ban';
 
 export interface AppRequest {
-  id: string;
+  _id: string;                // mongo generates this, it arrives as a 24 character hex string
   type: RequestType;
   status: 'pending' | 'approved' | 'rejected';   // there's no 'cancelled', the spec says a pending request can't be withdrawn
   summary: string;          // the wording is built once on the server so every queue renders the same sentence
   requestedBy: string;
-  groupId: string;          // empty on group-create, because the group doesn't exist yet
+  groupId: string | null;   // null on group-create, because the group doesn't exist yet
   payload: any;             // the type specific detail: a group's fields, a room name, or the reported email + reason
   createdAt: string;        // ISO, so sorting the strings and sorting the dates agree
   resolvedAt: string;
@@ -26,7 +26,7 @@ export interface AppRequest {
 
 // one row of the super admin's audit log
 export interface AuditEntry {
-  id: string;
+  _id: string;                // mongo generates this, it arrives as a 24 character hex string
   at: string;
   type: string;
   actor: string;

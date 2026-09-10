@@ -120,7 +120,7 @@
       <h2>My Requests</h2>
 
       <h3>Pending</h3>
-      @for (request of pendingRequests(); track request.id) {
+      @for (request of pendingRequests(); track request._id) {
         <div class="request-card">
           <p class="request-summary">{{ request.summary }}</p>
           <p class="request-meta">{{ labelFor(request.type) }} · raised {{ request.createdAt | date:'d MMM yyyy' }}</p>
@@ -134,7 +134,7 @@
       }
 
       <h3>Rejected</h3>
-      @for (request of rejectedRequests(); track request.id) {
+      @for (request of rejectedRequests(); track request._id) {
         <div class="request-card rejected">
           <p class="request-summary">{{ request.summary }}</p>
           <!-- a rejection always has a reason, the server refuses to record one without it -->

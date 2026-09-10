@@ -61,10 +61,10 @@
     }
 
     <!-- a signal is read by calling it, so it's myGroups() and not myGroups -->
-    @for (group of myGroups(); track group.id) {
+    @for (group of myGroups(); track group._id) {
       <div class="group-row-wrap">
         <!-- clicking a group opens its room list -->
-        <a class="group-row" [routerLink]="['/groups', group.id]">
+        <a class="group-row" [routerLink]="['/groups', group._id]">
           <div class="group-swatch" [style.background]="group.theme"></div>
           <div>
             <p class="group-name">
@@ -99,7 +99,7 @@
          the full list, including past rejections and their reasons, is on the profile page. -->
     @if (myPending().length) {
       <h3 class="pending-head">Awaiting approval</h3>
-      @for (request of myPending(); track request.id) {
+      @for (request of myPending(); track request._id) {
         <p class="pending-row">{{ request.summary }}</p>
       }
     }
@@ -118,7 +118,7 @@
       <!-- groups the user isn't in yet. the spec says every group is visible whatever your age,
            and the age check happens when you try to join. the server answers 403 and the
            reason appears in the bar at the top of the page. -->
-      @for (group of filteredDiscover(); track group.id) {
+      @for (group of filteredDiscover(); track group._id) {
         <div class="discover-row">
           <div class="group-swatch" [style.background]="group.theme"></div>
           <div class="discover-desc">

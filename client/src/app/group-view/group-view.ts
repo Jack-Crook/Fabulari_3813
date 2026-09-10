@@ -55,7 +55,7 @@ export class GroupView {
   private loadGroup() {
     this.groupService.getGroups().subscribe(groups => {   // fill the sidebar, and pick out the one being viewed
       this.groups.set(groups);
-      this.group.set(groups.find(g => g.id === this.groupId));
+      this.group.set(groups.find(g => g._id === this.groupId));
     });
 
     this.groupService.getChannels(this.groupId).subscribe(channels => {

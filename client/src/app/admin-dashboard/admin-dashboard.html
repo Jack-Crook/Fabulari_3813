@@ -85,10 +85,10 @@
     </form>
 
     <!-- signals are read by calling them, hence channels() -->
-    @for (channel of channels(); track channel.id) {
+    @for (channel of channels(); track channel._id) {
       <div class="room-row">
         <!-- only one room is ever being renamed, so the open row is the one whose id matches -->
-        @if (renamingChannelId() === channel.id) {
+        @if (renamingChannelId() === channel._id) {
           <form class="rename-room" (ngSubmit)="onRenameRoom(channel)">
             <input name="rename" type="text" [(ngModel)]="renameValue" required />
             <button type="submit" class="inline">Save</button>
@@ -211,17 +211,17 @@
       direct, so there are no join requests to action here.
     </p>
 
-    @for (request of proposals(); track request.id) {
+    @for (request of proposals(); track request._id) {
       <div class="request-row">
         <span class="request-email">{{ request.summary }}</span>
         <p class="request-meta">by {{ request.requestedBy }} · {{ request.createdAt | date:'d MMM' }}</p>
 
-        @if (rejectingId() === request.id) {
+        @if (rejectingId() === request._id) {
           <!-- the spec requires a reason on a rejection, and the server enforces it with a 400,
                so the box appears before the rejection rather than after -->
           <div class="reject-box">
-            <label [attr.for]="'reject-' + request.id">Reason for rejection</label>
-            <input [id]="'reject-' + request.id" name="reject-reason" type="text"
+            <label [attr.for]="'reject-' + request._id">Reason for rejection</label>
+            <input [id]="'reject-' + request._id" name="reject-reason" type="text"
                    [(ngModel)]="rejectReason" placeholder="Required" />
             <div class="request-actions">
               <button type="button" class="reject" (click)="onRejectProposal(request)">Confirm</button>

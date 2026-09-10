@@ -14,11 +14,11 @@
     <h2>Groups</h2>
 
     <!-- signals are read by calling them, hence groups() rather than groups -->
-    @for (item of groups(); track item.id) {
+    @for (item of groups(); track item._id) {
       <a class="group-tile"
-         [class.selected]="item.id === group()?.id"
+         [class.selected]="item._id === group()?._id"
          [style.background]="item.theme"
-         [routerLink]="['/groups', item.id]">
+         [routerLink]="['/groups', item._id]">
         {{ item.name }}
       </a>
     }
@@ -44,15 +44,15 @@
       <!-- only shown on a group this user admins, and it's the same check the route guard on
            the admin page makes: is my email in this group's adminEmails -->
       @if (isGroupAdmin()) {
-        <a class="manage-link" [routerLink]="['/admin-dashboard', current.id]">Manage this group →</a>
+        <a class="manage-link" [routerLink]="['/admin-dashboard', current._id]">Manage this group →</a>
       }
 
       <div class="rooms">
         <h2>Rooms</h2>
 
-        @for (channel of channels(); track channel.id) {
+        @for (channel of channels(); track channel._id) {
           <!-- clicking a room opens the chat room view for it -->
-          <a class="room-row" [routerLink]="['/groups', group()?.id, 'channels', channel.id]">
+          <a class="room-row" [routerLink]="['/groups', group()?._id, 'channels', channel._id]">
             <span class="room-name">{{ channel.name }}</span>
             <!-- there's no presence tracking yet, that needs socket.io in phase 2 -->
             <span class="room-count">Open</span>
@@ -67,7 +67,7 @@
              the queue instead of it disappearing until someone actions it -->
         @if (proposals().length) {
           <h3 class="proposed-head">Proposed, awaiting an admin</h3>
-          @for (request of proposals(); track request.id) {
+          @for (request of proposals(); track request._id) {
             <p class="proposed-row">{{ request.payload.name }}, proposed by {{ request.requestedBy }}</p>
           }
         }

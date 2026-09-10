@@ -63,16 +63,16 @@ describe('Profile', () => {
     flushByUrl(mock, {
       '/users/': makeUser(), '/groups': [],
       '/requests': [
-        makeRequest({ id: 'r1', status: 'pending' }),
-        makeRequest({ id: 'r2', status: 'rejected', reason: 'Duplicate' }),
-        makeRequest({ id: 'r3', status: 'approved' }),
+        makeRequest({ _id: 'r1', status: 'pending' }),
+        makeRequest({ _id: 'r2', status: 'rejected', reason: 'Duplicate' }),
+        makeRequest({ _id: 'r3', status: 'approved' }),
       ],
     });
 
     // the spec gives a user exactly two views of their own requests: what's pending, and what
     // was rejected and why. approved ones aren't listed.
-    expect(component.pendingRequests().map(r => r.id)).toEqual(['r1']);
-    expect(component.rejectedRequests().map(r => r.id)).toEqual(['r2']);
+    expect(component.pendingRequests().map(r => r._id)).toEqual(['r1']);
+    expect(component.rejectedRequests().map(r => r._id)).toEqual(['r2']);
     expect(component.rejectedRequests()[0].reason).toBe('Duplicate');
   });
 
@@ -80,14 +80,14 @@ describe('Profile', () => {
     await build('admin@test.com');
     flushByUrl(mock, {
       '/users/': makeUser({ email: 'admin@test.com' }),
-      '/groups': [makeGroup({ id: 'g1' }), makeGroup({ id: 'g2', adminEmails: ['someone@else.com'], memberEmails: ['admin@test.com'] })],
+      '/groups': [makeGroup({ _id: 'g1' }), makeGroup({ _id: 'g2', adminEmails: ['someone@else.com'], memberEmails: ['admin@test.com'] })],
       '/requests': [],
     });
 
     // group admin is a relationship with a group, not a role on the account, and this user is an
     // admin of one group and a plain member of the other
     expect(component.myGroups().length).toBe(2);
-    expect(component.adminOf().map(g => g.id)).toEqual(['g1']);
+    expect(component.adminOf().map(g => g._id)).toEqual(['g1']);
   });
 
   it('does not send the password when the field is left blank', async () => {

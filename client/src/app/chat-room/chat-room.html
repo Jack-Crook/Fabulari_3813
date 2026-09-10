@@ -7,17 +7,17 @@
     <h2>Rooms</h2>
 
     <!-- signals are read by calling them, so channels() and channel() -->
-    @for (item of channels(); track item.id) {
+    @for (item of channels(); track item._id) {
       <a class="room-link"
-         [class.selected]="item.id === channel()?.id"
-         [style.background]="item.id === channel()?.id ? theme() : ''"
-         [routerLink]="['/groups', group()?.id, 'channels', item.id]">
+         [class.selected]="item._id === channel()?._id"
+         [style.background]="item._id === channel()?._id ? theme() : ''"
+         [routerLink]="['/groups', group()?._id, 'channels', item._id]">
         {{ item.name }}
       </a>
     }
 
     <!-- back out to the group's room list -->
-    <a class="back-link" [routerLink]="['/groups', group()?.id]">Back to group</a>
+    <a class="back-link" [routerLink]="['/groups', group()?._id]">Back to group</a>
   </aside>
 
   <!-- middle, the conversation itself -->

@@ -57,12 +57,12 @@ export class ChatRoom {
       const channelId = params.get('channelId') ?? '';
 
       this.groupService.getGroups().subscribe(groups => {
-        this.group.set(groups.find(g => g.id === groupId));
+        this.group.set(groups.find(g => g._id === groupId));
       });
 
       this.groupService.getChannels(groupId).subscribe(channels => {
         this.channels.set(channels);
-        this.channel.set(channels.find(c => c.id === channelId));
+        this.channel.set(channels.find(c => c._id === channelId));
       });
     });
   }

@@ -43,7 +43,7 @@ export function signOut() {
 // writing out every field of a Group every time
 export function makeGroup(overrides: Partial<Group> = {}): Group {
   return {
-    id: 'g1',
+    _id: 'g1',
     name: 'Book Club',
     description: 'Fantasy readers',
     ageLimit: 0,
@@ -56,12 +56,12 @@ export function makeGroup(overrides: Partial<Group> = {}): Group {
 }
 
 export function makeChannel(overrides: Partial<Channel> = {}): Channel {
-  return { id: 'c1', groupId: 'g1', name: 'General', ...overrides };
+  return { _id: 'c1', groupId: 'g1', name: 'General', ...overrides };
 }
 
 export function makeRequest(overrides: Partial<AppRequest> = {}): AppRequest {
   return {
-    id: 'r1',
+    _id: 'r1',
     type: 'channel-create',
     status: 'pending',
     summary: 'Create room "Spoilers" in "Book Club"',

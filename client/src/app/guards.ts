@@ -49,7 +49,7 @@ export const groupAdminGuard: CanActivateFn = (route) => {
 
   return groupService.getGroups().pipe(
     map(groups => {
-      const group = groups.find(g => g.id === groupId);
+      const group = groups.find(g => g._id === groupId);
       return group?.adminEmails.includes(me)
         ? true
         : router.createUrlTree(['/user-dashboard']);

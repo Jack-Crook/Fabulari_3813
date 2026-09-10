@@ -37,7 +37,7 @@ export class Navbar {
   // computed works out its own value from other signals, and re-runs whenever any of them
   // change. so the link appears and disappears as you move around without any extra wiring.
   isGroupAdmin = computed(() => {
-    const current = this.groups().find(g => g.id === this.currentGroupId());
+    const current = this.groups().find(g => g._id === this.currentGroupId());
     return current?.adminEmails.includes(this.me) ?? false;
   });
 

@@ -20,7 +20,7 @@
       here, they go to the group's own admin.
     </p>
 
-    @for (request of pendingRequests(); track request.id) {
+    @for (request of pendingRequests(); track request._id) {
       <div class="request-row">
         <div class="request-body">
           <span class="request-detail">{{ request.summary }}</span>
@@ -44,12 +44,12 @@
           }
         </div>
 
-        @if (rejectingId() === request.id) {
+        @if (rejectingId() === request._id) {
           <div class="reject-box">
-            <label [attr.for]="'reject-' + request.id">Reason for rejection</label>
+            <label [attr.for]="'reject-' + request._id">Reason for rejection</label>
             <!-- required by the spec and enforced by the server with a 400. the requester
                  reads it back on their own profile page. -->
-            <input [id]="'reject-' + request.id" name="reject-reason" type="text"
+            <input [id]="'reject-' + request._id" name="reject-reason" type="text"
                    [(ngModel)]="rejectReason" placeholder="Required" />
             <div class="request-actions">
               <button type="button" class="reject" (click)="onReject(request)">Confirm</button>
@@ -148,7 +148,7 @@
         </thead>
         <tbody>
           <!-- newest first, sorted on the server -->
-          @for (entry of auditLog(); track entry.id) {
+          @for (entry of auditLog(); track entry._id) {
             <tr>
               <td>{{ entry.at | date:'d MMM yyyy, HH:mm' }}</td>
               <td>{{ entry.type }}</td>

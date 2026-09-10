@@ -10,8 +10,8 @@ describe('UserDashboard', () => {
   let mock: HttpTestingController;
 
   const groups = [
-    makeGroup({ id: 'g1', name: 'Book Club', memberEmails: ['admin@test.com', 'member@test.com'] }),
-    makeGroup({ id: 'g2', name: 'Robotics', ageLimit: 16, memberEmails: ['admin@test.com'] }),
+    makeGroup({ _id: 'g1', name: 'Book Club', memberEmails: ['admin@test.com', 'member@test.com'] }),
+    makeGroup({ _id: 'g2', name: 'Robotics', ageLimit: 16, memberEmails: ['admin@test.com'] }),
   ];
 
   // the component reads the signed in user in a field initialiser and fetches in its
@@ -46,8 +46,8 @@ describe('UserDashboard', () => {
 
     // one call fills both panels, and the difference is only whether this email is in the
     // group's member list
-    expect(component.myGroups().map(g => g.id)).toEqual(['g1']);
-    expect(component.discover().map(g => g.id)).toEqual(['g2']);
+    expect(component.myGroups().map(g => g._id)).toEqual(['g1']);
+    expect(component.discover().map(g => g._id)).toEqual(['g2']);
   });
 
   it('shows the super admin every group and nothing to discover', async () => {

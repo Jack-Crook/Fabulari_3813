@@ -41,7 +41,7 @@ describe('AdminDashboard', () => {
 
   it('reads a member\'s role off the group rather than the user record', async () => {
     await build();
-    load(makeGroup({ id: '', adminEmails: ['admin@test.com'], memberEmails: ['admin@test.com', 'member@test.com'] }));
+    load(makeGroup({ _id: '', adminEmails: ['admin@test.com'], memberEmails: ['admin@test.com', 'member@test.com'] }));
 
     // there is no per-member role stored anywhere. an admin is just an email that appears in
     // the group's adminEmails
@@ -51,7 +51,7 @@ describe('AdminDashboard', () => {
 
   it('flags the last remaining admin so they can\'t be demoted or removed', async () => {
     await build();
-    load(makeGroup({ id: '', adminEmails: ['admin@test.com'] }));
+    load(makeGroup({ _id: '', adminEmails: ['admin@test.com'] }));
 
     // a group must always keep at least one admin. the server returns 409 either way, this
     // just disables the buttons first.
@@ -61,14 +61,14 @@ describe('AdminDashboard', () => {
 
   it('stops flagging once a second admin exists', async () => {
     await build();
-    load(makeGroup({ id: '', adminEmails: ['admin@test.com', 'member@test.com'] }));
+    load(makeGroup({ _id: '', adminEmails: ['admin@test.com', 'member@test.com'] }));
 
     expect(component.isLastAdmin('admin@test.com')).toBe(false);
   });
 
   it('sends the actor with a settings change', async () => {
     await build();
-    load(makeGroup({ id: '' }));
+    load(makeGroup({ _id: '' }));
 
     component.formName = 'Renamed';
     component.formAgeLimit = 18;
@@ -83,7 +83,7 @@ describe('AdminDashboard', () => {
 
   it('reports who was removed when the age limit is raised', async () => {
     await build();
-    load(makeGroup({ id: '' }));
+    load(makeGroup({ _id: '' }));
 
     component.onSaveSettings();
     mock.expectOne(r => r.method === 'PATCH')
@@ -96,7 +96,7 @@ describe('AdminDashboard', () => {
 
   it('raises a deletion request instead of deleting the group', async () => {
     await build();
-    load(makeGroup({ id: '' }));
+    load(makeGroup({ _id: '' }));
 
     component.onRequestDeletion();
 
@@ -110,7 +110,7 @@ describe('AdminDashboard', () => {
 
   it('reports a user for a permanent ban rather than banning them', async () => {
     await build();
-    load(makeGroup({ id: '' }));
+    load(makeGroup({ _id: '' }));
 
     component.banReason = 'harassment';
     component.onReportUser('bad@test.com');
@@ -125,7 +125,7 @@ describe('AdminDashboard', () => {
 
   it('bans from the group directly, because that one needs no request', async () => {
     await build();
-    load(makeGroup({ id: '' }));
+    load(makeGroup({ _id: '' }));
 
     component.banReason = 'spam';
     component.onBanFromGroup('bad@test.com');
@@ -140,7 +140,7 @@ describe('AdminDashboard', () => {
   it('surfaces the 403 when trying to approve your own proposal', async () => {
     await build();
     const mine = makeRequest({ requestedBy: 'admin@test.com' });
-    load(makeGroup({ id: '' }), [mine]);
+    load(makeGroup({ _id: '' }), [mine]);
 
     component.onApproveProposal(mine);
     mock.expectOne(r => r.url.includes('/approve'))
@@ -152,7 +152,7 @@ describe('AdminDashboard', () => {
   it('sends the reason with a rejection', async () => {
     await build();
     const proposal = makeRequest();
-    load(makeGroup({ id: '' }), [proposal]);
+    load(makeGroup({ _id: '' }), [proposal]);
 
     component.rejectReason = 'We already have a room for that';
     component.onRejectProposal(proposal);

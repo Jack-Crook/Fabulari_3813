@@ -63,7 +63,7 @@ export class AdminDashboard {
 
   private load() {
     this.groupService.getGroups().subscribe(groups => {
-      this.group.set(groups.find(g => g.id === this.groupId));
+      this.group.set(groups.find(g => g._id === this.groupId));
     });
 
     this.groupService.getChannels(this.groupId).subscribe(channels => {
@@ -169,7 +169,7 @@ export class AdminDashboard {
   }
 
   startRenaming(channel: Channel) {
-    this.renamingChannelId.set(channel.id);
+    this.renamingChannelId.set(channel._id);
     this.renameValue = channel.name;
     this.clearMessages();
   }
@@ -177,7 +177,7 @@ export class AdminDashboard {
   onRenameRoom(channel: Channel) {  // PATCH /channels/:id, the spec allows an admin to fix a room's name
     this.clearMessages();
 
-    this.groupService.renameChannel(channel.id, this.renameValue, this.me).subscribe({
+    this.groupService.renameChannel(channel._id, this.renameValue, this.me).subscribe({
       next: updated => {
         this.actionSuccess.set(`Room renamed to "${updated.name}".`);
         this.renamingChannelId.set('');
@@ -190,7 +190,7 @@ export class AdminDashboard {
   onDeleteRoom(channel: Channel) {  // DELETE /channels/:id
     this.clearMessages();
 
-    this.groupService.deleteChannel(channel.id, this.me).subscribe({
+    this.groupService.deleteChannel(channel._id, this.me).subscribe({
       next: () => {
         this.actionSuccess.set(`Room "${channel.name}" deleted.`);
         this.load();
@@ -302,7 +302,7 @@ export class AdminDashboard {
   onApproveProposal(request: AppRequest) {
     this.clearMessages();
 
-    this.requestService.approve(request.id, this.me).subscribe({
+    this.requestService.approve(request._id, this.me).subscribe({
       next: () => {
         this.actionSuccess.set(`Approved: ${request.summary}`);
         this.load();
@@ -312,7 +312,7 @@ export class AdminDashboard {
   }
 
   startRejecting(request: AppRequest) {
-    this.rejectingId.set(request.id);
+    this.rejectingId.set(request._id);
     this.rejectReason = '';
     this.clearMessages();
   }
@@ -326,7 +326,7 @@ export class AdminDashboard {
   onRejectProposal(request: AppRequest) {
     this.clearMessages();
 
-    this.requestService.reject(request.id, this.me, this.rejectReason).subscribe({
+    this.requestService.reject(request._id, this.me, this.rejectReason).subscribe({
       next: () => {
         this.actionSuccess.set(`Rejected: ${request.summary}`);
         this.rejectingId.set('');

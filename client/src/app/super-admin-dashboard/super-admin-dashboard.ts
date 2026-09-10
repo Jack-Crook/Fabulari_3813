@@ -92,7 +92,7 @@ export class SuperAdminDashboard {
   onApprove(request: AppRequest) {
     this.clearMessages();
 
-    this.requestService.approve(request.id, this.me).subscribe({
+    this.requestService.approve(request._id, this.me).subscribe({
       next: () => {
         this.actionSuccess.set(`Approved: ${request.summary}`);
         this.load();
@@ -102,7 +102,7 @@ export class SuperAdminDashboard {
   }
 
   startRejecting(request: AppRequest) {
-    this.rejectingId.set(request.id);
+    this.rejectingId.set(request._id);
     this.rejectReason = '';
     this.clearMessages();
   }
@@ -116,7 +116,7 @@ export class SuperAdminDashboard {
   onReject(request: AppRequest) {
     this.clearMessages();
 
-    this.requestService.reject(request.id, this.me, this.rejectReason).subscribe({
+    this.requestService.reject(request._id, this.me, this.rejectReason).subscribe({
       next: () => {
         this.actionSuccess.set(`Rejected: ${request.summary}`);
         this.rejectingId.set('');
