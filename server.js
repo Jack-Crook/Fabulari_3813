@@ -434,6 +434,12 @@ app.delete('/groups/:id', async (req, res) => {
             return res.status(404).json({ error: 'Group not found' });
     }
 
+    // the rooms are read BEFORE they're deleted, because once they're gone there's nothing left
+    // to match their messages on. messages reference a channel, not a group, so deleting the
+    // group alone would strand every message in it.
+    const doomed = await channels.find({ groupId: group._id }).toArray();
+    await messages.deleteMany({ channelId: { $in: doomed.map(c => c._id) } });
+
     await groups.deleteOne({ _id: group._id });
     // a channel can't exist without its group, so its rooms go with it rather than being left
     // behind pointing at a groupId that no longer resolves
@@ -731,6 +737,10 @@ app.delete('/channels/:id', async (req, res) => {     // group admins can delete
             return res.status(403).json({ error: 'Only an admin of this group can delete a room' });
     }
 
+    // a message belongs to a room, so it can't outlive one. without this the messages stay in
+    // the collection forever, invisible but still counted, pointing at a channelId that no
+    // longer resolves.
+    await messages.deleteMany({ channelId: channel._id });
     await channels.deleteOne({ _id: channel._id });
     await logAudit('Room Deleted', actor, `Deleted room "${channel.name}"`);
     res.status(200).json({ message: 'Channel deleted' });
@@ -977,6 +987,12 @@ app.post('/requests/:id/approve', async (req, res) => {
                 if (!group) {
                     return res.status(404).json({ error: 'Group not found' });
             }
+            // same order as DELETE /groups/:id: read the rooms first, then their messages, then
+            // the group. this is the path the UI actually uses, since a group admin can't delete
+            // their own group directly and has to have the super admin approve it.
+            const doomed = await channels.find({ groupId: group._id }).toArray();
+            await messages.deleteMany({ channelId: { $in: doomed.map(c => c._id) } });
+
             await groups.deleteOne({ _id: group._id });
             await channels.deleteMany({ groupId: group._id });
             await logAudit('Group Deleted', actor, `Approved deletion of "${group.name}" and its rooms`);
