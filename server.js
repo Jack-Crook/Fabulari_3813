@@ -1122,6 +1122,124 @@ app.use((err, req, res, next) => {
     res.status(500).json({ error: 'Something went wrong on the server' });
 });
 
+// how many past messages a joiner is sent. enough to give a room context without shipping a
+// year of history down the wire every time someone clicks in.
+const HISTORY_LIMIT = 50;
+
+function registerSocketHandlers() {
+  io.on('connection', socket => {
+    // what this socket is currently in. kept on the socket itself so disconnect can clean up
+    // without searching every room in the presence map.
+    let joined = null;      // { channelId, email }
+
+    socket.on('joinRoom', async ({ channelId, email }, ack) => {
+      try {
+        const cleanEmail = normaliseEmail(email);
+        const id = toObjectId(channelId);
+        if (!id || !cleanEmail) {
+          return ack?.({ error: 'Bad room or user' });
+        }
+
+        const channel = await channels.findOne({ _id: id });
+        if (!channel) {
+          return ack?.({ error: 'Room not found' });
+        }
+
+        // you can only be in a room of a group you belong to. this is the same rule the rest
+        // routes enforce, and without it any signed in user could join any room by id.
+        const group = normaliseGroup(await groups.findOne({ _id: channel.groupId }));
+        if (!group || !group.memberEmails.includes(cleanEmail)) {
+          return ack?.({ error: 'You are not a member of this group' });
+        }
+
+        // leaving the previous room first means clicking between rooms can't leave you listed
+        // as present in one you already left
+        if (joined) {
+          await leaveCurrentRoom();
+        }
+
+        const roomKey = String(id);
+        socket.join(roomKey);
+        joined = { channelId: roomKey, email: cleanEmail };
+
+        if (!presence.has(roomKey)) {
+          presence.set(roomKey, new Map());
+        }
+        presence.get(roomKey).set(socket.id, cleanEmail);
+
+        // oldest first, because that's reading order in the transcript. the limit is applied
+        // from the newest end and then reversed, so you get the most recent 50, not the first 50.
+        const history = (await messages.find({ channelId: id })
+          .sort({ at: -1 }).limit(HISTORY_LIMIT).toArray()).reverse();
+
+        // ack goes only to the joiner: their history and who is already here
+        ack?.({ history, present: peopleIn(roomKey) });
+
+        // everyone else gets told someone arrived, plus the refreshed list.
+        // socket.to(room) excludes the sender, which is what makes "you joined" not appear to you.
+        socket.to(roomKey).emit('userJoined', { email: cleanEmail });
+        io.to(roomKey).emit('presence', peopleIn(roomKey));
+      } catch (err) {
+        console.error(err);
+        ack?.({ error: 'Could not join the room' });
+      }
+    });
+
+    socket.on('sendMessage', async ({ body }, ack) => {
+      try {
+        // the sender is taken from the socket's own join, never from the payload. a client that
+        // sends someone else's email can't spoof a message, because this never reads one.
+        if (!joined) {
+          return ack?.({ error: 'Join a room first' });
+        }
+        const text = String(body ?? '').trim();
+        if (!text) {
+          return ack?.({ error: 'Message cannot be empty' });
+        }
+
+        const message = {
+          channelId: new ObjectId(joined.channelId),
+          sender: joined.email,
+          body: text,
+          imageUrl: '',                        // filled in when image messages land
+          at: new Date().toISOString(),        // ISO so sorting strings and dates agree, same as audit
+        };
+        await messages.insertOne(message);     // insertOne sets _id on the object we then broadcast
+
+        io.to(joined.channelId).emit('newMessage', message);   // io.to, not socket.to: the sender sees it too
+        ack?.({ ok: true });
+      } catch (err) {
+        console.error(err);
+        ack?.({ error: 'Could not send that message' });
+      }
+    });
+
+    socket.on('leaveRoom', () => leaveCurrentRoom());
+    socket.on('disconnect', () => leaveCurrentRoom());   // closing the tab is a leave as well
+
+    async function leaveCurrentRoom() {
+      if (!joined) {
+        return;
+      }
+      const { channelId, email } = joined;
+      joined = null;
+
+      const room = presence.get(channelId);
+      if (room) {
+        room.delete(socket.id);
+        if (room.size === 0) {
+          presence.delete(channelId);   // don't leave empty rooms in the map forever
+        }
+      }
+
+      socket.leave(channelId);
+      socket.to(channelId).emit('userLeft', { email });
+      io.to(channelId).emit('presence', peopleIn(channelId));
+    }
+  });
+}
+
+
 
 const PORT = 3000;
 
