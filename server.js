@@ -1,3 +1,7 @@
+const http = require('http');                    // socket.io needs the raw http server, not the express app
+const { Server } = require('socket.io');
+
+
 const express = require('express');
 const cors = require('cors');// Angular (localhost:4200) and Express (localhost:3000) are different origins,
                             // so without this the browser blocks Angular's requests to this API by default.
@@ -26,6 +30,7 @@ let channels;
 let requests;
 let audit;
 let banned;
+let messages;
 
 
 // ids for groups, channels, requests and audit entries now come from mongo's own _id rather
@@ -1120,26 +1125,54 @@ app.use((err, req, res, next) => {
 
 const PORT = 3000;
 
-// the server only starts listening once mongo is connected, so a request can never arrive
-// while the collection handles above are still undefined.
-async function start() {
-    const client = new MongoClient(MONGO_URL);
-    await client.connect();
+// express and socket.io share one http server. app.listen() would create its own and give us
+// nowhere to attach io, so the server is built explicitly and express is handed to it as the
+// request handler.
+const server = http.createServer(app);
 
-    const db = client.db(DB_NAME);
-    users = db.collection('users');
-    groups = db.collection('groups');
-    channels = db.collection('channels');
-    requests = db.collection('requests');
-    audit = db.collection('audit');
-    banned = db.collection('banned');
+// the websocket handshake starts as a normal http request, so it needs its own cors config.
+// app.use(cors()) only covers the rest routes.
+const io = new Server(server, {
+  cors: { origin: 'http://localhost:4200', methods: ['GET', 'POST'] },
+});
 
-    console.log(`Connected to MongoDB at ${MONGO_URL}/${DB_NAME}`);
+// who is currently in which room. deliberately in memory rather than in mongo: presence is
+// ephemeral, and if the server restarts nobody is in a room any more, which is exactly what an
+// empty map says. persisting it would leave ghosts behind after a crash.
+// shape: channelId -> Map(socket.id -> email). keyed by socket, not email, so two tabs from the
+// same person are two entries and closing one doesn't mark them as gone.
+const presence = new Map();
 
-    app.listen(PORT, () => {
-        console.log(`Server listening on port ${PORT}`);
-    });
+function peopleIn(channelId) {
+  const room = presence.get(channelId);
+  return room ? [...new Set(room.values())] : [];   // Set dedupes the two-tabs case for display
 }
+
+async function start() {
+  const client = new MongoClient(MONGO_URL);
+  await client.connect();
+
+  const db = client.db(DB_NAME);
+  users = db.collection('users');
+  groups = db.collection('groups');
+  channels = db.collection('channels');
+  requests = db.collection('requests');
+  audit = db.collection('audit');
+  banned = db.collection('banned');
+  messages = db.collection('messages');
+
+  // one message belongs to one room, and the room view always wants them oldest first
+  await messages.createIndex({ channelId: 1, at: 1 });
+
+  registerSocketHandlers();      // registered after the collections exist, same rule as app.listen
+
+  console.log(`Connected to MongoDB at ${MONGO_URL}/${DB_NAME}`);
+
+  server.listen(PORT, () => {    // server.listen, not app.listen — io is attached to this one
+    console.log(`Server listening on port ${PORT}`);
+  });
+}
+
 
 start().catch(err => {      // if mongo isn't running there's nothing useful the app can do, so fail loudly instead of serving broken routes
     console.error('Failed to start server:', err);
