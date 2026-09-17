@@ -24,6 +24,12 @@ interface JoinResult {
 @Service()
 export class ChatService {
   private socket?: Socket;
+
+  // the room this tab is in right now, kept so it can be rejoined after a reconnect. the server's
+  // record of which room a socket joined dies with that connection, so without this a dropped
+  // connection comes back as a fresh socket in no room and every send answers "Join a room first".
+  private currentRoom?: { channelId: string; email: string };
+
   private apiUrl = 'http://localhost:3000';   // the same origin as the rest api, sockets share the http server
 
   // Signals, not plain arrays. Every one of these is written from a socket callback, which fires
@@ -61,6 +67,17 @@ export class ChatService {
 
     socket.on('connect_error', () => this.error.set('Lost connection to the chat server.'));
 
+    // socket.io reconnects by itself, but the server treats it as a brand new socket in no room.
+    // 'reconnect' is on the manager (socket.io), not the socket, and unlike 'connect' it doesn't
+    // fire on the very first connection, so this can't double up with the join joinRoom already
+    // sent. rejoining also refetches history, which picks up anything said while we were gone.
+    socket.io.on('reconnect', () => {
+      this.error.set('');
+      if (this.currentRoom) {
+        this.joinRoom(this.currentRoom.channelId, this.currentRoom.email);
+      }
+    });
+
     return socket;
   }
 
@@ -76,8 +93,9 @@ export class ChatService {
   // which is why sendMessage below doesn't take one.
   joinRoom(channelId: string, email: string) {
     const socket = this.connect();
+    this.currentRoom = { channelId, email };
 
-    this.messages.set([]);      // clear the previous room before the new history arrives, so the
+    this.messages.set([]);     // clear the previous room before the new history arrives, so the
     this.present.set([]);       // old transcript never flashes up under the new room's heading
     this.notice.set('');
     this.error.set('');
@@ -111,6 +129,7 @@ export class ChatService {
   // the tab is covered too, but navigating away inside the app doesn't disconnect the socket.
   leaveRoom() {
     this.socket?.emit('leaveRoom');
+    this.currentRoom = undefined;     // left on purpose, so a later reconnect shouldn't put us back in
     this.messages.set([]);
     this.present.set([]);
     this.notice.set('');
