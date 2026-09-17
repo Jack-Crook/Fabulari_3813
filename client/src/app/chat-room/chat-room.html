@@ -53,7 +53,17 @@
             }
             <span class="message-time">{{ message.at | date:'shortTime' }}</span>
           </p>
-          <p class="message-body">{{ message.body }}</p>
+          @if (message.imageUrl) {
+            <!-- opens the full size image in a new tab. rel="noopener" stops that tab getting a
+                 handle back to this page. (load) re-scrolls once the image has a height. -->
+            <a [href]="imageSrc(message.imageUrl)" target="_blank" rel="noopener">
+              <img class="message-image" [src]="imageSrc(message.imageUrl)"
+                   [alt]="'Image from ' + message.sender" (load)="scrollToBottom()" />
+            </a>
+          }
+          @if (message.body) {
+            <p class="message-body">{{ message.body }}</p>
+          }
         </div>
       }
 
@@ -64,13 +74,33 @@
 
     <!-- the input bar. enter or the button submits the form, which sends over the socket -->
     @if (canPost()) {
+      <!-- the attached image, before it's sent. it's already on the server at this point. -->
+      @if (pendingImage()) {
+        <div class="pending-image">
+          <img [src]="imageSrc(pendingImage())" alt="Image to send" />
+          <button type="button" class="remove-image" (click)="removeImage()">Remove</button>
+        </div>
+      }
+      @if (uploadError()) {
+        <p class="chat-error" role="alert">{{ uploadError() }}</p>
+      }
+
       <form class="composer" (ngSubmit)="onSend()">
+        <!-- the real file input is hidden because it can't be styled. the button below clicks it.
+             #picker names it so the button can reach it without any component code. -->
+        <input #picker type="file" hidden accept="image/png,image/jpeg,image/gif,image/webp"
+               (change)="onImageChosen($event)" />
+        <button type="button" class="attach" (click)="picker.click()"
+                [disabled]="uploading()" aria-label="Attach an image">
+          {{ uploading() ? '…' : 'Image' }}
+        </button>
+
         <input name="draft" type="text" autocomplete="off" aria-label="Message"
                [style.background]="theme()"
                [(ngModel)]="draft"
                placeholder="Message {{ channel()?.name }}" />
-        <!-- disabled while the box is empty, the server refuses an empty message anyway -->
-        <button type="submit" [disabled]="!draft.trim()">Send</button>
+        <!-- needs text or an image, and waits for an upload in progress to finish -->
+        <button type="submit" [disabled]="(!draft.trim() && !pendingImage()) || uploading()">Send</button>
       </form>
     }
   </section>

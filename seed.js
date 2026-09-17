@@ -33,6 +33,12 @@ async function seed() {
     await db.collection(name).deleteMany({});
   }
 
+  // clearing messages orphans every uploaded chat image, so the upload folder is emptied too.
+  // it only ever holds files POST /uploads wrote, and server.js recreates it on startup.
+  const uploads = path.join(__dirname, 'uploads');
+  fs.rmSync(uploads, { recursive: true, force: true });
+  fs.mkdirSync(uploads, { recursive: true });
+
   // users carry no id of their own, email is the identifier, so they go in unchanged
   const users = readJson('users.json');
   if (users.length) {

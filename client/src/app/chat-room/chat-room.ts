@@ -1,6 +1,7 @@
 import { Component, inject, signal, computed, DestroyRef, ElementRef, viewChild, afterRenderEffect } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';       // lets the html use [(ngModel)] on the message box
+import { HttpErrorResponse } from '@angular/common/http';
 import { DatePipe } from '@angular/common';         // formats each message's ISO timestamp as a time
 import { Navbar } from '../navbar/navbar';
 import { Auth } from '../auth';
@@ -44,6 +45,18 @@ export class ChatRoom {
 
   draft = '';   // plain property, [(ngModel)] writes it from a DOM event
 
+  // an image that's been uploaded and is waiting to go out with the next send. signals, because
+  // they're set inside the upload's subscribe callback.
+  pendingImage = signal('');       // the path the server gave back, '' when nothing is attached
+  uploading = signal(false);
+  uploadError = signal('');
+
+  // the same limits server.js enforces. checking here first means a 20 MB photo is refused
+  // straight away instead of after uploading all of it. the server still checks, because this
+  // code runs in the browser and can be bypassed.
+  private readonly imageTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+  private readonly maxImageBytes = 5 * 1024 * 1024;
+
   // the scrolling message list in the template, marked #scroller
   private scroller = viewChild<ElementRef<HTMLElement>>('scroller');
 
@@ -73,10 +86,7 @@ export class ChatRoom {
     // inside is what makes this re-run every time the list changes.
     afterRenderEffect(() => {
       this.messages();
-      const list = this.scroller()?.nativeElement;
-      if (list) {
-        list.scrollTop = list.scrollHeight;
-      }
+      this.scrollToBottom();
     });
 
     // navigating away inside the app doesn't close the socket, it's shared app wide, so without
@@ -84,15 +94,67 @@ export class ChatRoom {
     inject(DestroyRef).onDestroy(() => this.chat.leaveRoom());
   }
 
+  // also called when an image finishes loading. an image has no height until it has downloaded,
+  // so the scroll that ran when the message arrived stops short, and this finishes the job.
+  scrollToBottom() {
+    const list = this.scroller()?.nativeElement;
+    if (list) {
+      list.scrollTop = list.scrollHeight;
+    }
+  }
+
+  // step one of sending an image: upload it as soon as it's picked, so Send is instant and the
+  // preview shows the file the server actually stored
+  onImageChosen(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';      // reset, so picking the same file again still fires (change)
+    if (!file) {
+      return;
+    }
+
+    this.uploadError.set('');
+    if (!this.imageTypes.includes(file.type)) {
+      this.uploadError.set('Choose a PNG, JPEG, GIF or WebP image.');
+      return;
+    }
+    if (file.size > this.maxImageBytes) {
+      this.uploadError.set('Images must be 5 MB or smaller.');
+      return;
+    }
+
+    this.uploading.set(true);
+    this.chat.uploadImage(file).subscribe({
+      next: res => {
+        this.pendingImage.set(res.imageUrl);
+        this.uploading.set(false);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.uploadError.set(err.error?.error ?? 'Could not upload that image.');
+        this.uploading.set(false);
+      },
+    });
+  }
+
+  removeImage() {
+    this.pendingImage.set('');
+  }
+
+  imageSrc(imageUrl: string) {
+    return this.chat.imageSrc(imageUrl);
+  }
+
   onSend() {
     const body = this.draft.trim();
-    if (!body) {
+    const image = this.pendingImage();
+    if (!body && !image) {        // text, an image, or both, but not neither
       return;
     }
     // no email sent with it. the server takes the sender from this socket's join, so a message
-    // can't be posted as somebody else.
-    this.chat.send(body);
+    // can't be posted as somebody else. step two of an image message is this send carrying the path.
+    this.chat.send(body, image);
     this.draft = '';
+    this.pendingImage.set('');
   }
 
   // group admins get an indicator next to their name in chat, the spec asks for this.

@@ -1,9 +1,10 @@
-import { Service, signal } from '@angular/core';   // Service = injectable decorator, same as Auth and GroupService
+import { Service, signal, inject } from '@angular/core';   // Service = injectable decorator, same as Auth and GroupService
+import { HttpClient } from '@angular/common/http';          // the image upload is a normal http request, not a socket event
 import { io, Socket } from 'socket.io-client';
 
 // one message as the server broadcasts it, matching a document in the messages collection.
-// imageUrl is always empty for now: image messages are the next step, and having the field here
-// already means the shape doesn't change when they land.
+// a message has text, an image, or both. imageUrl is '' when there's no image, and otherwise a
+// path like /uploads/<uuid>.png on the api server.
 export interface ChatMessage {
   _id: string;
   channelId: string;
@@ -23,6 +24,7 @@ interface JoinResult {
 
 @Service()
 export class ChatService {
+  private http = inject(HttpClient);
   private socket?: Socket;
 
   // the room this tab is in right now, kept so it can be rejoined after a reconnect. the server's
@@ -110,15 +112,33 @@ export class ChatService {
     });
   }
 
+  // Step one of an image message: POST the file and get back the path the server saved it under.
+  // FormData is how a browser sends a file. The email and channelId are appended BEFORE the file,
+  // because multer reads the form in order and the server's membership check needs them by the
+  // time the file has been written. HttpClient sets the multipart Content-Type itself.
+  uploadImage(file: File) {
+    const form = new FormData();
+    form.append('email', this.currentRoom?.email ?? '');
+    form.append('channelId', this.currentRoom?.channelId ?? '');
+    form.append('image', file);
+    return this.http.post<{ imageUrl: string }>(`${this.apiUrl}/uploads`, form);
+  }
+
+  // messages store a relative path so they don't break if the server's address changes. this
+  // turns it into something an <img> can load.
+  imageSrc(imageUrl: string) {
+    return `${this.apiUrl}${imageUrl}`;
+  }
+
   // No email in the payload, deliberately. The server takes the sender from the socket's own
-  // validated join, so a client that sends someone else's address can't post as them. That's the
-  // one place this app doesn't have the self-asserted-identity weakness the REST routes have.
-  send(body: string) {
+  // validated join, so a client that sends someone else's address can't post as them.
+  // Step two of an image message is this, with the path uploadImage returned. Text, image or both.
+  send(body: string, imageUrl = '') {
     if (!this.socket) {
       this.error.set('Not connected to the chat server.');
       return;
     }
-    this.socket.emit('sendMessage', { body }, (res: { ok?: boolean; error?: string }) => {
+    this.socket.emit('sendMessage', { body, imageUrl }, (res: { ok?: boolean; error?: string }) => {
       if (res?.error) {
         this.error.set(res.error);
       }
