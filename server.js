@@ -7,11 +7,28 @@ const cors = require('cors');// Angular (localhost:4200) and Express (localhost:
                             // so without this the browser blocks Angular's requests to this API by default.
                     // cors() adds the Access-Control-Allow-Origin header to responses so the browser allows it.
 const { MongoClient, ObjectId } = require('mongodb');   // MongoClient opens the connection, ObjectId turns an id from a url back into the type mongo stores
+const multer = require('multer');       // reads multipart/form-data, which is how a browser uploads a file. express.json() can't
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');       // randomUUID() names each uploaded file
 
 const app = express();
 
 app.use(cors());            // allow requests from other origins (Angular on :4200)
 app.use(express.json());    // parse JSON request bodies into req.body
+
+// uploaded chat images live on disk in uploads/, not in mongo. a message stores only the path to
+// its image, which keeps documents small and lets express send the file itself. the folder is
+// gitignored, it's user content rather than source.
+const UPLOAD_DIR = path.join(__dirname, 'uploads');
+fs.mkdirSync(UPLOAD_DIR, { recursive: true });     // recursive means no error if it's already there
+
+// GET /uploads/<file> serves the image. nosniff tells the browser to trust the content type from
+// the extension rather than guessing from the bytes, so a file that isn't really an image can't be
+// run as something else.
+app.use('/uploads', express.static(UPLOAD_DIR, {
+    setHeaders: res => res.set('X-Content-Type-Options', 'nosniff'),
+}));
 
 app.get('/', (req, res) => {            // test route to confirm the server is alive
   res.send('Fabulari API running');
@@ -144,6 +161,19 @@ async function createGroupRecord({ name, description, ageLimit, theme }, creator
     };
     await groups.insertOne(newGroup);
     return newGroup;
+}
+
+// deletes messages and the image files that belong to them. a room or group going takes its
+// messages with it, and without removing the files too, every image ever sent there would stay in
+// uploads/ with nothing pointing at it. the image paths are read before the documents are deleted,
+// because afterwards there is nothing left to read them from.
+async function deleteMessages(filter) {
+    const withImages = await messages.find({ ...filter, imageUrl: { $ne: '' } }, { projection: { imageUrl: 1 } }).toArray();
+    await messages.deleteMany(filter);
+    // force: true means a file that's already gone isn't an error. basename() keeps the delete
+    // inside uploads/ whatever the stored path says.
+    await Promise.all(withImages.map(m =>
+        fs.promises.rm(path.join(UPLOAD_DIR, path.basename(m.imageUrl)), { force: true })));
 }
 
 // a group name has to be unique across every group, optionally ignoring one group so that
@@ -438,7 +468,7 @@ app.delete('/groups/:id', async (req, res) => {
     // to match their messages on. messages reference a channel, not a group, so deleting the
     // group alone would strand every message in it.
     const doomed = await channels.find({ groupId: group._id }).toArray();
-    await messages.deleteMany({ channelId: { $in: doomed.map(c => c._id) } });
+    await deleteMessages({ channelId: { $in: doomed.map(c => c._id) } });
 
     await groups.deleteOne({ _id: group._id });
     // a channel can't exist without its group, so its rooms go with it rather than being left
@@ -740,7 +770,7 @@ app.delete('/channels/:id', async (req, res) => {     // group admins can delete
     // a message belongs to a room, so it can't outlive one. without this the messages stay in
     // the collection forever, invisible but still counted, pointing at a channelId that no
     // longer resolves.
-    await messages.deleteMany({ channelId: channel._id });
+    await deleteMessages({ channelId: channel._id });
     await channels.deleteOne({ _id: channel._id });
     await logAudit('Room Deleted', actor, `Deleted room "${channel.name}"`);
     res.status(200).json({ message: 'Channel deleted' });
@@ -991,7 +1021,7 @@ app.post('/requests/:id/approve', async (req, res) => {
             // the group. this is the path the UI actually uses, since a group admin can't delete
             // their own group directly and has to have the super admin approve it.
             const doomed = await channels.find({ groupId: group._id }).toArray();
-            await messages.deleteMany({ channelId: { $in: doomed.map(c => c._id) } });
+            await deleteMessages({ channelId: { $in: doomed.map(c => c._id) } });
 
             await groups.deleteOne({ _id: group._id });
             await channels.deleteMany({ groupId: group._id });
@@ -1129,6 +1159,78 @@ app.get('/audit/types', async (req, res) => {
 });
 
 
+//image upload route
+//
+// sending an image is two steps. the browser uploads the file here over normal http and gets back
+// a path, then sends a chat message over the socket carrying that path. files don't go over the
+// socket itself because a multipart http upload streams to disk, gets a size limit and a type check
+// from multer, and doesn't hold a whole image in memory inside one socket event.
+
+// only these four. the extension comes from this map, never from the uploaded filename, so a file
+// can't choose its own extension. svg is deliberately missing: it can carry script.
+const IMAGE_TYPES = {
+    'image/png': '.png',
+    'image/jpeg': '.jpg',
+    'image/gif': '.gif',
+    'image/webp': '.webp',
+};
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;     // 5 MB
+
+const upload = multer({
+    storage: multer.diskStorage({
+        destination: UPLOAD_DIR,
+        // a random name, not the user's filename: two people uploading photo.jpg can't overwrite
+        // each other, and a name like ../../server.js can't escape the folder
+        filename: (req, file, cb) => cb(null, crypto.randomUUID() + IMAGE_TYPES[file.mimetype]),
+    }),
+    limits: { fileSize: MAX_IMAGE_BYTES, files: 1 },
+    // returning false skips the file rather than erroring, which leaves req.file undefined and the
+    // route below answers with a readable message
+    fileFilter: (req, file, cb) => cb(null, Boolean(IMAGE_TYPES[file.mimetype])),
+});
+
+// the path a message is allowed to carry: exactly what the route below hands out, a uuid and one of
+// the four extensions. anything else, like an outside url, is refused by sendMessage.
+const IMAGE_PATH = /^\/uploads\/[0-9a-f-]{36}\.(png|jpg|gif|webp)$/;
+
+app.post('/uploads', (req, res, next) => {
+    // upload.single is called by hand rather than listed as middleware, so its errors (too big,
+    // wrong field name) arrive in this callback and can be answered as json rather than reaching
+    // the generic 500 handler
+    upload.single('image')(req, res, async err => {
+        try {
+            if (err) {
+                if (err.code === 'LIMIT_FILE_SIZE') {
+                    return res.status(413).json({ error: 'Images must be 5 MB or smaller' });   // 413 = payload too large
+                }
+                return res.status(400).json({ error: 'Could not read that upload' });
+            }
+            if (!req.file) {
+                return res.status(400).json({ error: 'Choose a PNG, JPEG, GIF or WebP image' });
+            }
+
+            // the same rule as joining a room: only a member of the group can post into it, so only
+            // a member can upload for it. multer has already written the file by now, so a refused
+            // upload deletes it again rather than leaving it on disk.
+            const email = normaliseEmail(req.body.email);
+            const channelId = toObjectId(req.body.channelId);
+            const channel = channelId && await channels.findOne({ _id: channelId });
+            const group = channel && normaliseGroup(await groups.findOne({ _id: channel.groupId }));
+            if (!group || !group.memberEmails.includes(email)) {
+                await fs.promises.rm(req.file.path, { force: true });
+                return res.status(403).json({ error: 'You are not a member of this group' });
+            }
+
+            // a relative path, not a full url, so the stored message doesn't break if the server's
+            // address changes. the client puts its api url in front when it displays it.
+            res.status(201).json({ imageUrl: `/uploads/${req.file.filename}` });
+        } catch (e) {
+            next(e);
+        }
+    });
+});
+
+
 // express 5 catches a rejected promise from an async route handler and passes it here, so a
 // failed mongo call answers with a 500 instead of leaving the request hanging forever.
 // express 4 did not do this, which is why most tutorials wrap every route in try/catch.
@@ -1201,7 +1303,7 @@ function registerSocketHandlers() {
       }
     });
 
-    socket.on('sendMessage', async ({ body }, ack) => {
+    socket.on('sendMessage', async ({ body, imageUrl }, ack) => {
       try {
         // the sender is taken from the socket's own join, never from the payload. a client that
         // sends someone else's email can't spoof a message, because this never reads one.
@@ -1209,7 +1311,21 @@ function registerSocketHandlers() {
           return ack?.({ error: 'Join a room first' });
         }
         const text = String(body ?? '').trim();
-        if (!text) {
+        const image = String(imageUrl ?? '');
+
+        // an image has to be one POST /uploads actually handed out and that is still on disk.
+        // without this a client could send any url at all, e.g. an image on another site that
+        // logs who loaded it.
+        if (image) {
+          const onDisk = await fs.promises.access(path.join(UPLOAD_DIR, path.basename(image)))
+            .then(() => true, () => false);
+          if (!IMAGE_PATH.test(image) || !onDisk) {
+            return ack?.({ error: 'That image could not be found. Try uploading it again.' });
+          }
+        }
+
+        // a message needs text, an image, or both
+        if (!text && !image) {
           return ack?.({ error: 'Message cannot be empty' });
         }
 
@@ -1217,7 +1333,7 @@ function registerSocketHandlers() {
           channelId: new ObjectId(joined.channelId),
           sender: joined.email,
           body: text,
-          imageUrl: '',                        // filled in when image messages land
+          imageUrl: image,                     // '' for a text only message, so every document has the same shape
           at: new Date().toISOString(),        // ISO so sorting strings and dates agree, same as audit
         };
         await messages.insertOne(message);     // insertOne sets _id on the object we then broadcast

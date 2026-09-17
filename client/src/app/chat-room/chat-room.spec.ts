@@ -2,7 +2,8 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HttpTestingController } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 
 import { ChatRoom } from './chat-room';
 import { ChatService, ChatMessage } from '../chat';
@@ -21,7 +22,19 @@ function fakeChat() {
     joinRoom: vi.fn(),
     send: vi.fn(),
     leaveRoom: vi.fn(),
+    uploadImage: vi.fn(() => of({ imageUrl: '/uploads/abc.png' })),
+    imageSrc: (url: string) => `http://localhost:3000${url}`,
   };
+}
+
+// what the browser hands (change) when a file is picked. size can be overridden, because a test
+// shouldn't have to build a real 6 MB file to check the size limit.
+function pick(type = 'image/png', size?: number) {
+  const file = new File(['fake image bytes'], 'photo', { type });
+  if (size !== undefined) {
+    Object.defineProperty(file, 'size', { value: size });
+  }
+  return { target: { files: [file], value: 'photo' } } as unknown as Event;
 }
 
 function makeMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
@@ -130,8 +143,8 @@ describe('ChatRoom', () => {
     component.draft = '  hello room  ';
     component.onSend();
 
-    // no email goes with it, the server takes the sender from the socket's join
-    expect(chat.send).toHaveBeenCalledWith('hello room');
+    // no email goes with it, the server takes the sender from the socket's join. '' = no image
+    expect(chat.send).toHaveBeenCalledWith('hello room', '');
     expect(component.draft).toBe('');
   });
 
@@ -143,6 +156,88 @@ describe('ChatRoom', () => {
     component.onSend();
 
     expect(chat.send).not.toHaveBeenCalled();
+  });
+
+  it('uploads a picked image and holds it until send', async () => {
+    await build();
+    load();
+
+    component.onImageChosen(pick());
+
+    expect(chat.uploadImage).toHaveBeenCalled();
+    expect(component.pendingImage()).toBe('/uploads/abc.png');
+    expect(chat.send).not.toHaveBeenCalled();     // picking isn't sending
+  });
+
+  it('sends the attached image with the text, then clears both', async () => {
+    await build();
+    load();
+
+    component.onImageChosen(pick());
+    component.draft = 'look at this';
+    component.onSend();
+
+    // step two of an image message: the path from the upload goes out over the socket
+    expect(chat.send).toHaveBeenCalledWith('look at this', '/uploads/abc.png');
+    expect(component.pendingImage()).toBe('');
+    expect(component.draft).toBe('');
+  });
+
+  it('sends an image on its own with no text', async () => {
+    await build();
+    load();
+
+    component.onImageChosen(pick());
+    component.onSend();
+
+    expect(chat.send).toHaveBeenCalledWith('', '/uploads/abc.png');
+  });
+
+  it('refuses a file that is not an allowed image before uploading it', async () => {
+    await build();
+    load();
+
+    component.onImageChosen(pick('image/svg+xml'));
+
+    expect(chat.uploadImage).not.toHaveBeenCalled();
+    expect(component.uploadError()).toContain('PNG, JPEG, GIF or WebP');
+  });
+
+  it('refuses an image over 5 MB before uploading it', async () => {
+    await build();
+    load();
+
+    component.onImageChosen(pick('image/jpeg', 6 * 1024 * 1024));
+
+    expect(chat.uploadImage).not.toHaveBeenCalled();
+    expect(component.uploadError()).toContain('5 MB');
+  });
+
+  it('shows the server\'s reason when an upload is refused', async () => {
+    await build();
+    load();
+    chat.uploadImage.mockReturnValueOnce(throwError(() =>
+      new HttpErrorResponse({ status: 403, error: { error: 'You are not a member of this group' } })));
+
+    component.onImageChosen(pick());
+
+    expect(component.uploadError()).toBe('You are not a member of this group');
+    expect(component.pendingImage()).toBe('');
+    expect(component.uploading()).toBe(false);
+  });
+
+  it('renders an image message', async () => {
+    await build();
+    load();
+
+    chat.messages.set([makeMessage({ body: '', imageUrl: '/uploads/abc.png' })]);
+    await fixture.whenStable();
+
+    const img: HTMLImageElement | null = fixture.nativeElement.querySelector('.message-image');
+    expect(img?.getAttribute('src')).toBe('http://localhost:3000/uploads/abc.png');
+    expect(img?.getAttribute('alt')).toBe('Image from admin@test.com');
+    // an image only message has no empty text bubble under it
+    expect(fixture.nativeElement.querySelector('.message-body')).toBeNull();
   });
 
   it('only offers the message box to members', async () => {

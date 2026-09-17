@@ -172,6 +172,53 @@
   opacity: 0.7;
 }
 
+/* the Image button is secondary, so it's outlined rather than a second solid blue button */
+.composer .attach {
+  background: #FFFFFF;
+  color: #1A1D23;
+  border: 1px solid #E2E4E9;
+}
+
+.composer .attach:hover {
+  background: #F3F4F6;
+}
+
+.message-image {
+  display: block;
+  max-width: 100%;
+  max-height: 320px;          /* a tall phone photo shouldn't fill the whole conversation */
+  margin-bottom: 4px;
+  border-radius: 6px;
+}
+
+.pending-image {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 24px 0;
+}
+
+.pending-image img {
+  height: 64px;
+  border-radius: 6px;
+  border: 1px solid #E2E4E9;
+}
+
+/* reset from the global full width button, same as the composer's */
+.pending-image .remove-image {
+  width: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 6px 12px;
+  background: none;
+  color: #B91C1C;
+  font-size: 13px;
+}
+
+.pending-image .remove-image:hover {
+  background: #FEF2F2;
+}
+
 /* the global button in styles.css is a full width block made for the login form, so this one
    is reset to sit beside the input instead of underneath it */
 .composer button {
@@ -216,7 +263,7 @@
     display: none;
   }
 
-  .messages, .composer, .notice {
+  .messages, .composer, .notice, .pending-image {
     padding-left: 16px;
     padding-right: 16px;
   }
