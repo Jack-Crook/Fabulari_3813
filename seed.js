@@ -28,7 +28,7 @@ async function seed() {
   await client.connect();
   const db = client.db(DB_NAME);
 
-  const names = ['users', 'groups', 'channels', 'requests', 'audit', 'banned'];
+  const names = ['users', 'groups', 'channels', 'requests', 'audit', 'banned', 'messages'];
   for (const name of names) {
     await db.collection(name).deleteMany({});
   }

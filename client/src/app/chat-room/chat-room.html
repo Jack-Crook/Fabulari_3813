@@ -30,8 +30,19 @@
       <span class="chat-group">{{ group()?.name }}</span>
     </header>
 
-    <div class="messages">
-      @for (message of messages(); track $index) {
+    <!-- the join/leave notification the spec asks for, on top of the live list on the right.
+         role="status" makes a screen reader announce it without moving focus. -->
+    <p class="notice" role="status">{{ notice() }}</p>
+
+    @if (error()) {
+      <p class="chat-error" role="alert">{{ error() }}</p>
+    }
+
+    <!-- #scroller is how the component finds this element to keep the newest message in view -->
+    <div class="messages" #scroller>
+      <!-- tracked by _id now the messages are real, so angular reuses the existing rows and only
+           adds the new one when a message arrives -->
+      @for (message of messages(); track message._id) {
         <!-- my own messages sit on the right, everyone else's on the left -->
         <div class="message" [class.mine]="message.sender === me">
           <p class="message-sender">
@@ -40,6 +51,7 @@
             @if (isAdmin(message.sender)) {
               <span class="admin-tag">Admin</span>
             }
+            <span class="message-time">{{ message.at | date:'shortTime' }}</span>
           </p>
           <p class="message-body">{{ message.body }}</p>
         </div>
@@ -50,19 +62,24 @@
       }
     </div>
 
-    <!-- the input bar. it doesn't send anything yet, sending needs socket.io in phase 2, so
-         it's disabled rather than looking like a box that swallows what you type -->
-    <div class="composer">
-      <input type="text" [style.background]="theme()" disabled
-             placeholder="Messaging arrives with socket.io in Phase 2" />
-    </div>
+    <!-- the input bar. enter or the button submits the form, which sends over the socket -->
+    @if (canPost()) {
+      <form class="composer" (ngSubmit)="onSend()">
+        <input name="draft" type="text" autocomplete="off" aria-label="Message"
+               [style.background]="theme()"
+               [(ngModel)]="draft"
+               placeholder="Message {{ channel()?.name }}" />
+        <!-- disabled while the box is empty, the server refuses an empty message anyway -->
+        <button type="submit" [disabled]="!draft.trim()">Send</button>
+      </form>
+    }
   </section>
 
-  <!-- right, who else is in the room -->
+  <!-- right, who else is in the room, live from the server's presence event -->
   <aside class="presence-sidebar">
     <h2>Currently In</h2>
 
-    @for (person of currentlyIn(); track person) {
+    @for (person of present(); track person) {
       <p class="person">
         {{ person }}
         @if (isAdmin(person)) {
@@ -71,11 +88,9 @@
       </p>
     }
 
-    <!-- said out loud rather than left to look real. the spec wants a live list plus a
-         join/leave notice, and both need socket.io, which is phase 2. -->
-    <p class="presence-note">
-      Mock list. Live presence and join/leave notices arrive with socket.io in Phase 2.
-    </p>
+    @if (present().length === 0) {
+      <p class="empty">Nobody here.</p>
+    }
   </aside>
 
 </div>

@@ -147,11 +147,20 @@
 
 /* the message box along the bottom */
 
+.message-time {
+  margin-left: 8px;
+  font-size: 11px;
+}
+
 .composer {
+  display: flex;                /* input and send button side by side */
+  gap: 8px;
+  align-items: center;
   padding: 16px 24px 24px;
 }
 
 .composer input {
+  flex: 1;
   border-radius: 999px;         /* the rounded blue bar from the wireframe */
   border: none;
   background: #5FA8D3;
@@ -163,19 +172,38 @@
   opacity: 0.7;
 }
 
-/* disabled until socket.io lands in phase 2, so it shouldn't look like a live input */
-.composer input:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+/* the global button in styles.css is a full width block made for the login form, so this one
+   is reset to sit beside the input instead of underneath it */
+.composer button {
+  width: auto;
+  margin: 0;
+  padding: 0 20px;
+  border-radius: 999px;
 }
 
-.empty, .presence-note {
+/* a fixed height whether or not there's a notice, so a join or leave doesn't shove the
+   message list down and back up again four seconds later */
+.notice {
+  min-height: 20px;
+  margin: 0;
+  padding: 6px 24px 0;
   font-size: 13px;
   color: #6B7280;
 }
 
-.presence-note {
-  margin-top: 24px;
+.chat-error {
+  margin: 8px 24px 0;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  background: #FEF2F2;
+  color: #B91C1C;
+  border: 1px solid #FECACA;
+}
+
+.empty {
+  font-size: 13px;
+  color: #6B7280;
   text-align: center;
 }
 
@@ -188,7 +216,7 @@
     display: none;
   }
 
-  .messages, .composer {
+  .messages, .composer, .notice {
     padding-left: 16px;
     padding-right: 16px;
   }

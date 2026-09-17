@@ -1,3 +1,7 @@
+const http = require('http');                    // socket.io needs the raw http server, not the express app
+const { Server } = require('socket.io');
+
+
 const express = require('express');
 const cors = require('cors');// Angular (localhost:4200) and Express (localhost:3000) are different origins,
                             // so without this the browser blocks Angular's requests to this API by default.
@@ -26,6 +30,7 @@ let channels;
 let requests;
 let audit;
 let banned;
+let messages;
 
 
 // ids for groups, channels, requests and audit entries now come from mongo's own _id rather
@@ -429,6 +434,12 @@ app.delete('/groups/:id', async (req, res) => {
             return res.status(404).json({ error: 'Group not found' });
     }
 
+    // the rooms are read BEFORE they're deleted, because once they're gone there's nothing left
+    // to match their messages on. messages reference a channel, not a group, so deleting the
+    // group alone would strand every message in it.
+    const doomed = await channels.find({ groupId: group._id }).toArray();
+    await messages.deleteMany({ channelId: { $in: doomed.map(c => c._id) } });
+
     await groups.deleteOne({ _id: group._id });
     // a channel can't exist without its group, so its rooms go with it rather than being left
     // behind pointing at a groupId that no longer resolves
@@ -726,6 +737,10 @@ app.delete('/channels/:id', async (req, res) => {     // group admins can delete
             return res.status(403).json({ error: 'Only an admin of this group can delete a room' });
     }
 
+    // a message belongs to a room, so it can't outlive one. without this the messages stay in
+    // the collection forever, invisible but still counted, pointing at a channelId that no
+    // longer resolves.
+    await messages.deleteMany({ channelId: channel._id });
     await channels.deleteOne({ _id: channel._id });
     await logAudit('Room Deleted', actor, `Deleted room "${channel.name}"`);
     res.status(200).json({ message: 'Channel deleted' });
@@ -972,6 +987,12 @@ app.post('/requests/:id/approve', async (req, res) => {
                 if (!group) {
                     return res.status(404).json({ error: 'Group not found' });
             }
+            // same order as DELETE /groups/:id: read the rooms first, then their messages, then
+            // the group. this is the path the UI actually uses, since a group admin can't delete
+            // their own group directly and has to have the super admin approve it.
+            const doomed = await channels.find({ groupId: group._id }).toArray();
+            await messages.deleteMany({ channelId: { $in: doomed.map(c => c._id) } });
+
             await groups.deleteOne({ _id: group._id });
             await channels.deleteMany({ groupId: group._id });
             await logAudit('Group Deleted', actor, `Approved deletion of "${group.name}" and its rooms`);
@@ -1117,29 +1138,175 @@ app.use((err, req, res, next) => {
     res.status(500).json({ error: 'Something went wrong on the server' });
 });
 
+// how many past messages a joiner is sent. enough to give a room context without shipping a
+// year of history down the wire every time someone clicks in.
+const HISTORY_LIMIT = 50;
+
+function registerSocketHandlers() {
+  io.on('connection', socket => {
+    // what this socket is currently in. kept on the socket itself so disconnect can clean up
+    // without searching every room in the presence map.
+    let joined = null;      // { channelId, email }
+
+    socket.on('joinRoom', async ({ channelId, email }, ack) => {
+      try {
+        const cleanEmail = normaliseEmail(email);
+        const id = toObjectId(channelId);
+        if (!id || !cleanEmail) {
+          return ack?.({ error: 'Bad room or user' });
+        }
+
+        const channel = await channels.findOne({ _id: id });
+        if (!channel) {
+          return ack?.({ error: 'Room not found' });
+        }
+
+        // you can only be in a room of a group you belong to. this is the same rule the rest
+        // routes enforce, and without it any signed in user could join any room by id.
+        const group = normaliseGroup(await groups.findOne({ _id: channel.groupId }));
+        if (!group || !group.memberEmails.includes(cleanEmail)) {
+          return ack?.({ error: 'You are not a member of this group' });
+        }
+
+        // leaving the previous room first means clicking between rooms can't leave you listed
+        // as present in one you already left
+        if (joined) {
+          await leaveCurrentRoom();
+        }
+
+        const roomKey = String(id);
+        socket.join(roomKey);
+        joined = { channelId: roomKey, email: cleanEmail };
+
+        if (!presence.has(roomKey)) {
+          presence.set(roomKey, new Map());
+        }
+        presence.get(roomKey).set(socket.id, cleanEmail);
+
+        // oldest first, because that's reading order in the transcript. the limit is applied
+        // from the newest end and then reversed, so you get the most recent 50, not the first 50.
+        const history = (await messages.find({ channelId: id })
+          .sort({ at: -1 }).limit(HISTORY_LIMIT).toArray()).reverse();
+
+        // ack goes only to the joiner: their history and who is already here
+        ack?.({ history, present: peopleIn(roomKey) });
+
+        // everyone else gets told someone arrived, plus the refreshed list.
+        // socket.to(room) excludes the sender, which is what makes "you joined" not appear to you.
+        socket.to(roomKey).emit('userJoined', { email: cleanEmail });
+        io.to(roomKey).emit('presence', peopleIn(roomKey));
+      } catch (err) {
+        console.error(err);
+        ack?.({ error: 'Could not join the room' });
+      }
+    });
+
+    socket.on('sendMessage', async ({ body }, ack) => {
+      try {
+        // the sender is taken from the socket's own join, never from the payload. a client that
+        // sends someone else's email can't spoof a message, because this never reads one.
+        if (!joined) {
+          return ack?.({ error: 'Join a room first' });
+        }
+        const text = String(body ?? '').trim();
+        if (!text) {
+          return ack?.({ error: 'Message cannot be empty' });
+        }
+
+        const message = {
+          channelId: new ObjectId(joined.channelId),
+          sender: joined.email,
+          body: text,
+          imageUrl: '',                        // filled in when image messages land
+          at: new Date().toISOString(),        // ISO so sorting strings and dates agree, same as audit
+        };
+        await messages.insertOne(message);     // insertOne sets _id on the object we then broadcast
+
+        io.to(joined.channelId).emit('newMessage', message);   // io.to, not socket.to: the sender sees it too
+        ack?.({ ok: true });
+      } catch (err) {
+        console.error(err);
+        ack?.({ error: 'Could not send that message' });
+      }
+    });
+
+    socket.on('leaveRoom', () => leaveCurrentRoom());
+    socket.on('disconnect', () => leaveCurrentRoom());   // closing the tab is a leave as well
+
+    async function leaveCurrentRoom() {
+      if (!joined) {
+        return;
+      }
+      const { channelId, email } = joined;
+      joined = null;
+
+      const room = presence.get(channelId);
+      if (room) {
+        room.delete(socket.id);
+        if (room.size === 0) {
+          presence.delete(channelId);   // don't leave empty rooms in the map forever
+        }
+      }
+
+      socket.leave(channelId);
+      socket.to(channelId).emit('userLeft', { email });
+      io.to(channelId).emit('presence', peopleIn(channelId));
+    }
+  });
+}
+
+
 
 const PORT = 3000;
 
-// the server only starts listening once mongo is connected, so a request can never arrive
-// while the collection handles above are still undefined.
-async function start() {
-    const client = new MongoClient(MONGO_URL);
-    await client.connect();
+// express and socket.io share one http server. app.listen() would create its own and give us
+// nowhere to attach io, so the server is built explicitly and express is handed to it as the
+// request handler.
+const server = http.createServer(app);
 
-    const db = client.db(DB_NAME);
-    users = db.collection('users');
-    groups = db.collection('groups');
-    channels = db.collection('channels');
-    requests = db.collection('requests');
-    audit = db.collection('audit');
-    banned = db.collection('banned');
+// the websocket handshake starts as a normal http request, so it needs its own cors config.
+// app.use(cors()) only covers the rest routes.
+const io = new Server(server, {
+  cors: { origin: 'http://localhost:4200', methods: ['GET', 'POST'] },
+});
 
-    console.log(`Connected to MongoDB at ${MONGO_URL}/${DB_NAME}`);
+// who is currently in which room. deliberately in memory rather than in mongo: presence is
+// ephemeral, and if the server restarts nobody is in a room any more, which is exactly what an
+// empty map says. persisting it would leave ghosts behind after a crash.
+// shape: channelId -> Map(socket.id -> email). keyed by socket, not email, so two tabs from the
+// same person are two entries and closing one doesn't mark them as gone.
+const presence = new Map();
 
-    app.listen(PORT, () => {
-        console.log(`Server listening on port ${PORT}`);
-    });
+function peopleIn(channelId) {
+  const room = presence.get(channelId);
+  return room ? [...new Set(room.values())] : [];   // Set dedupes the two-tabs case for display
 }
+
+async function start() {
+  const client = new MongoClient(MONGO_URL);
+  await client.connect();
+
+  const db = client.db(DB_NAME);
+  users = db.collection('users');
+  groups = db.collection('groups');
+  channels = db.collection('channels');
+  requests = db.collection('requests');
+  audit = db.collection('audit');
+  banned = db.collection('banned');
+  messages = db.collection('messages');
+
+  // one message belongs to one room, and the room view always wants them oldest first
+  await messages.createIndex({ channelId: 1, at: 1 });
+
+  registerSocketHandlers();      // registered after the collections exist, same rule as app.listen
+
+  console.log(`Connected to MongoDB at ${MONGO_URL}/${DB_NAME}`);
+
+  server.listen(PORT, () => {    // server.listen, not app.listen — io is attached to this one
+    console.log(`Server listening on port ${PORT}`);
+  });
+}
+
 
 start().catch(err => {      // if mongo isn't running there's nothing useful the app can do, so fail loudly instead of serving broken routes
     console.error('Failed to start server:', err);
