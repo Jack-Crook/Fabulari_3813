@@ -31,10 +31,16 @@ async function seed() {
   await client.connect();
   const db = client.db(DB_NAME);
 
-  const names = ['users', 'groups', 'channels', 'requests', 'audit', 'banned'];
+  const names = ['users', 'groups', 'channels', 'requests', 'audit', 'banned', 'messages'];
   for (const name of names) {
     await db.collection(name).deleteMany({});
   }
+
+  // clearing messages orphans every uploaded chat image, so the upload folder is emptied too.
+  // it only ever holds files POST /uploads wrote, and server.js recreates it on startup.
+  const uploads = path.join(__dirname, 'uploads');
+  fs.rmSync(uploads, { recursive: true, force: true });
+  fs.mkdirSync(uploads, { recursive: true });
 
   // users carry no id of their own, email is the identifier, so nothing has to be rewritten.
   // the password does though: data/users.json is a fixture written by hand, so the passwords in
