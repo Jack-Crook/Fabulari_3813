@@ -11,6 +11,9 @@
 const fs = require('fs');
 const path = require('path');
 const { MongoClient } = require('mongodb');
+const bcrypt = require('bcrypt');       // the json files hold plain passwords, they get hashed on the way in
+
+const SALT_ROUNDS = 10;     // the same cost server.js registers with, so a seeded account is no different to a registered one
 
 const MONGO_URL = process.env.MONGO_URL ?? 'mongodb://localhost:27017';
 const DB_NAME = process.env.DB_NAME ?? 'fabulari';
@@ -33,10 +36,17 @@ async function seed() {
     await db.collection(name).deleteMany({});
   }
 
-  // users carry no id of their own, email is the identifier, so they go in unchanged
+  // users carry no id of their own, email is the identifier, so nothing has to be rewritten.
+  // the password does though: data/users.json is a fixture written by hand, so the passwords in
+  // it are readable, and the database only ever holds the hash. hashing here rather than
+  // rewriting the file keeps the fixture usable, since the point of it is knowing the logins.
   const users = readJson('users.json');
   if (users.length) {
-    await db.collection('users').insertMany(users);
+    const hashed = await Promise.all(users.map(async user => ({
+      ...user,
+      password: await bcrypt.hash(user.password, SALT_ROUNDS),
+    })));
+    await db.collection('users').insertMany(hashed);
   }
 
   // strip the old string id off each group and keep a map from it to the _id mongo assigns

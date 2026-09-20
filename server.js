@@ -3,6 +3,7 @@ const cors = require('cors');// Angular (localhost:4200) and Express (localhost:
                             // so without this the browser blocks Angular's requests to this API by default.
                     // cors() adds the Access-Control-Allow-Origin header to responses so the browser allows it.
 const { MongoClient, ObjectId } = require('mongodb');   // MongoClient opens the connection, ObjectId turns an id from a url back into the type mongo stores
+const bcrypt = require('bcrypt');       // hashes passwords so the stored value can't be read back as the password
 
 const app = express();
 
@@ -35,6 +36,18 @@ let banned;
 function toObjectId(value) {
     return ObjectId.isValid(value) ? new ObjectId(value) : null;
 }
+
+// phase 1 stored passwords as plain text, so anyone who could read the database could read
+// every password, and people reuse them across sites. bcrypt hashes are one way: the stored
+// value can be compared against a typed password but can't be turned back into one.
+//
+// 10 is bcrypt's own default cost. the cost is the exponent on how much work a hash takes
+// (2^10 rounds), which is what keeps a stolen database expensive to crack, and it's stored
+// inside the hash itself so raising it later doesn't invalidate existing hashes.
+//
+// bcrypt also generates a random salt per password and keeps it in the hash string, so two
+// people with the same password get different hashes and one cracked hash isn't every account.
+const SALT_ROUNDS = 10;
 
 // the spec says email is the unique identifier for a user, so it gets trimmed and lowercased everywhere.
 // without this Test@Test.com and test@test.com would be stored as two different people.
@@ -191,7 +204,7 @@ app.post('/register', async (req, res) => {       // handles new user signups
 
     const newUser = {
         email: cleanEmail,
-        password,
+        password: await bcrypt.hash(password, SALT_ROUNDS),   // the typed password is never stored, only this hash of it
         role,
         username: (username ?? '').trim() || cleanEmail.split('@')[0],   // fall back to the part before the @ so nobody is nameless
         dob: dob ?? '',        // optional at signup, but needed before joining an age restricted group
@@ -219,7 +232,11 @@ app.post('/login', async (req, res) => {
 
     const user = await users.findOne({ email: cleanEmail }); // look for a user whose email matches the one submitted; null if none found
 
-        if (!user || user.password !== password) {
+    // bcrypt.compare hashes what was typed with the salt stored inside the saved hash and
+    // compares the two, which is the only way to check a password that was never kept.
+    // the two cases are still answered identically, so this doesn't reveal whether an email
+    // is registered. && short circuits, so no hash is attempted when there's no user.
+        if (!user || !(await bcrypt.compare(String(password), user.password))) {
             return res.status(401).json({ error: 'Invalid email or password' });
     }
     // role goes back too so Angular knows which pages to offer, and the profile fields go with
@@ -292,7 +309,7 @@ app.put('/users/:email', async (req, res) => {
             if (String(password).length < 6) {
                 return res.status(400).json({ error: 'Password must be at least 6 characters' });
         }
-            changes.password = password;
+            changes.password = await bcrypt.hash(password, SALT_ROUNDS);    // hashed here too, or changing it would undo the hashing done at register
     }
 
     // returnDocument: 'after' hands back the record as it now is, so the client renders what
