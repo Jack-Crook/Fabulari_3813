@@ -11,6 +11,7 @@
       <a class="room-link"
          [class.selected]="item._id === channel()?._id"
          [style.background]="item._id === channel()?._id ? theme() : ''"
+         [style.color]="item._id === channel()?._id ? ink() : ''"
          [routerLink]="['/groups', group()?._id, 'channels', item._id]">
         {{ item.name }}
       </a>
@@ -25,7 +26,7 @@
     <!-- the spec says the group's theme colour extends into its chat rooms, so the room header,
          the selected room in the sidebar and the message bar below all take their colour from
          the group record rather than the palette -->
-    <header class="chat-banner" [style.background]="theme()">
+    <header class="chat-banner" [style.background]="theme()" [style.color]="ink()">
       <h1>{{ channel()?.name }}</h1>
       <span class="chat-group">{{ group()?.name }}</span>
     </header>
@@ -97,6 +98,8 @@
 
         <input name="draft" type="text" autocomplete="off" aria-label="Message"
                [style.background]="theme()"
+               [style.color]="ink()"
+               [class.on-dark]="onDark()"
                [(ngModel)]="draft"
                placeholder="Message {{ channel()?.name }}" />
         <!-- needs text or an image, and waits for an upload in progress to finish -->

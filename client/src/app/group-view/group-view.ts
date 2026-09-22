@@ -6,6 +6,7 @@ import { Navbar } from '../navbar/navbar';
 import { Auth } from '../auth';
 import { GroupService, Group, Channel } from '../group';
 import { RequestService, AppRequest } from '../request';
+import { readableInk, LIGHT_INK } from '../theme';
 
 @Component({
   selector: 'app-group-view',
@@ -42,6 +43,21 @@ export class GroupView {
   // the super admin oversees every group without being a member of any, so the propose form
   // is for actual members only
   isMember = computed(() => this.group()?.memberEmails.includes(this.me) ?? false);
+
+  // a group admin picks the theme colour, so nothing about it is known when this is written.
+  // the banner text colour is worked out from whatever they chose instead of being fixed, or
+  // a dark theme would put near black text on a near black background. see theme.ts.
+  ink = computed(() => readableInk(this.group()?.theme ?? ''));
+
+  // the pills sit on top of the banner and use a translucent overlay, which has to flip the
+  // same way the text does. a class, because a background can't be derived in the template.
+  onDark = computed(() => this.ink() === LIGHT_INK);
+
+  // the sidebar shows every group at once, each in its own colour, so they can't share the
+  // banner's single computed value
+  inkFor(theme: string) {
+    return readableInk(theme);
+  }
 
   constructor() {
     // paramMap is subscribed to rather than read once, because clicking a different group in

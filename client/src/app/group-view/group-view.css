@@ -25,7 +25,7 @@
   margin-bottom: 16px;
   border-radius: 6px;
   border: 2px solid transparent;    /* transparent now so the tile doesn't jump when it gets outlined */
-  color: #1A1D23;
+  color: #1A1D23;                   /* only the fallback: the real colour is bound per tile from its own theme */
   text-decoration: none;
   font-weight: 600;
   transition: filter 0.15s;
@@ -63,13 +63,13 @@
   font-size: 1.75rem;
   font-family: 'Fraunces Variable', Georgia, serif;
   font-weight: 800;
-  color: #1A1D23;
+  color: inherit;                   /* inherits the readable colour bound on the banner itself */
 }
 
 .banner-desc {
   margin: 4px 0 0;
   font-size: 14px;
-  color: #1A1D23;
+  color: inherit;
   opacity: 0.75;
 }
 
@@ -87,6 +87,14 @@
   font-size: 12px;
   font-weight: 600;
   color: #1A1D23;
+}
+
+/* a white veil lightens a pale theme barely at all, so on a dark theme the pill has to go the
+   other way and darken instead, or it turns into a light box wanting dark text on a banner
+   that has just switched to light text */
+.group-banner.on-dark .banner-pill {
+  background: rgba(0, 0, 0, 0.28);
+  color: inherit;
 }
 
 /* only rendered on a group this user admins, so it doubles as a visible answer to "which of
