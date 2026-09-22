@@ -47,9 +47,11 @@
 
 .room-link.selected {
   /* the background is set inline from the group's theme colour, because the spec says the
-     theme extends into the group's chat rooms. this is only the fallback and the weight. */
+     theme extends into the group's chat rooms, and the text colour is derived from it. these
+     are only the fallbacks and the weight - and the fallback background is a pale blue, so
+     the fallback text has to be the dark ink, not the white this used to hardcode. */
   background: #E8EDFB;
-  color: #FFFFFF;
+  color: #1A1D23;
   font-weight: 600;
 }
 
@@ -81,7 +83,7 @@
   align-items: baseline;
   gap: 12px;
   padding: 16px 24px;
-  color: #FFFFFF;
+  color: #1A1D23;               /* fallback only, the readable colour is bound from the theme */
   flex-wrap: wrap;
 }
 
@@ -170,6 +172,13 @@
 .composer input::placeholder {
   color: #1A1D23;
   opacity: 0.7;
+}
+
+/* the input's own colour is bound inline, but a placeholder is a pseudo element and can't be,
+   so the dark theme case is carried by a class the component sets from the same calculation */
+.composer input.on-dark::placeholder {
+  color: #FFFFFF;
+  opacity: 0.75;
 }
 
 /* the Image button is secondary, so it's outlined rather than a second solid blue button */

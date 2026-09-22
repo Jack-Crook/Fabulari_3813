@@ -18,6 +18,7 @@
       <a class="group-tile"
          [class.selected]="item._id === group()?._id"
          [style.background]="item.theme"
+         [style.color]="inkFor(item.theme)"
          [routerLink]="['/groups', item._id]">
         {{ item.name }}
       </a>
@@ -28,7 +29,8 @@
 
     <!-- banner across the top in the group's own theme colour -->
     @if (group(); as current) {
-      <header class="group-banner" [style.background]="current.theme">
+      <header class="group-banner" [style.background]="current.theme"
+              [style.color]="ink()" [class.on-dark]="onDark()">
         <div>
           <h1>{{ current.name }}</h1>
           <p class="banner-desc">{{ current.description }}</p>

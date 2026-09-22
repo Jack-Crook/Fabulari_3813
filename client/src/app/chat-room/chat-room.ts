@@ -7,6 +7,7 @@ import { Navbar } from '../navbar/navbar';
 import { Auth } from '../auth';
 import { GroupService, Group, Channel } from '../group';
 import { ChatService } from '../chat';
+import { readableInk, LIGHT_INK } from '../theme';
 
 @Component({
   selector: 'app-chat-room',
@@ -31,6 +32,15 @@ export class ChatRoom {
   // says the theme is the group's customisation and that it extends into its chat rooms, so
   // the banner, the selected room and the message bar all read from this.
   theme = computed(() => this.group()?.theme ?? '#5FA8D3');
+
+  // and the readable text colour for anything sitting on that theme. the banner used to
+  // hardcode white, which failed even against the fallback colour above at 2.6:1, well under
+  // the 4.5:1 WCAG asks for. worked out from the colour now instead. see theme.ts.
+  ink = computed(() => readableInk(this.theme()));
+
+  // the message box's placeholder is a pseudo element, so it can't be given an inline colour
+  // and needs a class to style against instead
+  onDark = computed(() => this.ink() === LIGHT_INK);
 
   // the live state lives in ChatService, not here. these are the service's own signals handed
   // straight to the template, not copies, so when a socket event updates one the page redraws.
