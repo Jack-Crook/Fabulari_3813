@@ -25,3 +25,8 @@ describe('App', () => {
     expect(compiled.querySelector('router-outlet')).toBeTruthy();
   });
 });
+
+
+//need atleast 1 test for each route
+//endpoints can use either
+//have components with lots of tests
