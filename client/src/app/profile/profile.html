@@ -21,10 +21,10 @@
       </div>
 
       @if (formSuccess()) {
-        <p class="success">{{ formSuccess() }}</p>
+        <p class="success" role="status">{{ formSuccess() }}</p>
       }
       @if (formError()) {
-        <p class="error">{{ formError() }}</p>
+        <p class="error" role="alert">{{ formError() }}</p>
       }
 
       <!-- read only view. the edit form replaces it rather than sitting under it, so there's

@@ -1,12 +1,13 @@
 <app-navbar></app-navbar>
 
 <!-- one message bar for the whole page, so requesting a group and joining one both report
-     back in the same place instead of each panel having its own -->
+     back in the same place instead of each panel having its own. the roles make a screen
+     reader announce it: alert straight away for an error, status at the next pause. -->
 @if (formError()) {
-  <p class="banner error">{{ formError() }}</p>
+  <p class="banner error" role="alert">{{ formError() }}</p>
 }
 @if (formSuccess()) {
-  <p class="banner success">{{ formSuccess() }}</p>
+  <p class="banner success" role="status">{{ formSuccess() }}</p>
 }
 
 <div class="dashboard-body">
@@ -110,8 +111,9 @@
     <section class="discover">
       <h2>Discover</h2>
       <!-- writes straight into the signal the filtered list is computed from, so the list
-           narrows as you type -->
-      <input type="text" placeholder="Search groups" class="discover-search"
+           narrows as you type. the placeholder isn't a label, it disappears as soon as you type
+           and screen readers don't reliably read it, so aria-label names the box instead. -->
+      <input type="text" placeholder="Search groups" class="discover-search" aria-label="Search groups"
              [value]="searchTerm()"
              (input)="searchTerm.set($any($event.target).value)">
 
