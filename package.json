@@ -16,7 +16,8 @@
   "main": "index.js",
   "scripts": {
     "start": "node server.js",
-    "seed": "node seed.js"
+    "seed": "node seed.js",
+    "test": "node --test --test-concurrency=1 \"test/*.test.js\""
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
@@ -25,5 +26,8 @@
     "mongodb": "^7.6.0",
     "multer": "^2.4.0",
     "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.8.3"
   }
 }

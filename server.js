@@ -1415,7 +1415,10 @@ function peopleIn(channelId) {
   return room ? [...new Set(room.values())] : [];   // Set dedupes the two-tabs case for display
 }
 
-async function start() {
+// port is a parameter so the tests can pass 0, which asks the OS for any free port. that way a
+// test run never collides with a real server already running on 3000. the mongo client is
+// returned so whoever started the server can close the connection again.
+async function start(port = PORT) {
   const client = new MongoClient(MONGO_URL);
   await client.connect();
 
@@ -1435,13 +1438,22 @@ async function start() {
 
   console.log(`Connected to MongoDB at ${MONGO_URL}/${DB_NAME}`);
 
-  server.listen(PORT, () => {    // server.listen, not app.listen — io is attached to this one
-    console.log(`Server listening on port ${PORT}`);
-  });
+  // wrapped in a promise so start() only resolves once the server is actually accepting
+  // connections, otherwise a test could fire its first request before anything is listening
+  await new Promise(resolve => server.listen(port, resolve));    // server.listen, not app.listen — io is attached to this one
+  console.log(`Server listening on port ${server.address().port}`);
+  return client;
 }
 
 
-start().catch(err => {      // if mongo isn't running there's nothing useful the app can do, so fail loudly instead of serving broken routes
-    console.error('Failed to start server:', err);
-    process.exit(1);
-});
+// require.main === module is only true when this file was run directly (`npm start`). the tests
+// require() it instead, to get at the server and start it themselves against a test database,
+// and without this check just requiring the file would boot a second server on port 3000.
+if (require.main === module) {
+  start().catch(err => {      // if mongo isn't running there's nothing useful the app can do, so fail loudly instead of serving broken routes
+      console.error('Failed to start server:', err);
+      process.exit(1);
+  });
+}
+
+module.exports = { app, server, io, start, UPLOAD_DIR };
