@@ -227,9 +227,43 @@
      count says 99 but nobody has confirmed they all pass since sockets and images
      landed. Put the pass/fail line and the duration under the table. -->
 
+**Server — integration tests** (`test/`, run with `npm test` from the repo root, needs `mongod`)
+
 | Spec file | Tests | Covers |
 |---|---|---|
-|  |  |  |
+| `api.test.js` — auth and users | 16 | health check; first account becomes super admin; bcrypt hash stored, never the password; email normalised; 400 on missing fields, bad email, short password; 403 on a banned email; identical 401 for wrong password and unknown email; password never returned; profile edit own-only (403), role not editable, changed password re-hashed |
+| `api.test.js` — groups | 26 | create (creator is first admin); case-insensitive unique names (409); edit admin-only (403); malformed id is 404, not 500; raising the age limit boots under-age members but never an admin; delete super-admin-only and cascades rooms and messages; join, already-in and super admin (409), too young or no date of birth (403); leave and remove; last admin can't be removed, banned or demoted (409); group ban blocks rejoin, lifting it allows it; promote and demote |
+| `api.test.js` — channels | 9 | list all / by group, malformed group id gives `[]`; admin creates, member gets 403 (must propose); duplicate name in a group (409); rename rules (403, 400, 409); delete admin-only and removes its messages |
+| `api.test.js` — requests | 18 | `scope` splits the super admin and group admin queues; `requestedBy` filter; super admin can't raise requests (403); duplicate pending name (409); member-only proposals, admin-only deletion requests; ban report needs a reason (400) and won't target a group's only admin (409); approve carries out all four types; nobody approves their own (403); can't action twice (409); name re-checked at approval time (409); approved ban deletes the account and blocks re-registering; reject needs a reason (400) and has the same authority check |
+| `api.test.js` — bans and audit | 3 | banned list; audit newest first and filterable by type; distinct sorted types, refused actions not logged |
+| `api.test.js` — uploads | 5 | member upload gets a random file name and is served with `nosniff`; non-member 403 and the file is removed from disk; SVG refused (400); over 5 MB refused (413); unknown file 404 |
+| `sockets.test.js` | 14 | members only can join; bad or unknown room refused; history and presence in the join ack; `userJoined` to others but not the joiner; history replayed oldest first; must join before sending; empty message refused; `newMessage` reaches the sender too and is stored; sender taken from the join, not the payload; uploaded image sends, an image url the server never issued is refused; leave and disconnect both send `userLeft` and update presence, no ghost entries |
+
+**Result: 2 files, 91 tests, 91 passed, about 2s.** Run 10 times in a row with no failures.
+
+**Client — unit tests** (`client/`, Vitest via `ng test`)
+
+| Spec file | Tests | Covers |
+|---|---|---|
+| `auth.spec.ts` | 9 | register and login payloads, url-encoded email, profile update never sends email or role, session round trip through `localStorage`, super admin detection, logout |
+| `group.spec.ts` | 6 | `GroupService` call shapes: actor sent with edits, url-encoded member removal, promote POST vs demote DELETE, reason sent with a ban |
+| `request.spec.ts` | 5 | empty filters dropped rather than sent, request payload, reject sends the reason, audit type only sent when chosen |
+| `theme.spec.ts` | 7 | WCAG contrast end points (21:1 and 1:1), symmetric, short hex form, dark vs light ink choice, every seeded theme passes AA 4.5:1, safe fallback on a bad value |
+| `guards.spec.ts` | 6 | `authGuard`, `superAdminGuard` and `groupAdminGuard`, each allowing and redirecting |
+| `app.spec.ts` | 2 | root component creates and renders the router outlet |
+| `login.spec.ts` | 4 | stores the user on success, shows the server's error, ignores a double submit |
+| `register.spec.ts` | 5 | ordinary signup clears the form, first-account super admin message, server errors shown |
+| `navbar.spec.ts` | 6 | Super Admin link only for the super admin; Group Admin link only on a group this user admins |
+| `user-dashboard.spec.ts` | 7 | My Groups / Discover split, super admin view, search filter, group request instead of create, age-limit rejection and last-admin 409 surfaced |
+| `group-view.spec.ts` | 7 | admin / member / non-member recognised, propose a room instead of creating it, 409 surfaced, pending proposals listed |
+| `chat-room.spec.ts` | 17 | joins the room in the url, admin indicator, theme colour and fallback, socket messages and presence rendered, send trims and clears, empty send blocked, image upload rules (type and 5 MB checked before uploading), image with and without text, members-only composer, leaves on destroy |
+| `profile.spec.ts` | 7 | loads from the server not `localStorage`, age from date of birth, pending vs rejected requests, groups administered, blank password not sent, server errors shown |
+| `super-admin-dashboard.spec.ts` | 7 | only super admin request types fetched, audit refetched on filter change, approve, 400 on a rejection with no reason, request type labels |
+| `admin-dashboard.spec.ts` | 11 | last admin flagged, actor sent with settings, booted members reported, deletion and ban go through requests, direct group ban, own-proposal 403 surfaced, rejection reason sent |
+
+**Result: 15 files, 106 tests, 106 passed.**
+
+**Total: 197 automated tests, all passing** (re-run 2026-09-29).
 
 ### Manual and integration testing
 

@@ -19,7 +19,7 @@ export class ChatRoom {
   private groupService = inject(GroupService);
   private route = inject(ActivatedRoute);
   private auth = inject(Auth);
-  private chat = inject(ChatService);/
+  private chat = inject(ChatService);
 
   // signals because the app is zoneless, same reason as the dashboard and group view
   group = signal<Group | undefined>(undefined);
