@@ -25,13 +25,16 @@
 </form>
 
 
-    <!-- shows this only if there's an error message -->
+    <!-- shows this only if there's an error message. role="alert" makes a screen reader read it
+         out the moment it appears, otherwise a failed login is silent unless you go looking.
+         the success line uses role="status" instead, which waits for a pause rather than
+         interrupting. same pattern as the chat room. -->
     @if (errormessage()) {
-  <p class="error">{{ errormessage() }}</p>
+  <p class="error" role="alert">{{ errormessage() }}</p>
 }
 
 @if (successmessage()) {
-  <p class="success">{{ successmessage() }}</p>
+  <p class="success" role="status">{{ successmessage() }}</p>
 }
 
 

@@ -2,10 +2,10 @@
 
 <!-- one message bar for every action, same pattern as the other two dashboards -->
 @if (actionError()) {
-  <p class="banner error">{{ actionError() }}</p>
+  <p class="banner error" role="alert">{{ actionError() }}</p>
 }
 @if (actionSuccess()) {
-  <p class="banner success">{{ actionSuccess() }}</p>
+  <p class="banner success" role="status">{{ actionSuccess() }}</p>
 }
 
 <div class="super-admin-body">
@@ -132,7 +132,9 @@
       <h2>Audit Log</h2>
       <!-- the spec asks for a log filterable by type and in date order. both happen on the
            server, and the options come from the log itself so they can't drift out of date. -->
-      <select class="audit-filter" [value]="auditFilter()"
+      <!-- aria-label because otherwise a screen reader only hears "All types, combo box" with
+           no idea what's being filtered -->
+      <select class="audit-filter" aria-label="Filter the audit log by type" [value]="auditFilter()"
               (change)="onFilterAudit($any($event.target).value)">
         <option value="">All types</option>
         @for (type of auditTypes(); track type) {

@@ -1,10 +1,10 @@
 <app-navbar></app-navbar>
 
 @if (formError()) {
-  <p class="banner error">{{ formError() }}</p>
+  <p class="banner error" role="alert">{{ formError() }}</p>
 }
 @if (formSuccess()) {
-  <p class="banner success">{{ formSuccess() }}</p>
+  <p class="banner success" role="status">{{ formSuccess() }}</p>
 }
 
 <div class="group-body">
@@ -79,7 +79,8 @@
              the super admin isn't a member of any group. -->
         @if (isMember() && !isGroupAdmin() && !isSuper) {
           <form class="propose-room" (ngSubmit)="onPropose()">
-            <input name="proposed" type="text" placeholder="Propose a new room"
+            <!-- aria-label names the box for a screen reader, since the placeholder vanishes on typing -->
+            <input name="proposed" type="text" placeholder="Propose a new room" aria-label="Name of the room to propose"
                    [(ngModel)]="proposedName" required />
             <button type="submit">Propose</button>
           </form>

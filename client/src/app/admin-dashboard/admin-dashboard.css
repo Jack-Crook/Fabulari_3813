@@ -92,6 +92,7 @@ h2 {
   border-radius: 3px;
   vertical-align: middle;
   margin: 0 4px;
+  box-shadow: inset 0 0 0 1px rgba(26, 29, 35, 0.2);   /* an edge so a near-white theme is still visible, same as the dashboard swatch */
 }
 
 .setting-description {
