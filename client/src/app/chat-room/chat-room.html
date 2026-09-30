@@ -31,6 +31,24 @@
       <span class="chat-group">{{ group()?.name }}</span>
     </header>
 
+    <!-- the same live list as the "Currently In" sidebar, for phones. the sidebar is hidden under
+         768px to give the messages the width, and without this the spec's "who else is in the
+         room" list would never be visible on a phone. hidden on desktop by the css. -->
+    <p class="presence-strip">
+      <span class="presence-label">In the room:</span>
+      @for (person of present(); track person) {
+        <span class="presence-person">
+          {{ person }}
+          @if (isAdmin(person)) {
+            <span class="admin-tag">Admin</span>
+          }
+        </span>
+      }
+      @if (present().length === 0) {
+        <span class="presence-person">nobody</span>
+      }
+    </p>
+
     <!-- the join/leave notification the spec asks for, on top of the live list on the right.
          role="status" makes a screen reader announce it without moving focus. -->
     <p class="notice" role="status">{{ notice() }}</p>

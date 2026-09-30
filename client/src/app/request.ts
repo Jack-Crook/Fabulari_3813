@@ -2,7 +2,7 @@ import { Service, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 
 // four things in the spec can't be done directly and have to be asked for. they share one
-// record shape and one requests.json file, because approve/reject/reason work identically for
+// record shape and one requests collection, because approve/reject/reason work identically for
 // all of them and only the action taken on approval differs.
 //   group-create    a user asks the super admin for a group, supplying the details up front
 //   group-delete    a group admin asks the super admin to delete or disband their group

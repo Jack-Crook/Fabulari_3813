@@ -56,7 +56,7 @@
           <!-- clicking a room opens the chat room view for it -->
           <a class="room-row" [routerLink]="['/groups', group()?._id, 'channels', channel._id]">
             <span class="room-name">{{ channel.name }}</span>
-            <!-- there's no presence tracking yet, that needs socket.io in phase 2 -->
+            <!-- who's in each room is shown once you're inside it, live from the socket -->
             <span class="room-count">Open</span>
           </a>
         }

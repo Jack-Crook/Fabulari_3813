@@ -1,7 +1,7 @@
 import { Service, inject } from '@angular/core';    // Service = injectable decorator; inject() = grabs a dependency
 import { HttpClient } from '@angular/common/http';  // lets this service make HTTP requests
 
-// the shape the express /groups routes send back, matches one record in data/groups.json
+// the shape the express /groups routes send back, one document in the groups collection
 export interface Group {
   _id: string;                // mongo generates this, it arrives as a 24 character hex string
   name: string;
@@ -13,7 +13,7 @@ export interface Group {
   bannedEmails: string[];     // group level bans. the account still exists, they just can't be in this group
 }
 
-// one record from data/channels.json. a channel is a room inside a group
+// one document in the channels collection. a channel is a room inside a group
 export interface Channel {
   _id: string;                // mongo generates this, it arrives as a 24 character hex string
   groupId: string;
@@ -49,26 +49,17 @@ export class GroupService {
     return this.http.get<Channel[]>(`${this.apiUrl}/channels`, { params: { groupId } });
   }
 
-  // POST /groups. the server puts creatorEmail into both adminEmails and memberEmails, so
-  // whoever fills in the form becomes that group's first admin, which is what the spec asks for.
-  // the UI no longer calls this directly. a user raises a group-create request instead and the
-  // super admin's approval runs the same code on the server. it's kept because approving is
-  // exactly this operation, and because the API is documented as having it.
-  createGroup(name: string, description: string, ageLimit: number, theme: string, creatorEmail: string) {
-    return this.http.post<Group>(`${this.apiUrl}/groups`, { name, description, ageLimit, theme, creatorEmail });
-  }
-
   // PATCH /groups/:id. actorEmail goes in the body so the server can check the caller really is
   // an admin of this group rather than taking the client's word for it.
   updateGroup(groupId: string, changes: GroupChanges, actorEmail: string) {
     return this.http.patch<GroupEditResponse>(`${this.apiUrl}/groups/${groupId}`, { ...changes, actorEmail });
   }
 
-  // POST /groups/:id/members, assigns an already registered user to an existing group.
-  // the server auto rejects with a 403 when the user is under the group's age limit, or has
-  // been banned from this group.
+  // POST /groups/:id/members, the signed in user joins a group. actorEmail has to match email,
+  // because you can only join a group yourself. the server auto rejects with a 403 when the user
+  // is under the group's age limit, or has been banned from this group.
   joinGroup(groupId: string, email: string) {
-    return this.http.post<Group>(`${this.apiUrl}/groups/${groupId}/members`, { email });
+    return this.http.post<Group>(`${this.apiUrl}/groups/${groupId}/members`, { email, actorEmail: email });
   }
 
   // DELETE /groups/:id/members/:email. this is the group level removal, the account itself

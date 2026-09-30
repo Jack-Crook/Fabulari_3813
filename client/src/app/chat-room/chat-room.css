@@ -265,11 +265,32 @@
 
 
 
+/* the phone version of the presence sidebar. only shown under 768px, see below */
+.presence-strip {
+  display: none;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0;
+  padding: 8px 16px;
+  border-bottom: 1px solid #E2E4E9;
+  font-size: 13px;
+  color: #1A1D23;
+}
+
+.presence-label {
+  color: #6B7280;
+}
+
 @media (max-width: 768px) {
   /* three columns don't fit on a phone, so the messages get the whole width.
-     the room list is still reachable through the group view. */
+     the room list is still reachable through the group view, and who's in the room moves into
+     the strip under the banner, because the spec asks for that list to be visible. */
   .rooms-sidebar, .presence-sidebar {
     display: none;
+  }
+
+  .presence-strip {
+    display: flex;
   }
 
   .messages, .composer, .notice, .pending-image {

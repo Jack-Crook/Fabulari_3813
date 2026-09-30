@@ -159,9 +159,10 @@ function ageProblem(user, group) {
     return null;
 }
 
-// group creation happens from two places, the direct POST /groups route and approving a
-// group-create request, so the record is built and inserted in one place rather than twice.
-// insertOne sets _id on the object it was given, so the caller can send it straight back.
+// builds and inserts a new group when the super admin approves a group-create request. there is
+// deliberately no POST /groups route: the spec says a group only exists once a request for it
+// has been approved, so a direct create route would be a way around the super admin.
+// insertOne sets _id on the object it was given, so the caller can read it straight back.
 async function createGroupRecord({ name, description, ageLimit, theme }, creatorEmail) {
     const newGroup = {
         name: String(name).trim(),
@@ -365,32 +366,6 @@ app.get('/groups', async (req, res) => {      // send back every group, the dash
     res.status(200).json(all.map(normaliseGroup));
 });
 
-app.post('/groups', async (req, res) => {     // creates a group
-    const { name, description, ageLimit, theme, creatorEmail } = req.body;
-
-        if (!name || !creatorEmail) {       // a group with no name, or with nobody to admin it, isn't valid
-            return res.status(400).json({ error: 'Group name and creator email are required' });
-    }
-
-        if (await nameTaken(name)) {        // stop two groups ending up with the same name
-            return res.status(409).json({ error: 'A group with that name already exists' });
-    }
-
-    const creator = normaliseEmail(creatorEmail);
-
-    const creatorUser = await users.findOne({ email: creator });
-        if (!creatorUser) {     // same rule as adding a member, a group can't be owned by an email that was never registered
-            return res.status(404).json({ error: 'User not found' });
-    }
-        if (creatorUser.role === 'super') {
-            return res.status(409).json({ error: 'The super admin cannot create or admin a group' });
-    }
-
-    const newGroup = await createGroupRecord({ name, description, ageLimit, theme }, creator);
-    await logAudit('Group Created', creator, `Created group "${newGroup.name}"`);
-    res.status(201).json(newGroup);
-});
-
 // a group admin can change the name, description, theme colour and age limit at any time with
 // no request needed, because the spec is explicit that only creating and deleting a group need the
 // super admin. actorEmail is in the body so the server can check they really are an admin here.
@@ -495,11 +470,17 @@ app.delete('/groups/:id', async (req, res) => {
     res.status(200).json({ message: 'Group deleted' });
 });
 
-app.post('/groups/:id/members', async (req, res) => {     // assigns an existing user to an existing group
+app.post('/groups/:id/members', async (req, res) => {     // a user joins a group
     const email = normaliseEmail(req.body.email);
 
         if (!email) {
             return res.status(400).json({ error: 'Email is required' });
+    }
+
+    // joining is something you do for yourself. without this anyone could add any registered
+    // user to any group, including one they'd never want to be in. same check as editing a profile.
+        if (normaliseEmail(req.body.actorEmail) !== email) {
+            return res.status(403).json({ error: 'You can only join a group yourself' });
     }
 
     const user = await users.findOne({ email });
@@ -1265,7 +1246,7 @@ function registerSocketHandlers() {
   io.on('connection', socket => {
     // what this socket is currently in. kept on the socket itself so disconnect can clean up
     // without searching every room in the presence map.
-    let joined = null;      // { channelId, email }
+    let joined = null;      // { channelId, groupId, email }
 
     socket.on('joinRoom', async ({ channelId, email }, ack) => {
       try {
@@ -1295,7 +1276,7 @@ function registerSocketHandlers() {
 
         const roomKey = String(id);
         socket.join(roomKey);
-        joined = { channelId: roomKey, email: cleanEmail };
+        joined = { channelId: roomKey, groupId: group._id, email: cleanEmail };
 
         if (!presence.has(roomKey)) {
           presence.set(roomKey, new Map());
@@ -1326,6 +1307,15 @@ function registerSocketHandlers() {
         // sends someone else's email can't spoof a message, because this never reads one.
         if (!joined) {
           return ack?.({ error: 'Join a room first' });
+        }
+
+        // membership was checked at join time, but someone can be removed, banned or leave while
+        // they're still sitting in the room. checked again on every send, otherwise they could
+        // keep posting into a group they're no longer in until they happened to navigate away.
+        const group = await groups.findOne({ _id: joined.groupId });
+        if (!group || !group.memberEmails.includes(joined.email)) {
+          await leaveCurrentRoom();
+          return ack?.({ error: 'You are no longer a member of this group' });
         }
         const text = String(body ?? '').trim();
         const image = String(imageUrl ?? '');

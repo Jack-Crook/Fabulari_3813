@@ -169,6 +169,15 @@ describe('sendMessage', () => {
         assert.equal((await received).sender, 'bob@test.com');
     });
 
+    it('refuses a sender who was removed from the group after joining', async () => {
+        const { socket } = await joined('bob@test.com');
+        await ctx.db.collection('groups').updateOne(
+            { _id: new ObjectId(ids.groupId) }, { $pull: { memberEmails: 'bob@test.com' } });
+        const ack = await emit(socket, 'sendMessage', { body: 'still here?' });
+        assert.equal(ack.error, 'You are no longer a member of this group');
+        assert.equal(await ctx.db.collection('messages').countDocuments({ body: 'still here?' }), 0);
+    });
+
     it('sends an image that was uploaded through POST /uploads', async () => {
         const upload = await uploadImage(ctx.base, { email: 'bob@test.com', channelId: ids.channelId });
         ctx.uploaded.push(upload.body.imageUrl);
