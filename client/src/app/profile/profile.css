@@ -35,7 +35,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #FFFFFF;
+  color: #1A1D23;       /* dark, not white: white on this blue is 2.6:1, under the 4.5:1 WCAG asks for */
   font-size: 28px;
   font-weight: 700;
   font-family: 'Fraunces Variable', Georgia, serif;

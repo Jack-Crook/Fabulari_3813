@@ -49,16 +49,38 @@
         <a class="manage-link" [routerLink]="['/admin-dashboard', current._id]">Manage this group →</a>
       }
 
+      <!-- the rooms are visible to everyone, the spec says any group can be seen, but only a
+           member can chat in them. someone who isn't in it gets the join button here instead of
+           room links that would only answer "you are not a member". the super admin oversees
+           groups without joining them, and the server refuses to add them, so no button for them. -->
+      @if (!isMember() && !isSuper) {
+        <div class="join-bar">
+          <p>You aren't a member of this group yet. Join it to chat in its rooms.</p>
+          <button type="button" (click)="onJoin()" [disabled]="joining()">
+            {{ joining() ? 'Joining…' : 'Join group' }}
+          </button>
+        </div>
+      }
+
       <div class="rooms">
         <h2>Rooms</h2>
 
         @for (channel of channels(); track channel._id) {
-          <!-- clicking a room opens the chat room view for it -->
-          <a class="room-row" [routerLink]="['/groups', group()?._id, 'channels', channel._id]">
-            <span class="room-name">{{ channel.name }}</span>
-            <!-- who's in each room is shown once you're inside it, live from the socket -->
-            <span class="room-count">Open</span>
-          </a>
+          @if (isMember()) {
+            <!-- clicking a room opens the chat room view for it -->
+            <a class="room-row" [routerLink]="['/groups', group()?._id, 'channels', channel._id]">
+              <span class="room-name">{{ channel.name }}</span>
+              <!-- who's in each room is shown once you're inside it, live from the socket -->
+              <span class="room-count">Open</span>
+            </a>
+          } @else {
+            <!-- not a link, because the chat would refuse them. still listed, so they can see
+                 what the group talks about before joining. -->
+            <div class="room-row locked">
+              <span class="room-name">{{ channel.name }}</span>
+              <span class="room-count">{{ isSuper ? 'Members only' : 'Join to chat' }}</span>
+            </div>
+          }
         }
 
         @if (channels().length === 0) {

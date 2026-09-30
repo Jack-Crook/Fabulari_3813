@@ -159,6 +159,39 @@
   background: #4A5CB8;
 }
 
+/* a room shown to someone who can't chat in it. greyed rather than hidden, and no hover,
+   because it isn't a link */
+.room-row.locked,
+.room-row.locked:hover {
+  background: #E2E4E9;
+  color: #1A1D23;
+  cursor: default;
+}
+
+.join-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 16px 24px 0;
+  padding: 12px 16px;
+  border: 1px solid #E2E4E9;
+  border-radius: 8px;
+  background: #FFFFFF;
+}
+
+.join-bar p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.join-bar button {
+  width: auto;          /* the global button is full width */
+  margin: 0;
+  padding: 8px 20px;
+}
+
 .room-count {
   font-size: 12px;
   opacity: 0.85;

@@ -192,6 +192,12 @@ export class ChatRoom {
     return url ? this.auth.avatarSrc(url) : '';
   }
 
+  // today's messages just show the time. anything older gets the date as well, otherwise last
+  // week's message reads "3:15 PM" and looks like it was sent this afternoon.
+  timeFormat(at: string) {
+    return new Date(at).toDateString() === new Date().toDateString() ? 'shortTime' : 'd MMM, h:mm a';
+  }
+
   // group admins get an indicator next to their name in chat, the spec asks for this.
   // it's a lookup in the group's adminEmails rather than a check on the user's role, because
   // that's where group admin actually lives.

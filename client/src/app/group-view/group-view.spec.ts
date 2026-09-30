@@ -9,8 +9,8 @@ describe('GroupView', () => {
   let fixture: ComponentFixture<GroupView>;
   let mock: HttpTestingController;
 
-  async function build(email: string) {
-    signIn(email);
+  async function build(email: string, role = 'user') {
+    signIn(email, role);
     fixture = TestBed.createComponent(GroupView);
     component = fixture.componentInstance;
     mock = TestBed.inject(HttpTestingController);
@@ -104,5 +104,52 @@ describe('GroupView', () => {
     // clickable room, because the channel doesn't exist yet
     expect(component.proposals().length).toBe(1);
     expect(component.channels().length).toBe(1);
+  });
+
+  it('offers a non-member a join button instead of room links that would fail', async () => {
+    await build('stranger@test.com');
+    load();
+    await fixture.whenStable();
+
+    const page = fixture.nativeElement as HTMLElement;
+    expect(page.querySelector('.join-bar button')?.textContent).toContain('Join group');
+    expect(page.querySelector('a.room-row')).toBeNull();
+    expect(page.querySelector('.room-row.locked')?.textContent).toContain('Join to chat');
+  });
+
+  it('joins from the group page and then shows the rooms as links', async () => {
+    await build('stranger@test.com');
+    load();
+
+    component.onJoin();
+    const req = mock.expectOne(r => r.method === 'POST' && r.url.endsWith('/members'));
+    expect(req.request.body).toEqual({ email: 'stranger@test.com', actorEmail: 'stranger@test.com' });
+    req.flush(makeGroup({ _id: '' }));
+
+    load(makeGroup({ _id: '', memberEmails: ['admin@test.com', 'stranger@test.com'] }));
+    await fixture.whenStable();
+    expect(component.formSuccess()).toContain('Joined');
+    expect((fixture.nativeElement as HTMLElement).querySelector('a.room-row')).not.toBeNull();
+  });
+
+  it('shows the server\'s reason when joining is refused', async () => {
+    await build('stranger@test.com');
+    load();
+
+    component.onJoin();
+    mock.expectOne(r => r.url.endsWith('/members'))
+      .flush({ error: 'You must be at least 18 to join this group.' }, { status: 403, statusText: 'Forbidden' });
+
+    expect(component.formError()).toContain('at least 18');
+    expect(component.joining()).toBe(false);
+  });
+
+  it('gives the super admin no join button, since they can\'t be a member', async () => {
+    await build('boss@test.com', 'super');
+    load();
+    await fixture.whenStable();
+
+    expect((fixture.nativeElement as HTMLElement).querySelector('.join-bar')).toBeNull();
+    expect((fixture.nativeElement as HTMLElement).querySelector('.room-row.locked')?.textContent).toContain('Members only');
   });
 });

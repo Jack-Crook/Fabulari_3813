@@ -282,4 +282,12 @@ describe('ChatRoom', () => {
     expect(component.nameFor('gone@test.com')).toBe('gone@test.com');
     expect(component.initialFor('gone@test.com')).toBe('G');
   });
+
+  it('shows only the time for today\'s messages, and the date as well for older ones', async () => {
+    await build();
+    load();
+
+    expect(component.timeFormat(new Date().toISOString())).toBe('shortTime');
+    expect(component.timeFormat('2026-01-15T10:00:00.000Z')).toBe('d MMM, h:mm a');
+  });
 });

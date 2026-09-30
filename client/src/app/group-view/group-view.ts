@@ -35,6 +35,7 @@ export class GroupView {
   proposedName = '';
   formError = signal('');
   formSuccess = signal('');
+  joining = signal(false);     // stops a double click sending two joins
 
   // group admin is a relationship with this group rather than a role on the account, so it's
   // read out of the group's adminEmails. a computed, because the group arrives asynchronously.
@@ -82,6 +83,31 @@ export class GroupView {
     // until an admin gets to it
     this.requestService.getRequests({ groupId: this.groupId, status: 'pending', scope: 'group' })
       .subscribe(requests => this.proposals.set(requests));
+  }
+
+  // the same direct join as the Discover list on the dashboard, offered here too so someone who
+  // opens a group they aren't in can join it from the page they're looking at. the server does
+  // the age limit and group ban checks, and its reason shows in the bar at the top.
+  onJoin() {
+    const group = this.group();
+    if (!group || this.joining()) {
+      return;
+    }
+    this.joining.set(true);
+    this.formError.set('');
+    this.formSuccess.set('');
+
+    this.groupService.joinGroup(group._id, this.me).subscribe({
+      next: () => {
+        this.formSuccess.set(`Joined ${group.name}. You can chat in its rooms now.`);
+        this.joining.set(false);
+        this.loadGroup();       // isMember flips to true and the rooms become links
+      },
+      error: (err: HttpErrorResponse) => {
+        this.formError.set(err.error?.error ?? 'Something went wrong, please try again.');
+        this.joining.set(false);
+      },
+    });
   }
 
   // the spec says regular users propose a room and the group admin approves or rejects it.

@@ -86,7 +86,7 @@
               @if (isAdmin(message.sender)) {
                 <span class="admin-tag">Admin</span>
               }
-              <span class="message-time">{{ message.at | date:'shortTime' }}</span>
+              <span class="message-time">{{ message.at | date: timeFormat(message.at) }}</span>
             </p>
             @if (message.imageUrl) {
               <!-- opens the full size image in a new tab. rel="noopener" stops that tab getting a
