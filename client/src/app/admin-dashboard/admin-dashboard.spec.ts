@@ -163,4 +163,46 @@ describe('AdminDashboard', () => {
     expect(req.request.body.reason).toBe('We already have a room for that');
     req.flush(makeRequest({ status: 'rejected' }));
   });
+
+  it('asks before deleting a room, and only deletes once confirmed', async () => {
+    await build();
+    load();
+    await fixture.whenStable();
+    const page = fixture.nativeElement as HTMLElement;
+
+    // the first click only opens the confirm box, nothing is sent
+    const deleteButton = [...page.querySelectorAll('button')].find(b => b.textContent?.trim() === 'Delete')!;
+    deleteButton.click();
+    await fixture.whenStable();
+    mock.expectNone(r => r.method === 'DELETE');
+    expect(page.querySelector('.confirm-text')?.textContent).toContain('every message');
+    // focus goes to Cancel, so pressing Enter straight away backs out rather than deleting
+    expect(document.activeElement?.textContent?.trim()).toBe('Cancel');
+
+    component.onDeleteRoom(makeChannel());
+    mock.expectOne(r => r.method === 'DELETE' && r.url.includes('/channels/c1')).flush({ message: 'ok' });
+    expect(component.confirmingDeleteId()).toBe('');
+  });
+
+  it('cancelling the confirm box sends nothing', async () => {
+    await build();
+    load();
+
+    component.startDeleting(makeChannel());
+    component.confirmingDeleteId.set('');        // what Cancel does
+    component.startRemoving('member@test.com');
+    component.confirmingRemoveEmail.set('');
+    mock.expectNone(r => r.method === 'DELETE');
+  });
+
+  it('asks before removing a member, with one box open under a member at a time', async () => {
+    await build();
+    load();
+
+    component.startBanning('member@test.com');
+    component.startRemoving('member@test.com');
+    expect(component.banningEmail()).toBe('');     // opening one closes the other
+    expect(component.confirmingRemoveEmail()).toBe('member@test.com');
+    mock.expectNone(r => r.method === 'DELETE');
+  });
 });

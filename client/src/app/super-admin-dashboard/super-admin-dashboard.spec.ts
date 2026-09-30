@@ -124,4 +124,35 @@ describe('SuperAdminDashboard', () => {
     expect(component.labelFor('group-delete')).toBe('Delete group');
     expect(component.labelFor('user-ban')).toBe('Permanent ban');
   });
+
+  it('asks before approving a permanent ban, and says what it will do', async () => {
+    await build();
+    const request = makeRequest({
+      _id: 'r9', type: 'user-ban', summary: 'Permanently ban bob@test.com',
+      payload: { email: 'bob@test.com', reason: 'spam' }, groupId: 'g1',
+    });
+    load([request]);
+
+    component.onApproveClicked(request);
+    await fixture.whenStable();
+    mock.expectNone(r => r.url.includes('/approve'));
+    expect((fixture.nativeElement as HTMLElement).querySelector('.confirm-text')?.textContent)
+      .toContain('can never register again');
+
+    component.onApprove(request);      // "Yes, approve"
+    mock.expectOne('http://localhost:3000/requests/r9/approve').flush(makeRequest({ status: 'approved' }));
+    expect(component.confirmingId()).toBe('');
+    load([]);
+  });
+
+  it('approves a new group straight away, because nothing is lost by it', async () => {
+    await build();
+    const request = makeRequest({ type: 'group-create', summary: 'Create group "Chess Club"' });
+    load([request]);
+
+    component.onApproveClicked(request);
+    expect(component.confirmingId()).toBe('');
+    mock.expectOne('http://localhost:3000/requests/r1/approve').flush(makeRequest({ status: 'approved' }));
+    load([]);
+  });
 });

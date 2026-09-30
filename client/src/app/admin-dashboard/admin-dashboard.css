@@ -274,6 +274,18 @@ h2 {
   background: #FEF2F2;
 }
 
+/* the confirming button in an "are you sure?" box. solid red, so the one button that actually
+   does the damage is unmistakable, where the outlined .danger buttons only open the box */
+.danger.solid {
+  background: #B91C1C;
+  color: #FFFFFF;
+  border-color: #B91C1C;
+}
+
+.danger.solid:hover {
+  background: #991B1B;
+}
+
 /* the global disabled style is a grey block, which is wrong for an outlined button. these are
    disabled on a group's last admin, because the group must always keep one. */
 .danger:disabled, .secondary:disabled {

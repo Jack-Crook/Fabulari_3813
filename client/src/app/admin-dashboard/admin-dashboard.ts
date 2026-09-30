@@ -4,13 +4,14 @@ import { ActivatedRoute } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Navbar } from '../navbar/navbar';
+import { Autofocus } from '../autofocus';
 import { Auth } from '../auth';
 import { GroupService, Group, Channel } from '../group';
 import { RequestService, AppRequest } from '../request';
 
 @Component({
   selector: 'app-admin-dashboard',
-  imports: [Navbar, FormsModule, DatePipe],
+  imports: [Navbar, FormsModule, DatePipe, Autofocus],
   templateUrl: './admin-dashboard.html',
   styleUrl: './admin-dashboard.css',
 })
@@ -49,6 +50,12 @@ export class AdminDashboard {
 
   banningEmail = signal('');       // which member the ban/report box is open for
   banReason = '';
+
+  // the "are you sure?" step, for the two actions here that can't be undone in one click:
+  // deleting a room takes every message in it, and removing a member takes them out of the group.
+  // the same one-open-row-at-a-time idea as the reject box below.
+  confirmingDeleteId = signal('');     // which room's delete is waiting to be confirmed
+  confirmingRemoveEmail = signal('');  // which member's removal is waiting to be confirmed
 
   rejectingId = signal('');        // which proposal the reject box is open for
   rejectReason = '';               // the spec says a rejection must carry a reason, so this can't be skipped
@@ -187,12 +194,18 @@ export class AdminDashboard {
     });
   }
 
-  onDeleteRoom(channel: Channel) {  // DELETE /channels/:id
+  startDeleting(channel: Channel) {
+    this.confirmingDeleteId.set(channel._id);
+    this.clearMessages();
+  }
+
+  onDeleteRoom(channel: Channel) {  // DELETE /channels/:id, only reached from the confirm box
     this.clearMessages();
 
     this.groupService.deleteChannel(channel._id, this.me).subscribe({
       next: () => {
         this.actionSuccess.set(`Room "${channel.name}" deleted.`);
+        this.confirmingDeleteId.set('');
         this.load();
       },
       error: (err: HttpErrorResponse) => this.showError(err),
@@ -203,12 +216,19 @@ export class AdminDashboard {
 
   // group level removal, not a system wide ban. the server refuses with a 409 if this would
   // leave the group without an admin, and that message is what ends up in actionError.
+  startRemoving(email: string) {
+    this.confirmingRemoveEmail.set(email);
+    this.banningEmail.set('');       // only one box open under a member at a time
+    this.clearMessages();
+  }
+
   onRemoveMember(email: string) {
     this.clearMessages();
 
     this.groupService.removeMember(this.groupId, email, this.me).subscribe({
       next: () => {
         this.actionSuccess.set(`${email} removed from this group.`);
+        this.confirmingRemoveEmail.set('');
         this.load();
       },
       error: (err: HttpErrorResponse) => this.showError(err),
@@ -245,6 +265,7 @@ export class AdminDashboard {
 
   startBanning(email: string) {
     this.banningEmail.set(email);
+    this.confirmingRemoveEmail.set('');
     this.banReason = '';
     this.clearMessages();
   }

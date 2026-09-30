@@ -3,13 +3,14 @@ import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Navbar } from '../navbar/navbar';
+import { Autofocus } from '../autofocus';
 import { Auth, AppUser } from '../auth';
 import { GroupService, Group } from '../group';
 import { RequestService, AppRequest, AuditEntry, BannedUser } from '../request';
 
 @Component({
   selector: 'app-super-admin-dashboard',
-  imports: [Navbar, FormsModule, DatePipe],
+  imports: [Navbar, FormsModule, DatePipe, Autofocus],
   templateUrl: './super-admin-dashboard.html',
   styleUrl: './super-admin-dashboard.css',
 })
@@ -38,6 +39,11 @@ export class SuperAdminDashboard {
 
   // only one request has its reject box open at a time, so this holds that request's id
   rejectingId = signal('');
+
+  // the request whose approval is waiting on "are you sure?". only the two that can't be undone
+  // ask: a permanent ban deletes the account for good, and a group deletion takes every room and
+  // message with it. approving a new group doesn't ask, because nothing is lost by it.
+  confirmingId = signal('');
   rejectReason = '';        // plain property, [(ngModel)] writes it from a DOM event
 
   constructor() {
@@ -86,6 +92,30 @@ export class SuperAdminDashboard {
     return this.groups().filter(g => g.adminEmails.includes(email)).length;
   }
 
+  needsConfirm(request: AppRequest) {
+    return request.type === 'user-ban' || request.type === 'group-delete';
+  }
+
+  // what the confirm box says will happen. spelled out, because "are you sure?" on its own
+  // doesn't tell anyone what they're agreeing to.
+  consequenceOf(request: AppRequest) {
+    return request.type === 'user-ban'
+      ? `This deletes ${request.payload.email}'s account and their email can never register again.`
+      : 'This deletes the group, all of its rooms and every message in them.';
+  }
+
+  // the Approve button. the two irreversible types open the confirm box, everything else goes
+  // straight through.
+  onApproveClicked(request: AppRequest) {
+    if (this.needsConfirm(request)) {
+      this.confirmingId.set(request._id);
+      this.rejectingId.set('');
+      this.clearMessages();
+      return;
+    }
+    this.onApprove(request);
+  }
+
   // approving is what actually carries the request out: a group-create really creates the
   // group with the requester as its first admin, a group-delete removes the group and its
   // rooms, and a user-ban deletes the account and blacklists the email permanently.
@@ -95,6 +125,7 @@ export class SuperAdminDashboard {
     this.requestService.approve(request._id, this.me).subscribe({
       next: () => {
         this.actionSuccess.set(`Approved: ${request.summary}`);
+        this.confirmingId.set('');
         this.load();
       },
       error: (err: HttpErrorResponse) => this.showError(err),
@@ -103,6 +134,7 @@ export class SuperAdminDashboard {
 
   startRejecting(request: AppRequest) {
     this.rejectingId.set(request._id);
+    this.confirmingId.set('');
     this.rejectReason = '';
     this.clearMessages();
   }

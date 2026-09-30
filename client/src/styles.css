@@ -202,3 +202,13 @@ label {
     height: 90px;               /* 150px logo takes up too much of a small screen */
   }
 }
+
+/* the question in an "are you sure?" box, before an action that can't be undone. both admin
+   dashboards use it, so it's defined once here. width: 100% makes it take its own line inside
+   the flex rows it sits in. */
+.confirm-text {
+  width: 100%;
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: #1A1D23;
+}

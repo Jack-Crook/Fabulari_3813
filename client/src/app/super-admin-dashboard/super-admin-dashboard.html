@@ -56,9 +56,24 @@
               <button type="button" class="reject" (click)="cancelRejecting()">Cancel</button>
             </div>
           </div>
+        } @else if (confirmingId() === request._id) {
+          <!-- a permanent ban or a group deletion can't be undone, so approving one asks first and
+               says what it will do. focus lands on Cancel, and aria-describedby reads the
+               question out to a screen reader when it does. -->
+          <div class="reject-box">
+            <p class="confirm-text" [id]="'confirm-' + request._id">
+              {{ request.summary }}? {{ consequenceOf(request) }}
+            </p>
+            <div class="request-actions">
+              <button type="button" class="confirm-danger" (click)="onApprove(request)">Yes, approve</button>
+              <button type="button" class="reject" appAutofocus
+                      [attr.aria-describedby]="'confirm-' + request._id"
+                      (click)="confirmingId.set('')">Cancel</button>
+            </div>
+          </div>
         } @else {
           <div class="request-actions">
-            <button type="button" class="approve" (click)="onApprove(request)">Approve</button>
+            <button type="button" class="approve" (click)="onApproveClicked(request)">Approve</button>
             <button type="button" class="reject" (click)="startRejecting(request)">Reject</button>
           </div>
         }

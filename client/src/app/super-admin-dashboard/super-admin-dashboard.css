@@ -147,6 +147,17 @@ h2 {
   background: #F3F4F6;
 }
 
+/* the button that actually carries out an irreversible approval. solid red rather than the
+   usual approve colour, so it can't be mistaken for an everyday approval */
+.request-actions .confirm-danger {
+  background: #B91C1C;
+  color: #FFFFFF;
+}
+
+.request-actions .confirm-danger:hover {
+  background: #991B1B;
+}
+
 .empty {
   font-size: 14px;
   color: #6B7280;

@@ -98,11 +98,27 @@
             <button type="submit" class="inline">Save</button>
             <button type="button" class="inline secondary" (click)="renamingChannelId.set('')">Cancel</button>
           </form>
+        } @else if (confirmingDeleteId() === channel._id) {
+          <!-- deleting a room can't be undone and takes every message with it, so it asks first.
+               the question says exactly what will happen rather than just "are you sure?".
+               focus lands on Cancel (appAutofocus), and aria-describedby makes a screen reader
+               read the question out when it gets there. -->
+          <div class="confirm-box">
+            <p class="confirm-text" [id]="'confirm-delete-' + channel._id">
+              Delete "{{ channel.name }}" and every message in it? This can't be undone.
+            </p>
+            <div class="row-actions">
+              <button type="button" class="danger solid" (click)="onDeleteRoom(channel)">Delete room</button>
+              <button type="button" class="inline secondary" appAutofocus
+                      [attr.aria-describedby]="'confirm-delete-' + channel._id"
+                      (click)="confirmingDeleteId.set('')">Cancel</button>
+            </div>
+          </div>
         } @else {
           <span class="room-name">{{ channel.name }}</span>
           <div class="row-actions">
             <button type="button" class="inline secondary" (click)="startRenaming(channel)">Rename</button>
-            <button type="button" class="danger" (click)="onDeleteRoom(channel)">Delete</button>
+            <button type="button" class="danger" (click)="startDeleting(channel)">Delete</button>
           </div>
         }
       </div>
@@ -151,7 +167,7 @@
                    the last remaining admin comes back as a 409 and shows in the bar up top. -->
               <button type="button" class="danger"
                       [disabled]="isLastAdmin(email)"
-                      (click)="onRemoveMember(email)">Remove</button>
+                      (click)="startRemoving(email)">Remove</button>
 
               <!-- opens the box below, which offers both a group ban and a report to the super
                    admin. you can't ban or report yourself. -->
@@ -162,6 +178,26 @@
               }
             </td>
           </tr>
+
+          <!-- the removal confirm drops in under the row, the same way the ban box does -->
+          @if (confirmingRemoveEmail() === email) {
+            <tr class="ban-row">
+              <td colspan="3">
+                <p class="confirm-text" [id]="'confirm-remove-' + email">
+                  {{ email === me ? 'Leave this group?' : 'Remove ' + email + ' from this group?' }}
+                  They can join again later unless they're banned.
+                </p>
+                <div class="row-actions">
+                  <button type="button" class="danger solid" (click)="onRemoveMember(email)">
+                    {{ email === me ? 'Leave' : 'Remove' }}
+                  </button>
+                  <button type="button" class="inline secondary" appAutofocus
+                          [attr.aria-describedby]="'confirm-remove-' + email"
+                          (click)="confirmingRemoveEmail.set('')">Cancel</button>
+                </div>
+              </td>
+            </tr>
+          }
 
           <!-- the ban box drops in under the row it belongs to, so it's obvious who it's about -->
           @if (banningEmail() === email) {
