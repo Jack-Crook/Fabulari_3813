@@ -13,10 +13,31 @@
     @if (isSuperAdmin) {
       <li><a routerLink="/super-admin-dashboard" routerLinkActive="active">Super Admin</a></li>
     }
-    <li><a routerLink="/profile" routerLinkActive="active">Profile</a></li>
-    <!-- every page in this app looks different depending on who you are, so the bar says which
-         account is signed in rather than leaving it to be worked out from the page -->
-    <li class="nav-who">{{ displayName }}</li>
-    <li><button type="button" (click)="onLogout()">Logout</button></li>
+    <!-- the account menu. every page in this app looks different depending on who you are, so
+         the avatar is always there to say which account is signed in, and Profile and Logout
+         live inside it rather than as two more links on the bar.
+         it's a disclosure button (aria-expanded), not an ARIA menu: role="menu" promises arrow
+         key navigation, and plain links and buttons that Tab moves through are what this is. -->
+    <li class="nav-account">
+      <button #accountButton type="button" class="account-button"
+              (click)="toggleMenu()"
+              aria-controls="account-menu"
+              [attr.aria-expanded]="menuOpen()"
+              [attr.aria-label]="'Account: ' + displayName">
+        <span class="nav-avatar" aria-hidden="true">{{ initial }}</span>
+        <span class="caret" aria-hidden="true">▾</span>
+      </button>
+
+      @if (menuOpen()) {
+        <div id="account-menu" class="account-menu">
+          <div class="menu-who">
+            <p class="menu-name">{{ displayName }}</p>
+            <p class="menu-email">{{ me }}</p>
+          </div>
+          <a routerLink="/profile" routerLinkActive="active">Profile</a>
+          <button type="button" (click)="onLogout()">Logout</button>
+        </div>
+      }
+    </li>
   </ul>
 </header>

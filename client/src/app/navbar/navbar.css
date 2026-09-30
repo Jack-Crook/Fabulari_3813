@@ -32,13 +32,95 @@
   font-weight: 600;
 }
 
-.nav-who {
+.nav-links {
+  align-items: center;
+}
+
+/* account menu: the avatar button and the dropdown that hangs off it */
+
+.nav-account {
+  position: relative;       /* the dropdown is positioned against this, so it sits under the avatar */
+}
+
+.nav-links .account-button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;         /* touch target, the same minimum every other button in the app keeps */
+  padding: 0 4px;
+  border-radius: 22px;
+}
+
+.nav-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #5FA8D3;
+  color: #1A1D23;           /* dark, not white: white on this blue is 2.6:1, under the 4.5:1 WCAG asks for */
+  font-family: 'Fraunces Variable', Georgia, serif;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.caret {
+  font-size: 12px;
   color: #6B7280;
-  font-size: 14px;
-  max-width: 180px;
+}
+
+.account-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;                 /* lines up with the right edge of the avatar, so it never runs off the screen */
+  z-index: 10;              /* above page content like the group banners */
+  min-width: 220px;
+  padding: 8px 0;
+  background: #FFFFFF;
+  border: 1px solid #E2E4E9;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(26, 29, 35, 0.12);
+  display: flex;
+  flex-direction: column;
+}
+
+.menu-who {
+  padding: 8px 16px 12px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid #E2E4E9;
+}
+
+.menu-name {
+  margin: 0;
+  font-weight: 600;
+  color: #1A1D23;
+}
+
+.menu-email {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: #6B7280;
   overflow: hidden;
-  text-overflow: ellipsis;      /* a long email is cut off rather than pushing Logout off the bar */
+  text-overflow: ellipsis;  /* a long email is cut off rather than stretching the menu */
   white-space: nowrap;
+}
+
+/* the two items. a link and a button, made to look the same, each a full row tall enough to tap */
+.account-menu a,
+.nav-links .account-menu button {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 16px;
+  width: 100%;
+  text-align: left;
+  box-sizing: border-box;
+}
+
+.account-menu a:hover,
+.nav-links .account-menu button:hover {
+  background: #F3F4F6;
 }
 
 .nav-links button {
