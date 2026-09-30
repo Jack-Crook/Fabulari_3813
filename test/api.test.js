@@ -561,6 +561,38 @@ describe('POST /requests/:id/approve', () => {
         assert.equal(await ctx.db.collection('channels').countDocuments(), 0);
     });
 
+    it('banning a user closes their pending requests, so a deleted account can\'t end up admin of a new group', async () => {
+        const groupReq = await raise('bob@test.com', 'group-create', { payload: { name: 'Chess' } });
+        const banReq = await raise('alice@test.com', 'user-ban', {
+            groupId: ids.groupId, payload: { email: 'bob@test.com', reason: 'abuse' },
+        });
+        await call('POST', `/requests/${banReq}/approve`, { actorEmail: 'super@test.com' });
+
+        const closed = await ctx.db.collection('requests').findOne({ _id: new ObjectId(groupReq) });
+        assert.equal(closed.status, 'rejected');
+        assert.match(closed.reason, /banned/);
+        assert.equal((await call('POST', `/requests/${groupReq}/approve`, { actorEmail: 'super@test.com' })).status, 409);
+        assert.equal(await ctx.db.collection('groups').countDocuments({ name: 'Chess' }), 0);
+    });
+
+    it('won\'t carry out a request whose requester no longer has an account', async () => {
+        const id = await raise('carol@test.com', 'group-create', { payload: { name: 'Chess' } });
+        await ctx.db.collection('users').deleteOne({ email: 'carol@test.com' });
+        assert.equal((await call('POST', `/requests/${id}/approve`, { actorEmail: 'super@test.com' })).status, 409);
+        assert.equal(await ctx.db.collection('groups').countDocuments({ name: 'Chess' }), 0);
+    });
+
+    it('deleting a group closes its other pending requests, but approves the deletion itself', async () => {
+        const proposal = await raise('bob@test.com', 'channel-create', { groupId: ids.groupId, payload: { name: 'Spoilers' } });
+        const deletion = await raise('alice@test.com', 'group-delete', { groupId: ids.groupId });
+        await call('POST', `/requests/${deletion}/approve`, { actorEmail: 'super@test.com' });
+
+        const find = id => ctx.db.collection('requests').findOne({ _id: new ObjectId(id) });
+        assert.equal((await find(proposal)).status, 'rejected');
+        assert.equal((await find(proposal)).reason, 'The group was deleted');
+        assert.equal((await find(deletion)).status, 'approved');
+    });
+
     it('answers 404 for a request that doesn\'t exist', async () => {
         assert.equal((await call('POST', `/requests/${missingId}/approve`, { actorEmail: 'super@test.com' })).status, 404);
     });

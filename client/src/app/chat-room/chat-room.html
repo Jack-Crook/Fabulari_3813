@@ -27,6 +27,11 @@
          the selected room in the sidebar and the message bar below all take their colour from
          the group record rather than the palette -->
     <header class="chat-banner" [style.background]="theme()" [style.color]="ink()">
+      <!-- the phone version of "Back to group". that link lives in the rooms sidebar, which is
+           hidden under 768px, so without this a phone had no way out of the room but the navbar.
+           hidden on desktop by the css. it takes the banner's text colour so it's readable on any theme. -->
+      <a class="banner-back" [routerLink]="['/groups', group()?._id]" [style.color]="ink()"
+         aria-label="Back to the group's rooms">‹ Back</a>
       <h1>{{ channel()?.name }}</h1>
       <span class="chat-group">{{ group()?.name }}</span>
     </header>

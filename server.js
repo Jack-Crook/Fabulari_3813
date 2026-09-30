@@ -191,6 +191,20 @@ async function deleteMessages(filter) {
         fs.promises.rm(path.join(UPLOAD_DIR, path.basename(m.imageUrl)), { force: true })));
 }
 
+// closes every pending request matching the filter as rejected, with the reason recorded. used
+// when the thing a request depends on stops existing: a group that's deleted, or a requester who is
+// permanently banned. without it those requests sat in a queue forever, and approving one could
+// act on something that was gone, e.g. create a group whose only admin is a deleted account.
+// rejected rather than deleted, so the requester still sees what happened on their profile page.
+async function closePendingRequests(filter, reason, actor) {
+    const result = await requests.updateMany(
+        { ...filter, status: 'pending' },
+        { $set: { status: 'rejected', reason, resolvedAt: new Date().toISOString(), resolvedBy: actor } });
+    if (result.modifiedCount) {
+        await logAudit('Requests Closed', actor, `${result.modifiedCount} pending request(s) closed: ${reason}`);
+    }
+}
+
 // deletes one file that POST /uploads or the avatar route wrote, given the path stored for it.
 // '' or undefined means there's nothing to delete. basename() keeps it inside uploads/, and
 // force: true means a file that's already gone isn't an error.
@@ -477,6 +491,8 @@ app.delete('/groups/:id', async (req, res) => {
     // a channel can't exist without its group, so its rooms go with it rather than being left
     // behind pointing at a groupId that no longer resolves
     await channels.deleteMany({ groupId: group._id });
+    // room proposals and ban reports for this group can never be actioned now
+    await closePendingRequests({ groupId: group._id }, 'The group was deleted', actor);
     await logAudit('Group Deleted', actor, `Deleted group "${group.name}" and its rooms`);
     res.status(200).json({ message: 'Group deleted' });
 });
@@ -1011,6 +1027,12 @@ app.post('/requests/:id/approve', async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
     }
 
+    // a ban closes the banned user's requests, but this is checked here as well so nothing is ever
+    // carried out on behalf of an account that no longer exists. it can still be rejected.
+        if (!(await users.findOne({ email: request.requestedBy }))) {
+            return res.status(409).json({ error: 'The user who raised this request no longer has an account. Reject it instead.' });
+    }
+
     // who is allowed to action this depends on the type: the super admin for the three system
     // level ones, an admin of the group in question for a room proposal
         if (SUPER_TYPES.includes(request.type)) {
@@ -1053,6 +1075,8 @@ app.post('/requests/:id/approve', async (req, res) => {
 
             await groups.deleteOne({ _id: group._id });
             await channels.deleteMany({ groupId: group._id });
+            // every other pending request for this group, not this one, which is marked approved below
+            await closePendingRequests({ groupId: group._id, _id: { $ne: request._id } }, 'The group was deleted', actor);
             await logAudit('Group Deleted', actor, `Approved deletion of "${group.name}" and its rooms`);
             break;
         }
@@ -1099,6 +1123,9 @@ app.post('/requests/:id/approve', async (req, res) => {
                 bannedAt: new Date().toISOString(),
                 bannedBy: actor,
             });
+            // anything they had waiting is closed too. approving their group-create afterwards
+            // would make a deleted account the only admin of a brand new group.
+            await closePendingRequests({ requestedBy: target }, 'The requester was permanently banned', actor);
             await logAudit('User Banned', actor, `Permanently banned ${target}. Reason: ${request.payload.reason ?? 'no reason given'}`);
             break;
         }

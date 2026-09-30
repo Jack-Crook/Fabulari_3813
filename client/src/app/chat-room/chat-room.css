@@ -99,6 +99,18 @@
   opacity: 0.85;
 }
 
+/* only on phones, see the media query at the bottom */
+.banner-back {
+  display: none;
+  align-self: center;
+  min-height: 44px;             /* touch target */
+  align-items: center;
+  padding-right: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
 .chat-main {
   flex: 1;
   min-width: 0;
@@ -327,6 +339,10 @@
 
   .chat-banner {
     padding: 12px 16px;
+  }
+
+  .banner-back {
+    display: flex;              /* the sidebar's Back to group link is hidden at this width */
   }
 
   .message {
