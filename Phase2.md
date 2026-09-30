@@ -6,31 +6,17 @@
 **Workshop Time:** Thursday 9am
 **Repository:** https://github.com/Jack-Crook/Fabulari_3813
 
-<!-- ============================================================
-     HOW TO USE THIS FILE
-     Every <!-- comment --> is a prompt for you, not content.
-     Delete them all before exporting the PDF.
-     Tables are empty on purpose: the columns are right, the rows
-     are yours. Where a row count or a source file is noted, that
-     is so you know when a table is finished.
-     ============================================================ -->
+
 
 
 ## 1. Specifications and Requirements
 
-<!-- Open with a short paragraph: where the requirements came from (the brief, the
-     Week 2 client briefing, the numbered Specification Update docs), and the fact
-     that the client is the convenor and the brief is deliberately incomplete.
-     Then say in one line what changed since Phase 1: Phase 1 was UI + user
-     management on JSON files; Phase 2 is the whole app on MongoDB with real-time
-     messaging. -->
+ The requirements for this assignment came from the assignment brief, the Week 2 client briefing, and the Spec Update documents that answered questions from the students. The client is the course convenor, and the brief was deliberately incomplete, so some requirements only exist in those Q&A answers.
+
+  Phase 1 covered the UI and user management, stored in JSON files. Phase 2 is the full app: data in MongoDB, real-time chat over socket.io with text and image messages, a live presence list, the request and approval flow, hashed passwords and profile pictures.
 
 ### Requirements implemented in Phase 2
 
-<!-- 27 requirements, R1-R27. Reuse the Phase 1 §3 requirement wording where it
-     still holds and mark what is new in Phase 2 (sockets, presence, images,
-     hashing). "Where it's enforced" should name a route, an event or a file so a
-     marker can go and look at it. -->
 
 | # | Requirement | Where it's enforced |
 |---|---|---|
@@ -94,13 +80,13 @@
 
 ## 2. API Documentation
 
-<!-- Lead with the stack line: Express 5.2 on port 3000, server.js at the repo root,
-     MongoDB 8.0 via the mongodb driver 7.6, database `fabulari`, socket.io 4.8 on
-     the same HTTP server, multer 2.4 for uploads, bcrypt 6.0 cost 10.
+The server is Express 5.2 in server.js at the repo root, on port 3000. Data is in MongoDB through the official mongodb driver (7.6), database fabulari. socket.io 4.8 runs on the same HTTP server as Express. Uploads use multer 2.4, and passwords are hashed with bcrypt 6.0 at cost 10.
 
-     Then a conventions paragraph: errors are always { "error": "..." }, email is
-     trimmed and lowercased on every route, ids are ObjectIds serialised as 24-char
-     hex, and a malformed id gives 404 rather than 500 (say why - toObjectId). -->
+Conventions
+- Every error response is JSON: { "error": "..." }.
+- Emails are trimmed and lowercased on every route (normaliseEmail()), so Test@Test.com and test@test.com are the same account.
+- Ids are Mongo ObjectIds, sent as 24-character hex strings. An id from a URL goes through toObjectId() first. A malformed id would make the ObjectId constructor throw, so the function returns null instead and the route answers 404 rather than crashing with a 500.
+- Users never have a password in a response. Every route that returns a user goes through publicUser().
 
 ### REST endpoints
 
