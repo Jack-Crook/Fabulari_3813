@@ -29,12 +29,18 @@ export class Navbar {
   me = this.auth.email;       // not private, the account menu shows it under the name
 
   // the account menu on the right says which account you're acting as, which matters a lot on
-  // this app because the same page looks different per role
-  displayName = this.auth.getUser()?.username || this.me;
+  // this app because the same page looks different per role. computed from auth.session, so
+  // changing the name or the picture on the profile page shows up here straight away.
+  displayName = computed(() => this.auth.session()?.username || this.me);
 
-  // the letter in the avatar circle. the same idea as the profile page's avatar: there are no
-  // uploaded profile pictures, so the first letter of the name stands in for one
-  initial = (this.displayName.charAt(0) || '?').toUpperCase();
+  // the letter in the avatar circle when there's no picture, the same as the profile page
+  initial = computed(() => (this.displayName().charAt(0) || '?').toUpperCase());
+
+  // their uploaded profile picture, or '' when they haven't set one and the initial shows instead
+  avatarSrc = computed(() => {
+    const url = this.auth.session()?.avatarUrl;
+    return url ? this.auth.avatarSrc(url) : '';
+  });
 
   // a signal because it's also closed from the document listeners and from a navigation event,
   // not only from a click on the button itself

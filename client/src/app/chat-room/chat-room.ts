@@ -5,7 +5,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { DatePipe } from '@angular/common';         // formats each message's ISO timestamp as a time
 import { Navbar } from '../navbar/navbar';
 import { Auth } from '../auth';
-import { GroupService, Group, Channel } from '../group';
+import { GroupService, Group, Channel, GroupMember } from '../group';
 import { ChatService } from '../chat';
 import { readableInk, LIGHT_INK } from '../theme';
 
@@ -25,6 +25,10 @@ export class ChatRoom {
   group = signal<Group | undefined>(undefined);
   channels = signal<Channel[]>([]);                 // every room in this group, listed down the left
   channel = signal<Channel | undefined>(undefined); // the room actually open
+
+  // the name and picture for each member, keyed by email because a message's sender is an email.
+  // a Map so each message looks its sender up directly instead of searching a list.
+  members = signal(new Map<string, GroupMember>());
 
   me = this.auth.email;   // used to work out which messages are mine
 
@@ -79,6 +83,11 @@ export class ChatRoom {
 
       this.groupService.getGroups().subscribe(groups => {
         this.group.set(groups.find(g => g._id === groupId));
+      });
+
+      // fetched once per room rather than once per message
+      this.groupService.getMembers(groupId).subscribe(members => {
+        this.members.set(new Map(members.map(m => [m.email, m])));
       });
 
       this.groupService.getChannels(groupId).subscribe(channels => {
@@ -165,6 +174,22 @@ export class ChatRoom {
     this.chat.send(body, image);
     this.draft = '';
     this.pendingImage.set('');
+  }
+
+  // what a message shows for its sender. someone who has since left or been banned isn't in the
+  // members list any more, and their old messages fall back to the email and its first letter.
+  nameFor(email: string) {
+    return this.members().get(email)?.username || email;
+  }
+
+  initialFor(email: string) {
+    return (this.nameFor(email).charAt(0) || '?').toUpperCase();
+  }
+
+  // the full address of their picture, or '' so the template shows the initial instead
+  avatarFor(email: string) {
+    const url = this.members().get(email)?.avatarUrl;
+    return url ? this.auth.avatarSrc(url) : '';
   }
 
   // group admins get an indicator next to their name in chat, the spec asks for this.

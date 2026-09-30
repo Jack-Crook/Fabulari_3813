@@ -89,4 +89,39 @@ describe('Auth', () => {
     service.logout();
     expect(service.getUser()).toBeNull();
   });
+
+  it('uploads a profile picture as a form with actorEmail before the file', () => {
+    signIn('a+b@test.com');
+    service.uploadAvatar(new File(['x'], 'me.png', { type: 'image/png' })).subscribe();
+
+    const req = mock.expectOne('http://localhost:3000/users/a%2Bb%40test.com/avatar');
+    expect(req.request.method).toBe('POST');
+    // multer reads the form in order, so actorEmail has to be there before the file arrives
+    const fields = [...(req.request.body as FormData).keys()];
+    expect(fields).toEqual(['actorEmail', 'image']);
+    req.flush({});
+  });
+
+  it('removes the profile picture with actorEmail in the query', () => {
+    signIn('a@b.com');
+    service.removeAvatar().subscribe();
+
+    const req = mock.expectOne(r => r.url === 'http://localhost:3000/users/a%40b.com/avatar');
+    expect(req.request.method).toBe('DELETE');
+    expect(req.request.params.get('actorEmail')).toBe('a@b.com');
+    req.flush({});
+  });
+
+  it('updates the session signal when the stored user changes', () => {
+    service.saveUser({ email: 'a@b.com', role: 'user', username: 'a' });
+    expect(service.session()?.username).toBe('a');
+
+    // this is what lets the navbar redraw straight after a profile change
+    service.saveUser({ email: 'a@b.com', role: 'user', username: 'renamed', avatarUrl: '/uploads/x.png' });
+    expect(service.session()?.username).toBe('renamed');
+    expect(service.session()?.avatarUrl).toBe('/uploads/x.png');
+
+    service.logout();
+    expect(service.session()).toBeNull();
+  });
 });

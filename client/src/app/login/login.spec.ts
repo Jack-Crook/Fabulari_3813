@@ -36,12 +36,14 @@ describe('Login', () => {
 
     mock.expectOne('http://localhost:3000/login').flush({
       message: 'Login successful', email: 'a@b.com', role: 'user',
-      username: 'ab', dob: '', bio: '', createdAt: '',
+      username: 'ab', dob: '', bio: '', avatarUrl: '/uploads/me.png', createdAt: '',
     });
 
     // localStorage is what every other page reads to work out who is signed in. it's state,
-    // not security, because the server never checks it.
-    expect(TestBed.inject(Auth).getUser()).toEqual({ email: 'a@b.com', role: 'user', username: 'ab' });
+    // not security, because the server never checks it. the avatar goes in too, for the navbar.
+    expect(TestBed.inject(Auth).getUser()).toEqual({
+      email: 'a@b.com', role: 'user', username: 'ab', avatarUrl: '/uploads/me.png',
+    });
     expect(component.successmessage()).toBe('Logged in successfully.');
   });
 

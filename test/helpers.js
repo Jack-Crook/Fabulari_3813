@@ -120,4 +120,13 @@ async function uploadImage(base, { email, channelId, bytes = PNG, type = 'image/
     return { status: res.status, body: await res.json() };
 }
 
-module.exports = { PASSWORD, startServer, reset, api, uploadImage, PNG };
+// a profile picture upload, the same shape as Auth.uploadAvatar: actorEmail first, then the file
+async function uploadAvatar(base, { email, actorEmail = email, bytes = PNG, type = 'image/png', name = 'me.png' }) {
+    const form = new FormData();
+    form.append('actorEmail', actorEmail);
+    form.append('image', new Blob([bytes], { type }), name);
+    const res = await fetch(`${base}/users/${encodeURIComponent(email)}/avatar`, { method: 'POST', body: form });
+    return { status: res.status, body: await res.json() };
+}
+
+module.exports = { PASSWORD, startServer, reset, api, uploadImage, uploadAvatar, PNG };

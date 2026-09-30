@@ -65,6 +65,10 @@
   font-weight: 700;
 }
 
+img.nav-avatar {
+  object-fit: cover;        /* crops a photo to the circle instead of squashing it */
+}
+
 .caret {
   font-size: 12px;
   color: #6B7280;

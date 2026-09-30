@@ -99,6 +99,7 @@ function publicUser(user) {
         username: user.username ?? '',
         dob: user.dob ?? '',
         bio: user.bio ?? '',
+        avatarUrl: user.avatarUrl ?? '',    // '' when they haven't uploaded a profile picture
         createdAt: user.createdAt ?? '',
     };
 }
@@ -190,6 +191,15 @@ async function deleteMessages(filter) {
         fs.promises.rm(path.join(UPLOAD_DIR, path.basename(m.imageUrl)), { force: true })));
 }
 
+// deletes one file that POST /uploads or the avatar route wrote, given the path stored for it.
+// '' or undefined means there's nothing to delete. basename() keeps it inside uploads/, and
+// force: true means a file that's already gone isn't an error.
+async function removeUploadedFile(url) {
+    if (url) {
+        await fs.promises.rm(path.join(UPLOAD_DIR, path.basename(url)), { force: true });
+    }
+}
+
 // a group name has to be unique across every group, optionally ignoring one group so that
 // saving an edit form without touching the name doesn't collide with the group's own record.
 async function nameTaken(name, exceptId) {
@@ -245,6 +255,7 @@ app.post('/register', async (req, res) => {       // handles new user signups
         username: (username ?? '').trim() || cleanEmail.split('@')[0],   // fall back to the part before the @ so nobody is nameless
         dob: dob ?? '',        // optional at signup, but needed before joining an age restricted group
         bio: '',
+        avatarUrl: '',         // no profile picture until they upload one from the profile page
         createdAt: new Date().toISOString(),
     };
 
@@ -468,6 +479,25 @@ app.delete('/groups/:id', async (req, res) => {
     await channels.deleteMany({ groupId: group._id });
     await logAudit('Group Deleted', actor, `Deleted group "${group.name}" and its rooms`);
     res.status(200).json({ message: 'Group deleted' });
+});
+
+// the members of one group as the chat room shows them: email, display name and profile picture.
+// deliberately only those three. the spec says profiles are private, so a member's date of birth
+// and bio aren't handed to everyone else in the room, which GET /users would do.
+app.get('/groups/:id/members', async (req, res) => {
+    const groupId = toObjectId(req.params.id);
+    const group = groupId && await groups.findOne({ _id: groupId });
+        if (!group) {
+            return res.status(404).json({ error: 'Group not found' });
+    }
+
+    // one query for every member rather than one per person, the same $in as the age limit boot
+    const members = await users.find({ email: { $in: group.memberEmails } }).toArray();
+    res.status(200).json(members.map(u => ({
+        email: u.email,
+        username: u.username ?? '',
+        avatarUrl: u.avatarUrl ?? '',
+    })));
 });
 
 app.post('/groups/:id/members', async (req, res) => {     // a user joins a group
@@ -1051,6 +1081,9 @@ app.post('/requests/:id/approve', async (req, res) => {
             // a system wide ban is permanent, so it happens in three parts: the account is
             // deleted, they're pulled out of every group, and the email goes on the banned
             // list so /register can never hand it out again
+            // their profile picture goes with the account, or it would sit in uploads/ forever
+            const bannedUser = await users.findOne({ email: target });
+            await removeUploadedFile(bannedUser?.avatarUrl);
             await users.deleteOne({ email: target });
 
             // one updateMany instead of rewriting every group, so groups the user was never in
@@ -1226,6 +1259,80 @@ app.post('/uploads', (req, res, next) => {
             next(e);
         }
     });
+});
+
+
+// profile pictures
+//
+// the same multer setup as chat images: the same four types, the same 5 MB limit, a random file
+// name and the extension from IMAGE_TYPES. the file lives in uploads/ and the user document only
+// stores its path in avatarUrl, the same reason as messages: documents stay small and express
+// serves the file itself.
+
+// runs multer and hands back its error (or null) as a promise, so the route below can be a normal
+// async handler instead of nesting everything inside multer's callback like POST /uploads does
+function readImage(req, res) {
+    return new Promise(resolve => upload.single('image')(req, res, err => resolve(err ?? null)));
+}
+
+app.post('/users/:email/avatar', async (req, res) => {
+    const email = normaliseEmail(req.params.email);
+
+    const err = await readImage(req, res);
+        if (err) {
+            if (err.code === 'LIMIT_FILE_SIZE') {
+                return res.status(413).json({ error: 'Images must be 5 MB or smaller' });
+        }
+            return res.status(400).json({ error: 'Could not read that upload' });
+    }
+        if (!req.file) {
+            return res.status(400).json({ error: 'Choose a PNG, JPEG, GIF or WebP image' });
+    }
+
+    // only the account holder changes their own picture, same rule as PUT /users/:email. multer
+    // has already written the file by the time this runs, so a refused upload deletes it again.
+    // actorEmail has to come before the file in the form, or it won't be in req.body yet.
+        if (normaliseEmail(req.body.actorEmail) !== email) {
+            await fs.promises.rm(req.file.path, { force: true });
+            return res.status(403).json({ error: 'You can only change your own profile picture' });
+    }
+
+    const user = await users.findOne({ email });
+        if (!user) {
+            await fs.promises.rm(req.file.path, { force: true });
+            return res.status(404).json({ error: 'User not found' });
+    }
+
+    const updated = await users.findOneAndUpdate(
+        { email }, { $set: { avatarUrl: `/uploads/${req.file.filename}` } }, { returnDocument: 'after' });
+
+    // the old picture is deleted after the new one is saved, so a failed save never leaves the
+    // account pointing at a file that's already gone
+    await removeUploadedFile(user.avatarUrl);
+
+    await logAudit('Profile Picture Changed', email, 'Uploaded a new profile picture');
+    res.status(200).json(publicUser(updated));
+});
+
+// back to the initial letter. the file is deleted too, nothing else points at it.
+app.delete('/users/:email/avatar', async (req, res) => {
+    const email = normaliseEmail(req.params.email);
+
+        if (normaliseEmail(req.query.actorEmail) !== email) {
+            return res.status(403).json({ error: 'You can only change your own profile picture' });
+    }
+
+    const user = await users.findOne({ email });
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+    }
+
+    const updated = await users.findOneAndUpdate(
+        { email }, { $set: { avatarUrl: '' } }, { returnDocument: 'after' });
+    await removeUploadedFile(user.avatarUrl);
+
+    await logAudit('Profile Picture Removed', email, 'Removed their profile picture');
+    res.status(200).json(publicUser(updated));
 });
 
 

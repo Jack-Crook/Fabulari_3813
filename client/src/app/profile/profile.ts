@@ -32,6 +32,15 @@ export class Profile {
   formSuccess = signal('');
   saving = signal(false);
 
+  // the profile picture. signals, because they're set inside the upload's subscribe callback
+  uploadingAvatar = signal(false);
+  avatarError = signal('');
+
+  // the same limits the server enforces. checked here first so a 20 MB photo is refused straight
+  // away instead of after uploading all of it. the server still checks, this can be bypassed.
+  private readonly imageTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+  private readonly maxImageBytes = 5 * 1024 * 1024;
+
   // the edit form's fields. plain properties, because [(ngModel)] writes to them from a DOM
   // event and angular already schedules a redraw after those.
   formUsername = '';
@@ -87,6 +96,64 @@ export class Profile {
     });
   }
 
+  // the full address of the stored picture, or '' when there isn't one and the initial shows instead
+  avatarSrc = computed(() => {
+    const url = this.user()?.avatarUrl;
+    return url ? this.auth.avatarSrc(url) : '';
+  });
+
+  // a picture is uploaded as soon as it's picked, the same as attaching one in the chat room.
+  // there's nothing else to fill in, so there's no separate save step.
+  onAvatarChosen(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';      // reset, so choosing the same file again still fires (change)
+    if (!file) {
+      return;
+    }
+
+    this.avatarError.set('');
+    if (!this.imageTypes.includes(file.type)) {
+      this.avatarError.set('Choose a PNG, JPEG, GIF or WebP image.');
+      return;
+    }
+    if (file.size > this.maxImageBytes) {
+      this.avatarError.set('Images must be 5 MB or smaller.');
+      return;
+    }
+
+    this.uploadingAvatar.set(true);
+    this.auth.uploadAvatar(file).subscribe({
+      next: updated => this.afterAvatarChange(updated),
+      error: (err: HttpErrorResponse) => {
+        this.avatarError.set(err.error?.error ?? 'Could not upload that image.');
+        this.uploadingAvatar.set(false);
+      },
+    });
+  }
+
+  onRemoveAvatar() {
+    this.avatarError.set('');
+    this.auth.removeAvatar().subscribe({
+      next: updated => this.afterAvatarChange(updated),
+      error: (err: HttpErrorResponse) => this.avatarError.set(err.error?.error ?? 'Could not remove the picture.'),
+    });
+  }
+
+  // both upload and remove send back the updated account. the page shows it, and localStorage is
+  // refreshed too because that's where the navbar reads the picture from.
+  private afterAvatarChange(updated: AppUser) {
+    this.user.set(updated);
+    this.saveSession(updated);
+    this.uploadingAvatar.set(false);
+  }
+
+  // the navbar reads the username and picture out of localStorage, so the stored copy is
+  // refreshed after any change or it would keep showing the old ones until the next login
+  private saveSession(user: AppUser) {
+    this.auth.saveUser({ email: user.email, role: user.role, username: user.username, avatarUrl: user.avatarUrl });
+  }
+
   startEditing() {
     // copy the stored values into the form so it opens showing what's actually saved
     const user = this.user();
@@ -130,9 +197,7 @@ export class Profile {
     this.auth.updateProfile(this.email, changes).subscribe({
       next: updated => {
         this.user.set(updated);
-        // the navbar reads the username out of localStorage, so the stored copy is refreshed
-        // here too or it would keep showing the old one until the next login
-        this.auth.saveUser({ email: updated.email, role: updated.role, username: updated.username });
+        this.saveSession(updated);
         this.formSuccess.set('Profile saved.');
         this.editing.set(false);
         this.saving.set(false);

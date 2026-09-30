@@ -112,9 +112,37 @@
   padding: 24px;
 }
 
+/* the avatar and the bubble side by side. the avatar sits at the bottom, level with the end of
+   the message, the way most chat apps do it */
+.message-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.message-row.mine {
+  flex-direction: row-reverse;  /* my own messages on the right, with my avatar on the far right */
+}
+
+.chat-avatar {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;               /* a long message mustn't squash the circle */
+  border-radius: 50%;
+  object-fit: cover;            /* crops a photo to the circle instead of squashing it */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #5FA8D3;
+  color: #1A1D23;               /* dark on this blue, white would fail contrast */
+  font-family: 'Fraunces Variable', Georgia, serif;
+  font-size: 15px;
+  font-weight: 700;
+}
+
 .message {
   max-width: 60%;
-  margin-bottom: 20px;
   padding: 12px 16px;
   border-radius: 8px;
   background: #FFFFFF;
@@ -122,7 +150,6 @@
 }
 
 .message.mine {
-  margin-left: auto;            /* auto left margin pushes my own messages over to the right */
   background: #E8EDFB;
 }
 

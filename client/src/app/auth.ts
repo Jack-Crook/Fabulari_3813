@@ -1,4 +1,4 @@
-import { Service, inject } from '@angular/core';    // Service = injectable decorator; inject() = grabs a dependency
+import { Service, inject, signal, computed } from '@angular/core';    // Service = injectable decorator; inject() = grabs a dependency
 import { HttpClient } from '@angular/common/http';  // lets this service make HTTP requests
 
 // one account as the server sends it back. the password is never in here, because server.js strips it
@@ -9,6 +9,7 @@ export interface AppUser {
   username: string;
   dob: string;        // yyyy-mm-dd, empty when they haven't set one. the age limit check needs it
   bio: string;
+  avatarUrl: string;  // /uploads/<uuid>.png on the api server, or '' when they haven't set a picture
   createdAt: string;
 }
 
@@ -24,6 +25,7 @@ export interface StoredUser {
   email: string;
   role: string;
   username: string;
+  avatarUrl?: string;   // optional, so a session saved before profile pictures existed still reads fine
 }
 
 // the fields a user is allowed to change about themself. email isn't here, because the spec
@@ -40,6 +42,18 @@ export interface ProfileChanges {
 export class Auth {
   private http = inject(HttpClient);
   private apiUrl = 'http://localhost:3000';
+
+  // localStorage can't tell angular when it changes, so saveUser and logout bump this counter and
+  // `session` below re-reads storage whenever it moves. that's what lets the navbar redraw the
+  // moment the profile page changes the picture or the name, instead of on the next page load.
+  private sessionVersion = signal(0);
+
+  // the signed in user as a signal. localStorage is still where it lives, this only makes a
+  // change to it something the template can react to.
+  session = computed(() => {
+    this.sessionVersion();
+    return this.getUser();
+  });
 
   // username and dob are optional at signup. the server falls back to the part before the @
   // when no username is given, so nobody ends up nameless.
@@ -72,8 +86,32 @@ export class Auth {
       { ...changes, actorEmail: this.email });
   }
 
+  // POST /users/:email/avatar, a new profile picture. FormData because it's a file upload, the
+  // same as a chat image. actorEmail goes BEFORE the file: multer reads the form top to bottom,
+  // and the server's "only your own picture" check needs it in req.body by the time the file
+  // has been written.
+  uploadAvatar(file: File) {
+    const form = new FormData();
+    form.append('actorEmail', this.email);
+    form.append('image', file);
+    return this.http.post<AppUser>(`${this.apiUrl}/users/${encodeURIComponent(this.email)}/avatar`, form);
+  }
+
+  // DELETE /users/:email/avatar, back to the initial letter
+  removeAvatar() {
+    return this.http.delete<AppUser>(`${this.apiUrl}/users/${encodeURIComponent(this.email)}/avatar`,
+      { params: { actorEmail: this.email } });
+  }
+
+  // the server stores a relative path, so it keeps working if the api's address changes. this
+  // turns it into something an <img> can load, the same as ChatService.imageSrc.
+  avatarSrc(avatarUrl: string) {
+    return `${this.apiUrl}${avatarUrl}`;
+  }
+
   saveUser(user: StoredUser) {     // called after a successful login so the rest of the app knows who is signed in
     localStorage.setItem('user', JSON.stringify(user));   // localStorage only holds strings, so the object gets stringified first
+    this.sessionVersion.update(v => v + 1);
   }
 
   getUser(): StoredUser | null {              // reads the logged in user back out, or null if nobody is logged in
@@ -94,6 +132,7 @@ export class Auth {
 
   logout() {
     localStorage.removeItem('user');          // clearing the key is all "logging out" means for now, there's no server side session
+    this.sessionVersion.update(v => v + 1);
   }
 
 }

@@ -4,6 +4,16 @@ import { HttpTestingController } from '@angular/common/http/testing';
 import { Profile } from './profile';
 import { testProviders, signIn, signOut, makeGroup, makeUser, makeRequest, flushByUrl } from '../testing';
 
+// the event a file input's (change) hands the component. size can be faked so the 5 MB test
+// doesn't need a real 5 MB file.
+function pick(type = 'image/png', size?: number) {
+  const file = new File(['fake image bytes'], 'me', { type });
+  if (size !== undefined) {
+    Object.defineProperty(file, 'size', { value: size });
+  }
+  return { target: { files: [file], value: 'me' } } as unknown as Event;
+}
+
 describe('Profile', () => {
   let component: Profile;
   let fixture: ComponentFixture<Profile>;
@@ -117,5 +127,42 @@ describe('Profile', () => {
 
     expect(component.formError()).toContain('valid date of birth');
     expect(component.saving()).toBe(false);
+  });
+
+  it('uploads a picked photo, shows it, and refreshes the session for the navbar', async () => {
+    await build();
+    flushByUrl(mock, { '/users/': makeUser(), '/groups': [], '/requests': [] });
+
+    component.onAvatarChosen(pick());
+    expect(component.uploadingAvatar()).toBe(true);
+    mock.expectOne(r => r.method === 'POST' && r.url.endsWith('/avatar'))
+      .flush(makeUser({ avatarUrl: '/uploads/me.png' }));
+
+    expect(component.avatarSrc()).toBe('http://localhost:3000/uploads/me.png');
+    expect(JSON.parse(localStorage.getItem('user')!).avatarUrl).toBe('/uploads/me.png');
+    expect(component.uploadingAvatar()).toBe(false);
+  });
+
+  it('refuses a file that is not an allowed image, or is over 5 MB, before uploading', async () => {
+    await build();
+    flushByUrl(mock, { '/users/': makeUser(), '/groups': [], '/requests': [] });
+
+    component.onAvatarChosen(pick('image/svg+xml'));
+    expect(component.avatarError()).toContain('PNG');
+    component.onAvatarChosen(pick('image/png', 5 * 1024 * 1024 + 1));
+    expect(component.avatarError()).toContain('5 MB');
+
+    mock.expectNone(r => r.url.endsWith('/avatar'));
+  });
+
+  it('removes the photo and goes back to the initial', async () => {
+    await build();
+    flushByUrl(mock, { '/users/': makeUser({ avatarUrl: '/uploads/me.png' }), '/groups': [], '/requests': [] });
+    expect(component.avatarSrc()).not.toBe('');
+
+    component.onRemoveAvatar();
+    mock.expectOne(r => r.method === 'DELETE' && r.url.endsWith('/avatar')).flush(makeUser({ avatarUrl: '' }));
+
+    expect(component.avatarSrc()).toBe('');
   });
 });

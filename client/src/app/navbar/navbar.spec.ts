@@ -111,6 +111,18 @@ describe('Navbar', () => {
     expect(menu.textContent).toContain('Logout');
   });
 
+  it('shows the uploaded profile picture instead of the initial', async () => {
+    localStorage.setItem('user', JSON.stringify({
+      email: 'member@test.com', role: 'user', username: 'jack', avatarUrl: '/uploads/me.png',
+    }));
+    await build();
+    mock.expectOne('http://localhost:3000/groups').flush([]);
+    await fixture.whenStable();
+
+    const avatar = (fixture.nativeElement as HTMLElement).querySelector('img.nav-avatar');
+    expect(avatar?.getAttribute('src')).toBe('http://localhost:3000/uploads/me.png');
+  });
+
   it('closes the menu on Escape and on a click outside the navbar', async () => {
     signIn('member@test.com');
     await build();

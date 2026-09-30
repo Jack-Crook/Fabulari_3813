@@ -5,7 +5,7 @@ const { describe, it, before, after, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const { ObjectId } = require('mongodb');
-const { PASSWORD, startServer, reset, api, uploadImage } = require('./helpers');
+const { PASSWORD, startServer, reset, api, uploadImage, uploadAvatar } = require('./helpers');
 
 let ctx;        // { base, db, stop, uploaded, UPLOAD_DIR }
 let call;       // call(method, url, body) -> { status, body }
@@ -232,6 +232,22 @@ describe('DELETE /groups/:id', () => {
     it('answers 404 for a group that doesn\'t exist', async () => {
         const res = await call('DELETE', `/groups/${missingId}?actorEmail=super@test.com`);
         assert.equal(res.status, 404);
+    });
+});
+
+
+describe('GET /groups/:id/members', () => {
+    it('lists each member\'s email, name and picture, and nothing else from their profile', async () => {
+        const res = await call('GET', `/groups/${ids.groupId}/members`);
+        assert.equal(res.status, 200);
+        assert.deepEqual(res.body.map(m => m.email).sort(), ['alice@test.com', 'bob@test.com']);
+        // profiles are private, so no date of birth, bio, role or password
+        assert.deepEqual(Object.keys(res.body[0]).sort(), ['avatarUrl', 'email', 'username']);
+    });
+
+    it('answers 404 for an unknown or malformed group id', async () => {
+        assert.equal((await call('GET', `/groups/${missingId}/members`)).status, 404);
+        assert.equal((await call('GET', '/groups/nope/members')).status, 404);
     });
 });
 
@@ -603,6 +619,55 @@ describe('GET /audit/types', () => {
         await call('POST', '/groups/' + ids.groupId + '/members', { email: 'super@test.com', actorEmail: 'super@test.com' });   // refused, so not logged
         const res = await call('GET', '/audit/types');
         assert.deepEqual(res.body, ['Group Edited', 'Group Joined']);
+    });
+});
+
+
+describe('profile pictures', () => {
+    const onDisk = url => fs.existsSync(ctx.UPLOAD_DIR + '/' + url.split('/').pop());
+
+    it('stores your own picture, returns it on the account, and serves the file', async () => {
+        const res = await uploadAvatar(ctx.base, { email: 'bob@test.com' });
+        assert.equal(res.status, 200);
+        ctx.uploaded.push(res.body.avatarUrl);
+        assert.match(res.body.avatarUrl, /^\/uploads\/[0-9a-f-]{36}\.png$/);
+        assert.equal(res.body.password, undefined);
+
+        assert.equal((await call('GET', '/users/bob@test.com')).body.avatarUrl, res.body.avatarUrl);
+        assert.equal((await fetch(ctx.base + res.body.avatarUrl)).status, 200);
+    });
+
+    it('deletes the old file when the picture is replaced', async () => {
+        const first = await uploadAvatar(ctx.base, { email: 'bob@test.com' });
+        const second = await uploadAvatar(ctx.base, { email: 'bob@test.com' });
+        ctx.uploaded.push(first.body.avatarUrl, second.body.avatarUrl);
+        assert.ok(!onDisk(first.body.avatarUrl));
+        assert.ok(onDisk(second.body.avatarUrl));
+    });
+
+    it('refuses someone else\'s picture with 403 and doesn\'t leave the file on disk', async () => {
+        const before = fs.readdirSync(ctx.UPLOAD_DIR).length;
+        const res = await uploadAvatar(ctx.base, { email: 'bob@test.com', actorEmail: 'alice@test.com' });
+        assert.equal(res.status, 403);
+        assert.equal(fs.readdirSync(ctx.UPLOAD_DIR).length, before);
+    });
+
+    it('refuses a file that isn\'t an allowed image with 400', async () => {
+        const res = await uploadAvatar(ctx.base, {
+            email: 'bob@test.com', bytes: Buffer.from('<svg/>'), type: 'image/svg+xml', name: 'x.svg',
+        });
+        assert.equal(res.status, 400);
+    });
+
+    it('removes the picture and its file, own account only', async () => {
+        const up = await uploadAvatar(ctx.base, { email: 'bob@test.com' });
+        ctx.uploaded.push(up.body.avatarUrl);
+        assert.equal((await call('DELETE', '/users/bob@test.com/avatar?actorEmail=alice@test.com')).status, 403);
+
+        const res = await call('DELETE', '/users/bob@test.com/avatar?actorEmail=bob@test.com');
+        assert.equal(res.status, 200);
+        assert.equal(res.body.avatarUrl, '');
+        assert.ok(!onDisk(up.body.avatarUrl));
     });
 });
 

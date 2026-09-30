@@ -7,6 +7,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 
 import { ChatRoom } from './chat-room';
 import { ChatService, ChatMessage } from '../chat';
+import { GroupMember } from '../group';
 import { testProviders, signIn, signOut, makeGroup, makeChannel, flushByUrl } from '../testing';
 
 // A stand-in for ChatService. The real one opens a socket to localhost:3000 the moment a room is
@@ -63,8 +64,10 @@ describe('ChatRoom', () => {
     await fixture.whenStable();
   }
 
-  function load(group = makeGroup()) {
-    flushByUrl(mock, { '/groups': [group], '/channels': [makeChannel()] });
+  // '/members' goes first: the members url also contains '/groups', and flushByUrl answers the
+  // first pattern that matches, so otherwise it would be handed the list of groups
+  function load(group = makeGroup(), members: GroupMember[] = []) {
+    flushByUrl(mock, { '/members': members, '/groups': [group], '/channels': [makeChannel()] });
   }
 
   beforeEach(async () => {
@@ -256,5 +259,27 @@ describe('ChatRoom', () => {
 
     // the socket is shared app wide and stays open, so leaving has to be said explicitly
     expect(chat.leaveRoom).toHaveBeenCalled();
+  });
+
+  it('shows each sender\'s picture and display name next to their message', async () => {
+    await build();
+    load(makeGroup(), [{ email: 'admin@test.com', username: 'Ada', avatarUrl: '/uploads/ada.png' }]);
+    chat.messages.set([makeMessage({ sender: 'admin@test.com' })]);
+    await fixture.whenStable();
+
+    const page = fixture.nativeElement as HTMLElement;
+    expect(page.querySelector('img.chat-avatar')?.getAttribute('src')).toBe('http://localhost:3000/uploads/ada.png');
+    expect(page.querySelector('.message-sender')?.textContent).toContain('Ada');
+  });
+
+  it('falls back to the initial, and to the email, for a sender with no picture or who has left', async () => {
+    await build();
+    load(makeGroup(), [{ email: 'admin@test.com', username: 'Ada', avatarUrl: '' }]);
+
+    expect(component.avatarFor('admin@test.com')).toBe('');
+    expect(component.initialFor('admin@test.com')).toBe('A');
+    // not in the members list any more, e.g. banned since they wrote it
+    expect(component.nameFor('gone@test.com')).toBe('gone@test.com');
+    expect(component.initialFor('gone@test.com')).toBe('G');
   });
 });

@@ -20,6 +20,14 @@ export interface Channel {
   name: string;
 }
 
+// one member as GET /groups/:id/members sends them: only what the chat room shows next to a
+// message. profiles are private, so nothing else about them comes with it.
+export interface GroupMember {
+  email: string;
+  username: string;
+  avatarUrl: string;    // '' when they haven't uploaded a picture
+}
+
 // PATCH /groups/:id sends back the saved group plus anyone the change removed, because raising
 // the age limit boots members who no longer meet it and the admin should be told who went.
 export interface GroupEditResponse {
@@ -47,6 +55,11 @@ export class GroupService {
 
   getChannels(groupId: string) {    // GET /channels?groupId=g1, just the rooms inside one group
     return this.http.get<Channel[]>(`${this.apiUrl}/channels`, { params: { groupId } });
+  }
+
+  // GET /groups/:id/members, the name and picture for everyone in the group, for the chat room
+  getMembers(groupId: string) {
+    return this.http.get<GroupMember[]>(`${this.apiUrl}/groups/${groupId}/members`);
   }
 
   // PATCH /groups/:id. actorEmail goes in the body so the server can check the caller really is

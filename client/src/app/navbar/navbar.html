@@ -23,15 +23,20 @@
               (click)="toggleMenu()"
               aria-controls="account-menu"
               [attr.aria-expanded]="menuOpen()"
-              [attr.aria-label]="'Account: ' + displayName">
-        <span class="nav-avatar" aria-hidden="true">{{ initial }}</span>
+              [attr.aria-label]="'Account: ' + displayName()">
+        <!-- alt="" because the button's aria-label already names the account -->
+        @if (avatarSrc()) {
+          <img class="nav-avatar" [src]="avatarSrc()" alt="" />
+        } @else {
+          <span class="nav-avatar" aria-hidden="true">{{ initial() }}</span>
+        }
         <span class="caret" aria-hidden="true">▾</span>
       </button>
 
       @if (menuOpen()) {
         <div id="account-menu" class="account-menu">
           <div class="menu-who">
-            <p class="menu-name">{{ displayName }}</p>
+            <p class="menu-name">{{ displayName() }}</p>
             <p class="menu-email">{{ me }}</p>
           </div>
           <a routerLink="/profile" routerLinkActive="active">Profile</a>

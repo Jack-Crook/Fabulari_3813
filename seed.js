@@ -51,6 +51,7 @@ async function seed() {
     const hashed = await Promise.all(users.map(async user => ({
       ...user,
       password: await bcrypt.hash(user.password, SALT_ROUNDS),
+      avatarUrl: user.avatarUrl ?? '',   // no profile pictures in the fixture, and uploads/ is emptied below anyway
     })));
     await db.collection('users').insertMany(hashed);
   }

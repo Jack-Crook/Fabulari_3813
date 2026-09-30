@@ -6,19 +6,40 @@
     <div class="card">
       <h2>Profile</h2>
 
-      <!-- avatar circle + name, same as the little user box on the dashboard wireframe.
-           the initial is the first letter of the display name so the circle isn't just a blank
-           blob, since the spec rules out profile pictures. -->
+      <!-- avatar circle + name, same as the little user box on the dashboard wireframe. the
+           uploaded picture when there is one, otherwise the first letter of the display name so
+           the circle isn't just a blank blob. -->
       <div class="profile-top">
-        <div class="avatar">{{ (user()?.username || email).charAt(0).toUpperCase() }}</div>
+        @if (avatarSrc()) {
+          <img class="avatar" [src]="avatarSrc()" alt="Your profile picture" />
+        } @else {
+          <div class="avatar" aria-hidden="true">{{ (user()?.username || email).charAt(0).toUpperCase() }}</div>
+        }
         <div>
           <p class="username">{{ user()?.username }}</p>
           <!-- role is 'user' or 'super'. group admin isn't a role on the user record, it's
                whether their email is in a group's adminEmails, which is why it's listed
                separately below rather than shown here. -->
           <p class="role-tag">{{ user()?.role === 'super' ? 'Super Admin' : 'User' }}</p>
+
+          <!-- the real file input is hidden because it can't be styled, and the button clicks it.
+               the same pattern as attaching an image in the chat room. -->
+          <div class="avatar-actions">
+            <input #avatarPicker type="file" hidden accept="image/png,image/jpeg,image/gif,image/webp"
+                   (change)="onAvatarChosen($event)" />
+            <button type="button" class="small" (click)="avatarPicker.click()" [disabled]="uploadingAvatar()">
+              {{ uploadingAvatar() ? 'Uploading…' : (avatarSrc() ? 'Change photo' : 'Add photo') }}
+            </button>
+            @if (avatarSrc()) {
+              <button type="button" class="small secondary" (click)="onRemoveAvatar()">Remove</button>
+            }
+          </div>
         </div>
       </div>
+
+      @if (avatarError()) {
+        <p class="error" role="alert">{{ avatarError() }}</p>
+      }
 
       @if (formSuccess()) {
         <p class="success" role="status">{{ formSuccess() }}</p>

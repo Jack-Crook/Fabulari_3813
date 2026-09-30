@@ -40,10 +40,10 @@ export class Login {
             next: (res: LoginResponse) => {
 
         // this runs if the backend says login worked
-        // only the three fields the navbar and the guards need are kept. everything else about
+        // only the fields the navbar and the guards need are kept. everything else about
         // the account is fetched fresh by the profile page, because localStorage goes stale the
         // moment the profile is edited.
-        this.auth.saveUser({ email: res.email, role: res.role, username: res.username });
+        this.auth.saveUser({ email: res.email, role: res.role, username: res.username, avatarUrl: res.avatarUrl });
         this.successmessage.set('Logged in successfully.');
 
 

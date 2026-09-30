@@ -24,8 +24,8 @@
   margin-bottom: 24px;
 }
 
-/* the spec rules out profile pictures, so the circle holds the first letter of the display
-   name instead of staying an empty blob */
+/* the uploaded picture, or the first letter of the display name when there isn't one. the same
+   class does both, so the circle is the same size either way. */
 .avatar {
   width: 64px;
   height: 64px;
@@ -156,4 +156,24 @@
   .info-value {
     text-align: left;
   }
+}
+
+/* object-fit: cover crops a photo to fill the circle instead of squashing it */
+img.avatar {
+  object-fit: cover;
+  background: #E2E4E9;
+}
+
+.avatar-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* the global button is full width and 16px, far too big next to an avatar */
+.avatar-actions button.small {
+  width: auto;
+  margin: 0;
+  padding: 6px 12px;
+  font-size: 13px;
 }

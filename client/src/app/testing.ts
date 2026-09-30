@@ -122,6 +122,7 @@ export function makeUser(overrides: Partial<AppUser> = {}): AppUser {
     username: 'member',
     dob: '2000-01-01',
     bio: '',
+    avatarUrl: '',
     createdAt: '2026-08-01T00:00:00.000Z',
     ...overrides,
   };

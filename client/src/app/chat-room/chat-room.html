@@ -62,27 +62,39 @@
       <!-- tracked by _id now the messages are real, so angular reuses the existing rows and only
            adds the new one when a message arrives -->
       @for (message of messages(); track message._id) {
-        <!-- my own messages sit on the right, everyone else's on the left -->
-        <div class="message" [class.mine]="message.sender === me">
-          <p class="message-sender">
-            {{ message.sender }}
-            <!-- the spec asks for an indicator when the sender is that group's admin -->
-            @if (isAdmin(message.sender)) {
-              <span class="admin-tag">Admin</span>
+        <!-- my own messages sit on the right, everyone else's on the left. the avatar is beside
+             the bubble, and row-reverse in the css puts mine on the right-hand side of it. -->
+        <div class="message-row" [class.mine]="message.sender === me">
+          <!-- alt="" because the sender's name is written right next to it, so a screen reader
+               would otherwise read the name twice -->
+          @if (avatarFor(message.sender); as src) {
+            <img class="chat-avatar" [src]="src" alt="" />
+          } @else {
+            <span class="chat-avatar" aria-hidden="true">{{ initialFor(message.sender) }}</span>
+          }
+
+          <div class="message" [class.mine]="message.sender === me">
+            <!-- the display name, with the email on hover, since the email is still what identifies them -->
+            <p class="message-sender" [title]="message.sender">
+              {{ nameFor(message.sender) }}
+              <!-- the spec asks for an indicator when the sender is that group's admin -->
+              @if (isAdmin(message.sender)) {
+                <span class="admin-tag">Admin</span>
+              }
+              <span class="message-time">{{ message.at | date:'shortTime' }}</span>
+            </p>
+            @if (message.imageUrl) {
+              <!-- opens the full size image in a new tab. rel="noopener" stops that tab getting a
+                   handle back to this page. (load) re-scrolls once the image has a height. -->
+              <a [href]="imageSrc(message.imageUrl)" target="_blank" rel="noopener">
+                <img class="message-image" [src]="imageSrc(message.imageUrl)"
+                     [alt]="'Image from ' + message.sender" (load)="scrollToBottom()" />
+              </a>
             }
-            <span class="message-time">{{ message.at | date:'shortTime' }}</span>
-          </p>
-          @if (message.imageUrl) {
-            <!-- opens the full size image in a new tab. rel="noopener" stops that tab getting a
-                 handle back to this page. (load) re-scrolls once the image has a height. -->
-            <a [href]="imageSrc(message.imageUrl)" target="_blank" rel="noopener">
-              <img class="message-image" [src]="imageSrc(message.imageUrl)"
-                   [alt]="'Image from ' + message.sender" (load)="scrollToBottom()" />
-            </a>
-          }
-          @if (message.body) {
-            <p class="message-body">{{ message.body }}</p>
-          }
+            @if (message.body) {
+              <p class="message-body">{{ message.body }}</p>
+            }
+          </div>
         </div>
       }
 
