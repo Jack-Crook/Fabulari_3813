@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed } from '@angular/core';
+import { Component, inject, signal, computed, ElementRef, viewChild } from '@angular/core';
 import { RouterLink, RouterLinkActive, Router, NavigationEnd } from '@angular/router';
 import { Auth } from '../auth';
 import { GroupService, Group } from '../group';
@@ -9,6 +9,13 @@ import { GroupService, Group } from '../group';
   imports: [RouterLink, RouterLinkActive],
   templateUrl: './navbar.html',
   styleUrl: './navbar.css',
+  // listeners on the whole document, not just the navbar, because the account menu should close
+  // when you click anywhere else on the page or press Escape, which is how people expect a
+  // dropdown to behave
+  host: {
+    '(document:click)': 'onDocumentClick($event)',
+    '(document:keydown.escape)': 'closeMenu(true)',
+  },
 })
 
 
@@ -16,13 +23,26 @@ export class Navbar {
   private auth = inject(Auth);
   private router = inject(Router);
   private groupService = inject(GroupService);
+  private host = inject(ElementRef<HTMLElement>);    // this navbar's own element, to tell a click inside it from one outside
 
 
-  private me = this.auth.email;
+  me = this.auth.email;       // not private, the account menu shows it under the name
 
-  // shown on the right of the bar so it's always obvious which account you're acting as, which
-  // matters a lot on this app because the same page looks different per role
+  // the account menu on the right says which account you're acting as, which matters a lot on
+  // this app because the same page looks different per role
   displayName = this.auth.getUser()?.username || this.me;
+
+  // the letter in the avatar circle. the same idea as the profile page's avatar: there are no
+  // uploaded profile pictures, so the first letter of the name stands in for one
+  initial = (this.displayName.charAt(0) || '?').toUpperCase();
+
+  // a signal because it's also closed from the document listeners and from a navigation event,
+  // not only from a click on the button itself
+  menuOpen = signal(false);
+
+  // the avatar button, so focus can go back to it when Escape closes the menu. otherwise a
+  // keyboard user is left focused on something that just disappeared
+  private accountButton = viewChild<ElementRef<HTMLButtonElement>>('accountButton');
 
   // not a computed like isGroupAdmin below, because it doesn't depend on which page you're on.
   // super admin authority is system wide rather than tied to one group, so the link is always
@@ -54,6 +74,7 @@ export class Navbar {
     this.router.events.subscribe(event => {
       if (event instanceof NavigationEnd) {
         this.readGroupFromUrl();
+        this.menuOpen.set(false);     // picking Profile from the menu shouldn't leave it open on the next page
       }
     });
   }
@@ -69,6 +90,30 @@ export class Navbar {
   }
 
 
+
+  toggleMenu() {
+    this.menuOpen.update(open => !open);
+  }
+
+  // Escape closes the menu and puts focus back on the avatar button. only when it was actually
+  // open, so pressing Escape somewhere else on the page doesn't steal focus into the navbar.
+  closeMenu(returnFocus = false) {
+    if (!this.menuOpen()) {
+      return;
+    }
+    this.menuOpen.set(false);
+    if (returnFocus) {
+      this.accountButton()?.nativeElement.focus();
+    }
+  }
+
+  // a click anywhere outside the navbar closes the menu. clicks inside it are left alone, the
+  // button toggles it itself and the links close it by navigating.
+  onDocumentClick(event: MouseEvent) {
+    if (!this.host.nativeElement.contains(event.target as Node)) {
+      this.closeMenu();
+    }
+  }
 
   onLogout() {                          // runs when the logout button is clicked
     this.auth.logout();                 // clear the stored user first

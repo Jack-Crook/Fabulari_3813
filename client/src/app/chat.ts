@@ -103,6 +103,12 @@ export class ChatService {
     this.error.set('');
 
     socket.emit('joinRoom', { channelId, email }, (res: JoinResult) => {
+      // clicking between rooms quickly sends two joins, and the first one's reply can land after
+      // the second. by then it belongs to a room we've already left, so it's ignored rather than
+      // putting the old room's history under the new room's name.
+      if (this.currentRoom?.channelId !== channelId) {
+        return;
+      }
       if (res?.error) {
         this.error.set(res.error);
         return;

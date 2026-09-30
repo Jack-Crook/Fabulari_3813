@@ -29,6 +29,15 @@ async function raise(by, type, extra = {}) {
     return res.body._id;
 }
 
+// a second group straight into the database. there's no route that creates a group directly,
+// only approving a group-create request, so tests that just need one to exist insert it.
+async function addGroup(name, adminEmail) {
+    await ctx.db.collection('groups').insertOne({
+        name, description: '', ageLimit: 0, theme: '#5FA8D3',
+        adminEmails: [adminEmail], memberEmails: [adminEmail], bannedEmails: [],
+    });
+}
+
 
 describe('GET /', () => {
     it('answers so you can tell the server is up', async () => {
@@ -165,27 +174,6 @@ describe('GET /groups', () => {
 });
 
 
-describe('POST /groups', () => {
-    it('creates a group with the creator as its first admin and member', async () => {
-        const res = await call('POST', '/groups', { name: 'Chess', creatorEmail: 'carol@test.com' });
-        assert.equal(res.status, 201);
-        assert.deepEqual(res.body.adminEmails, ['carol@test.com']);
-        assert.deepEqual(res.body.memberEmails, ['carol@test.com']);
-    });
-
-    it('treats group names as unique regardless of case', async () => {
-        const res = await call('POST', '/groups', { name: 'book club', creatorEmail: 'carol@test.com' });
-        assert.equal(res.status, 409);
-    });
-
-    it('rejects a missing name 400, an unknown creator 404, and the super admin 409', async () => {
-        assert.equal((await call('POST', '/groups', { creatorEmail: 'carol@test.com' })).status, 400);
-        assert.equal((await call('POST', '/groups', { name: 'X', creatorEmail: 'nobody@test.com' })).status, 404);
-        assert.equal((await call('POST', '/groups', { name: 'X', creatorEmail: 'super@test.com' })).status, 409);
-    });
-});
-
-
 describe('PATCH /groups/:id', () => {
     it('lets a group admin edit the name, description and theme', async () => {
         const res = await call('PATCH', `/groups/${ids.groupId}`, {
@@ -207,7 +195,7 @@ describe('PATCH /groups/:id', () => {
     });
 
     it('refuses a name another group already has with 409', async () => {
-        await call('POST', '/groups', { name: 'Chess', creatorEmail: 'carol@test.com' });
+        await addGroup('Chess', 'carol@test.com');
         const res = await call('PATCH', `/groups/${ids.groupId}`, { actorEmail: 'alice@test.com', name: 'CHESS' });
         assert.equal(res.status, 409);
     });
@@ -250,25 +238,32 @@ describe('DELETE /groups/:id', () => {
 
 describe('POST /groups/:id/members', () => {
     it('lets a user join a group', async () => {
-        const res = await call('POST', `/groups/${ids.groupId}/members`, { email: 'carol@test.com' });
+        const res = await call('POST', `/groups/${ids.groupId}/members`, { email: 'carol@test.com', actorEmail: 'carol@test.com' });
         assert.equal(res.status, 200);
         assert.ok(res.body.memberEmails.includes('carol@test.com'));
     });
 
     it('refuses someone already in the group, and the super admin, with 409', async () => {
-        assert.equal((await call('POST', `/groups/${ids.groupId}/members`, { email: 'bob@test.com' })).status, 409);
-        assert.equal((await call('POST', `/groups/${ids.groupId}/members`, { email: 'super@test.com' })).status, 409);
+        assert.equal((await call('POST', `/groups/${ids.groupId}/members`, { email: 'bob@test.com', actorEmail: 'bob@test.com' })).status, 409);
+        assert.equal((await call('POST', `/groups/${ids.groupId}/members`, { email: 'super@test.com', actorEmail: 'super@test.com' })).status, 409);
     });
 
     it('auto-rejects a user who is too young, or has no date of birth, with 403', async () => {
         await ctx.db.collection('groups').updateOne({ _id: new ObjectId(ids.groupId) }, { $set: { ageLimit: 18 } });
-        assert.equal((await call('POST', `/groups/${ids.groupId}/members`, { email: 'kid@test.com' })).status, 403);
-        assert.equal((await call('POST', `/groups/${ids.groupId}/members`, { email: 'carol@test.com' })).status, 403);
+        assert.equal((await call('POST', `/groups/${ids.groupId}/members`, { email: 'kid@test.com', actorEmail: 'kid@test.com' })).status, 403);
+        assert.equal((await call('POST', `/groups/${ids.groupId}/members`, { email: 'carol@test.com', actorEmail: 'carol@test.com' })).status, 403);
+    });
+
+    it('only lets you add yourself, 403 for adding someone else', async () => {
+        const res = await call('POST', `/groups/${ids.groupId}/members`, { email: 'carol@test.com', actorEmail: 'alice@test.com' });
+        assert.equal(res.status, 403);
+        const group = await ctx.db.collection('groups').findOne({ _id: new ObjectId(ids.groupId) });
+        assert.ok(!group.memberEmails.includes('carol@test.com'));
     });
 
     it('answers 404 for an unknown user or group', async () => {
-        assert.equal((await call('POST', `/groups/${ids.groupId}/members`, { email: 'nobody@test.com' })).status, 404);
-        assert.equal((await call('POST', `/groups/${missingId}/members`, { email: 'carol@test.com' })).status, 404);
+        assert.equal((await call('POST', `/groups/${ids.groupId}/members`, { email: 'nobody@test.com', actorEmail: 'nobody@test.com' })).status, 404);
+        assert.equal((await call('POST', `/groups/${missingId}/members`, { email: 'carol@test.com', actorEmail: 'carol@test.com' })).status, 404);
     });
 });
 
@@ -300,7 +295,7 @@ describe('POST /groups/:id/bans', () => {
         assert.equal(res.status, 200);
         assert.ok(!res.body.memberEmails.includes('bob@test.com'));
         assert.ok(res.body.bannedEmails.includes('bob@test.com'));
-        assert.equal((await call('POST', `/groups/${ids.groupId}/members`, { email: 'bob@test.com' })).status, 403);
+        assert.equal((await call('POST', `/groups/${ids.groupId}/members`, { email: 'bob@test.com', actorEmail: 'bob@test.com' })).status, 403);
     });
 
     it('refuses a non-admin with 403, the last admin with 409, and a repeat ban with 409', async () => {
@@ -319,7 +314,7 @@ describe('DELETE /groups/:id/bans/:email', () => {
         const url = `/groups/${ids.groupId}/bans/bob@test.com`;
         assert.equal((await call('DELETE', `${url}?actorEmail=carol@test.com`)).status, 403);
         assert.equal((await call('DELETE', `${url}?actorEmail=alice@test.com`)).status, 200);
-        assert.equal((await call('POST', `/groups/${ids.groupId}/members`, { email: 'bob@test.com' })).status, 200);
+        assert.equal((await call('POST', `/groups/${ids.groupId}/members`, { email: 'bob@test.com', actorEmail: 'bob@test.com' })).status, 200);
     });
 });
 
@@ -479,7 +474,7 @@ describe('POST /requests', () => {
 
     it('needs a reason to report a user, and won\'t ban a group\'s only admin', async () => {
         await call('POST', `/groups/${ids.groupId}/admins`, { email: 'bob@test.com', actorEmail: 'alice@test.com' });
-        await call('POST', '/groups', { name: 'Chess', creatorEmail: 'carol@test.com' });   // carol is Chess's only admin
+        await addGroup('Chess', 'carol@test.com');   // carol is Chess's only admin
         assert.equal((await call('POST', '/requests', {
             type: 'user-ban', requestedBy: 'alice@test.com', groupId: ids.groupId, payload: { email: 'carol@test.com' },
         })).status, 400);
@@ -525,7 +520,7 @@ describe('POST /requests/:id/approve', () => {
 
     it('re-checks the name at approval time, in case it was taken while the request waited', async () => {
         const id = await raise('carol@test.com', 'group-create', { payload: { name: 'Chess' } });
-        await call('POST', '/groups', { name: 'Chess', creatorEmail: 'bob@test.com' });   // someone else got there first
+        await addGroup('Chess', 'bob@test.com');   // someone else got there first
         const res = await call('POST', `/requests/${id}/approve`, { actorEmail: 'super@test.com' });
         assert.equal(res.status, 409);
         assert.equal(await ctx.db.collection('groups').countDocuments({ name: 'Chess' }), 1);
@@ -588,7 +583,7 @@ describe('GET /bans', () => {
 
 describe('GET /audit', () => {
     it('records every change, newest first, and filters by type', async () => {
-        await call('POST', '/groups/' + ids.groupId + '/members', { email: 'carol@test.com' });
+        await call('POST', '/groups/' + ids.groupId + '/members', { email: 'carol@test.com', actorEmail: 'carol@test.com' });
         await call('PATCH', `/groups/${ids.groupId}`, { actorEmail: 'alice@test.com', description: 'x' });
 
         const all = await call('GET', '/audit');
@@ -604,8 +599,8 @@ describe('GET /audit', () => {
 describe('GET /audit/types', () => {
     it('lists the distinct types in the log, sorted', async () => {
         await call('PATCH', `/groups/${ids.groupId}`, { actorEmail: 'alice@test.com', description: 'x' });
-        await call('POST', '/groups/' + ids.groupId + '/members', { email: 'carol@test.com' });
-        await call('POST', '/groups/' + ids.groupId + '/members', { email: 'super@test.com' });   // refused, so not logged
+        await call('POST', '/groups/' + ids.groupId + '/members', { email: 'carol@test.com', actorEmail: 'carol@test.com' });
+        await call('POST', '/groups/' + ids.groupId + '/members', { email: 'super@test.com', actorEmail: 'super@test.com' });   // refused, so not logged
         const res = await call('GET', '/audit/types');
         assert.deepEqual(res.body, ['Group Edited', 'Group Joined']);
     });

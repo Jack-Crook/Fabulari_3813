@@ -1,6 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HttpTestingController } from '@angular/common/http/testing';
 
+import { Router } from '@angular/router';
+
 import { Navbar } from './navbar';
 import { testProviders, signIn, signOut, makeGroup } from '../testing';
 
@@ -82,5 +84,57 @@ describe('Navbar', () => {
 
     fixture.componentInstance.currentGroupId.set('g1');
     expect(fixture.componentInstance.isGroupAdmin()).toBe(false);
+  });
+
+  // the account menu replaced the name, Profile and Logout that used to sit on the bar itself
+
+  it('shows the initial in the avatar and keeps the menu closed until it is clicked', async () => {
+    signIn('member@test.com', 'user', 'jack');
+    await build();
+    mock.expectOne('http://localhost:3000/groups').flush([]);
+    await fixture.whenStable();
+
+    const page = fixture.nativeElement as HTMLElement;
+    const button = page.querySelector('.account-button') as HTMLButtonElement;
+    expect(page.querySelector('.nav-avatar')?.textContent?.trim()).toBe('J');
+    expect(button.getAttribute('aria-expanded')).toBe('false');
+    expect(page.querySelector('.account-menu')).toBeNull();
+
+    button.click();
+    await fixture.whenStable();
+
+    expect(button.getAttribute('aria-expanded')).toBe('true');
+    const menu = page.querySelector('.account-menu')!;
+    expect(menu.textContent).toContain('jack');
+    expect(menu.textContent).toContain('member@test.com');
+    expect(menu.textContent).toContain('Profile');
+    expect(menu.textContent).toContain('Logout');
+  });
+
+  it('closes the menu on Escape and on a click outside the navbar', async () => {
+    signIn('member@test.com');
+    await build();
+    mock.expectOne('http://localhost:3000/groups').flush([]);
+    const navbar = fixture.componentInstance;
+
+    navbar.toggleMenu();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(navbar.menuOpen()).toBe(false);
+
+    navbar.toggleMenu();
+    document.body.click();          // the body is outside the navbar's own element
+    expect(navbar.menuOpen()).toBe(false);
+  });
+
+  it('logs out from the menu and goes back to the login page', async () => {
+    signIn('member@test.com');
+    await build();
+    mock.expectOne('http://localhost:3000/groups').flush([]);
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+
+    fixture.componentInstance.onLogout();
+
+    expect(localStorage.getItem('user')).toBeNull();
+    expect(navigate).toHaveBeenCalledWith('/login');
   });
 });
