@@ -6,24 +6,6 @@ group admins and a super admin manage everything through a request and approval 
 
 The design and API documentation is in [`Phase2.md`](Phase2.md).
 
-## Requirements
-
-- Node.js 22 or newer, with npm
-- MongoDB on `localhost:27017`, for example:
-  - macOS (Homebrew): `brew services start mongodb-community`
-  - Docker or Podman: `podman run -d --name fabulari-mongo -p 27017:27017 docker.io/library/mongo:8`
-
-## Setup
-
-```bash
-npm install                 # the server's packages, in the repo root
-cd client && npm install    # the Angular app's packages
-cd ..
-npm run seed                # loads the demo data in data/ into MongoDB
-```
-
-`npm run seed` clears the database first, so it always gives the same starting state.
-
 ## Running it
 
 Two terminals:
