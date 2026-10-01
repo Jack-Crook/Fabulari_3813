@@ -42,3 +42,7 @@ __screenshots__/
 # System files
 .DS_Store
 Thumbs.db
+
+# cypress writes these on every run (screenshots of failures, recordings). output, not source
+/cypress/screenshots
+/cypress/videos
