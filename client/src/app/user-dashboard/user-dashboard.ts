@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed } from '@angular/core';
+import { Component, inject, signal, computed, DestroyRef } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -6,6 +6,8 @@ import { Navbar } from '../navbar/navbar'
 import { Auth } from '../auth';
 import { GroupService, Group } from '../group';
 import { RequestService, AppRequest } from '../request';
+import { ChatService } from '../chat';
+import { nameProblem, textProblem, ageLimitProblem, firstProblem } from '../validation';
 
 @Component({
   selector: 'app-user-dashboard',
@@ -41,6 +43,7 @@ export class UserDashboard {
   formError = signal('');
   formSuccess = signal('');
   submitting = signal(false);
+  joining = signal('');           // the group a join request is being sent for, stops a double click
 
   // re-runs whenever the search term or the list changes
   filteredDiscover = computed(() => {
@@ -54,6 +57,11 @@ export class UserDashboard {
 
   constructor() {
     this.loadGroups();
+
+    // live: a request raised or actioned anywhere (e.g. mine approved) refreshes this page. stops
+    // listening when the page goes.
+    const stop = inject(ChatService).onRequestsChanged(() => this.loadGroups());
+    inject(DestroyRef).onDestroy(stop);
   }
 
   // called again after any change, so the page updates without a refresh
@@ -94,9 +102,19 @@ export class UserDashboard {
     if (this.submitting()) {
       return;
     }
-    this.submitting.set(true);
     this.formError.set('');
     this.formSuccess.set('');
+
+    // checked here first, the server checks the same again
+    const problem = firstProblem(
+      nameProblem('Group name', this.newName),
+      textProblem('Description', this.newDescription),
+      ageLimitProblem(this.newAgeLimit));
+    if (problem) {
+      this.formError.set(problem);
+      return;
+    }
+    this.submitting.set(true);
 
     const payload = {
       name: this.newName,
@@ -124,20 +142,36 @@ export class UserDashboard {
     });
   }
 
-  // joining is direct. the server refuses (403) if too young or no date of birth.
+  // joining needs an admin of the group to approve it. someone too young, or with no date of birth,
+  // is turned down straight away: the request comes back already rejected, with the reason.
   onJoin(group: Group) {
+    if (this.joining()) {
+      return;
+    }
+    this.joining.set(group._id);
     this.formError.set('');
     this.formSuccess.set('');
 
-    this.groupService.joinGroup(group._id, this.me).subscribe({
-      next: () => {
-        this.formSuccess.set(`Joined ${group.name}.`);
-        this.loadGroups();    // moves it from Discover to My Groups
+    this.requestService.raise('group-join', this.me, {}, group._id).subscribe({
+      next: request => {
+        if (request.status === 'rejected') {
+          this.formError.set(request.reason);
+        } else {
+          this.formSuccess.set(`Asked to join ${group.name}. An admin of the group will review it.`);
+        }
+        this.joining.set('');
+        this.loadGroups();    // a pending request shows under Awaiting approval
       },
       error: (err: HttpErrorResponse) => {
         this.formError.set(err.error?.error ?? 'Something went wrong, please try again.');
+        this.joining.set('');
       },
     });
+  }
+
+  // already asked to join this group and still waiting
+  awaitingJoin(group: Group) {
+    return this.myPending().some(r => r.type === 'group-join' && r.groupId === group._id);
   }
 
   // same endpoint as an admin removing someone. 409 if you're the last admin.

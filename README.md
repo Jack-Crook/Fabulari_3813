@@ -54,6 +54,6 @@ test/                server integration tests (node --test)
 uploads/             uploaded images, created on start, not in git
 client/src/app/      the Angular app: one folder per page, plus the services and guards
 client/cypress/      end to end tests
-design/              wireframes
+design/              wireframes, and screens/ with the finished app
 Phase2.md            requirements, API, Angular architecture, design and testing
 ```

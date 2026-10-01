@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed } from '@angular/core';
+import { Component, inject, signal, computed, DestroyRef } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';   // ActivatedRoute = the current url's details
 import { HttpErrorResponse } from '@angular/common/http';
@@ -6,7 +6,9 @@ import { Navbar } from '../navbar/navbar';
 import { Auth } from '../auth';
 import { GroupService, Group, Channel } from '../group';
 import { RequestService, AppRequest } from '../request';
+import { ChatService } from '../chat';
 import { readableInk, LIGHT_INK } from '../theme';
+import { nameProblem } from '../validation';
 
 @Component({
   selector: 'app-group-view',
@@ -29,11 +31,12 @@ export class GroupView {
   group = signal<Group | undefined>(undefined);   // the one in the url
   channels = signal<Channel[]>([]);
   proposals = signal<AppRequest[]>([]);    // pending room proposals
+  myJoinRequest = signal<AppRequest | undefined>(undefined);   // my request to join, if it's waiting
 
   proposedName = '';      // plain, [(ngModel)] writes it from a DOM event
   formError = signal('');
   formSuccess = signal('');
-  joining = signal(false);     // stops a double join
+  joining = signal(false);     // stops a double click sending two requests
 
   // group admin is stored on the group, not the user
   isGroupAdmin = computed(() => this.group()?.adminEmails.includes(this.me) ?? false);
@@ -57,6 +60,15 @@ export class GroupView {
       this.groupId = params.get('id') ?? '';
       this.loadGroup();
     });
+
+    // live: a request about this group raised or actioned (e.g. my request to join approved)
+    // refreshes the page. stops listening when the page goes.
+    const stop = inject(ChatService).onRequestsChanged(groupId => {
+      if (groupId === this.groupId) {
+        this.loadGroup();
+      }
+    });
+    inject(DestroyRef).onDestroy(stop);
   }
 
   private loadGroup() {
@@ -69,12 +81,17 @@ export class GroupView {
       this.channels.set(channels);
     });
 
-    // so members can see their proposal is waiting
-    this.requestService.getRequests({ groupId: this.groupId, status: 'pending', scope: 'group' })
+    // so members can see their proposal is waiting. room proposals only, join requests are private
+    this.requestService.getRequests({ groupId: this.groupId, status: 'pending', type: 'channel-create' })
       .subscribe(requests => this.proposals.set(requests));
+
+    // whether I've already asked to join, so the page says so instead of offering the button again
+    this.requestService.getRequests({ groupId: this.groupId, status: 'pending', type: 'group-join', requestedBy: this.me })
+      .subscribe(requests => this.myJoinRequest.set(requests[0]));
   }
 
-  // join from the group page. the server checks age limit and bans.
+  // ask to join from the group page. an admin approves it, or it's rejected straight away with the
+  // reason if I'm too young or have no date of birth set.
   onJoin() {
     const group = this.group();
     if (!group || this.joining()) {
@@ -84,11 +101,15 @@ export class GroupView {
     this.formError.set('');
     this.formSuccess.set('');
 
-    this.groupService.joinGroup(group._id, this.me).subscribe({
-      next: () => {
-        this.formSuccess.set(`Joined ${group.name}. You can chat in its rooms now.`);
+    this.requestService.raise('group-join', this.me, {}, group._id).subscribe({
+      next: request => {
+        if (request.status === 'rejected') {
+          this.formError.set(request.reason);
+        } else {
+          this.formSuccess.set(`Asked to join ${group.name}. An admin of the group will review it.`);
+        }
         this.joining.set(false);
-        this.loadGroup();       // rooms become links
+        this.loadGroup();
       },
       error: (err: HttpErrorResponse) => {
         this.formError.set(err.error?.error ?? 'Something went wrong, please try again.');
@@ -101,6 +122,12 @@ export class GroupView {
   onPropose() {
     this.formError.set('');
     this.formSuccess.set('');
+
+    const problem = nameProblem('Room name', this.proposedName);
+    if (problem) {
+      this.formError.set(problem);
+      return;
+    }
 
     this.requestService.raise('channel-create', this.me, { name: this.proposedName }, this.groupId).subscribe({
       next: () => {

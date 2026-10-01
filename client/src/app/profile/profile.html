@@ -33,14 +33,14 @@
       </div>
 
       @if (avatarError()) {
-        <p class="error" role="alert">{{ avatarError() }}</p>
+        <p class="error" role="alert" animate.enter="fade-in">{{ avatarError() }}</p>
       }
 
       @if (formSuccess()) {
-        <p class="success" role="status">{{ formSuccess() }}</p>
+        <p class="success" role="status" animate.enter="fade-in">{{ formSuccess() }}</p>
       }
       @if (formError()) {
-        <p class="error" role="alert">{{ formError() }}</p>
+        <p class="error" role="alert" animate.enter="fade-in">{{ formError() }}</p>
       }
 
       <!-- read only view, replaced by the form when editing -->

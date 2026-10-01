@@ -21,8 +21,8 @@ describe('Group admin', () => {
     createGroup(admin, groupName).then(created => {
       group = created;
       adminPage = `/admin-dashboard/${group._id}`;
-      joinGroup(group._id, member);
-      joinGroup(group._id, minor);
+      joinGroup(group._id, member, admin);
+      joinGroup(group._id, minor, admin);
     });
   });
 
@@ -130,7 +130,7 @@ describe('Group admin', () => {
 
   it('reports a member, and the super admin bans them permanently', () => {
     // lifting a ban doesn't re-add them, so they rejoin
-    joinGroup(group._id, member);
+    joinGroup(group._id, member, admin);
 
     visitAs(admin, adminPage);
     memberRow().within(() => cy.contains('button', 'Ban…').click());
@@ -195,7 +195,7 @@ describe('Stepping down as a group admin', () => {
     register(second);
     createGroup(owner, `E2E Step ${unique()}`).then(created => {
       group = created;
-      joinGroup(group._id, second);
+      joinGroup(group._id, second, owner);
       cy.request('POST', `${API}/groups/${group._id}/admins`, { email: second.email, actorEmail: owner.email });
     });
   });

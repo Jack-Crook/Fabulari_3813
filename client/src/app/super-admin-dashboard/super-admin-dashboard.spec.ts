@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HttpTestingController } from '@angular/common/http/testing';
 
 import { SuperAdminDashboard } from './super-admin-dashboard';
-import { testProviders, signIn, signOut, makeGroup, makeUser, makeRequest, flushByUrl } from '../testing';
+import { testProviders, signIn, signOut, makeGroup, makeUser, makeRequest, flushByUrl, liveUpdates } from '../testing';
 
 describe('SuperAdminDashboard', () => {
   let component: SuperAdminDashboard;
@@ -97,18 +97,15 @@ describe('SuperAdminDashboard', () => {
     load([]);   // everything reloads after an action
   });
 
-  it('surfaces the 400 when a rejection has no reason', async () => {
+  it('asks for a reason before rejecting, without sending anything', async () => {
     await build();
     const request = makeRequest();
     load([request]);
 
-    component.rejectReason = '';
+    component.rejectReason = '  ';
     component.onReject(request);
 
-    mock.expectOne('http://localhost:3000/requests/r1/reject')
-      .flush({ error: 'A reason is required when rejecting a request' },
-             { status: 400, statusText: 'Bad Request' });
-
+    mock.expectNone('http://localhost:3000/requests/r1/reject');
     expect(component.actionError()).toContain('reason is required');
   });
 
@@ -150,5 +147,31 @@ describe('SuperAdminDashboard', () => {
     expect(component.confirmingId()).toBe('');
     mock.expectOne('http://localhost:3000/requests/r1/approve').flush(makeRequest({ status: 'approved' }));
     load([]);
+  });
+
+  it('shows the audit log a page at a time, and fetches the next page on request', async () => {
+    await build();
+    const page = Array.from({ length: 100 }, (_, i) => ({ _id: `a${i}`, at: '', type: 'Test', actor: 'x', detail: '' }));
+    flushByUrl(mock, {
+      '/requests': [], '/users': [], '/groups': [], '/bans': [], '/audit/types': [], '/audit': page,
+    });
+    // a full page came back, so there may be more
+    expect(component.moreAudit()).toBe(true);
+
+    component.onShowOlderAudit();
+    const next = mock.expectOne(r => r.url.endsWith('/audit') && r.params.get('skip') === '100');
+    next.flush([{ _id: 'old', at: '', type: 'Test', actor: 'x', detail: '' }]);
+
+    expect(component.auditLog().length).toBe(101);
+    expect(component.moreAudit()).toBe(false);
+  });
+
+  it('refreshes the queue when the server announces a change to the requests', async () => {
+    await build();
+    load();
+
+    liveUpdates.announce?.(null);
+    // the queue is fetched again
+    expect(mock.match(r => r.url.endsWith('/requests')).length).toBe(1);
   });
 });

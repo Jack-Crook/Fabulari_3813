@@ -203,6 +203,45 @@ describe('sendMessage', () => {
 });
 
 
+describe('typing, older messages and live updates', () => {
+    it('tells the others in the room someone is typing, but not the typist', async () => {
+        const alice = await joined('alice@test.com');
+        const bob = await joined('bob@test.com');
+
+        const toAlice = next(alice.socket, 'typing');
+        const bobHearsHimself = nothing(bob.socket, 'typing');
+        bob.socket.emit('typing');
+
+        assert.deepEqual(await toAlice, { email: 'bob@test.com' });
+        await bobHearsHimself;
+    });
+
+    it('sends the newest 50 on joining, says there are more, and loads the older ones on request', async () => {
+        const channelId = new ObjectId(ids.channelId);
+        const at = i => new Date(Date.UTC(2026, 0, 1, 0, 0, i)).toISOString();
+        // 55 messages, inserted oldest first so their _ids are in the same order
+        await ctx.db.collection('messages').insertMany(Array.from({ length: 55 }, (_, i) =>
+            ({ channelId, sender: 'alice@test.com', body: `message ${i}`, imageUrl: '', at: at(i) })));
+
+        const { socket, ack } = await joined('bob@test.com');
+        assert.equal(ack.history.length, 50);
+        assert.equal(ack.history[0].body, 'message 5');
+        assert.equal(ack.more, true);
+
+        const older = await emit(socket, 'loadOlder', { before: String(ack.history[0]._id) });
+        assert.deepEqual(older.messages.map(m => m.body), ['message 0', 'message 1', 'message 2', 'message 3', 'message 4']);
+        assert.equal(older.more, false);
+    });
+
+    it('tells every open page when a request is raised, with only the group id', async () => {
+        const socket = await client();
+        const announced = next(socket, 'requestsChanged');
+        await call('POST', '/requests', { type: 'group-join', requestedBy: 'carol@test.com', groupId: ids.groupId });
+        assert.deepEqual(await announced, { groupId: ids.groupId });
+    });
+});
+
+
 describe('being taken out of a room', () => {
     it('takes a member out when an admin removes them, so they stop receiving messages', async () => {
         const alice = await joined('alice@test.com');

@@ -49,7 +49,7 @@ describe('Accessibility', () => {
     register(outsider);
     createGroup(admin, `E2E A11y ${unique()}`).then(group => {
       groupId = group._id;
-      joinGroup(group._id, member);
+      joinGroup(group._id, member, admin);
       createRoom(group._id, 'General', admin).then(room => {
         channelId = room._id;
       });

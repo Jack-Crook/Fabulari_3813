@@ -62,10 +62,18 @@
     <!-- #scroller lets the component keep the newest message in view. role="log" makes a screen
          reader announce each new message, and tabindex lets keyboard users scroll the history -->
     <div class="messages" #scroller role="log" aria-label="Messages" tabindex="0">
+      <!-- the history comes 50 at a time. this asks for the 50 before the oldest one shown -->
+      @if (more()) {
+        <button type="button" class="more-button" (click)="loadOlder()" [disabled]="loadingOlder()">
+          {{ loadingOlder() ? 'Loading…' : 'Load older messages' }}
+        </button>
+      }
+
       <!-- tracked by _id, so only new messages are added -->
       @for (message of messages(); track message._id) {
-        <!-- mine on the right, others on the left (row-reverse in the css) -->
-        <div class="message-row" [class.mine]="message.sender === me">
+        <!-- mine on the right, others on the left (row-reverse in the css). animate.enter fades
+             each new message in -->
+        <div class="message-row" [class.mine]="message.sender === me" animate.enter="fade-in">
           <!-- alt="" since the name is right next to it -->
           @if (avatarFor(message.sender); as src) {
             <img class="chat-avatar" [src]="src" alt="" />
@@ -102,6 +110,13 @@
       }
     </div>
 
+    <!-- "x is typing", live from the socket. not a live region: it changes too often to read out -->
+    <p class="typing">
+      @if (typing()) {
+        {{ nameFor(typing()) }} is typing…
+      }
+    </p>
+
     <!-- enter or the button submits, which sends over the socket -->
     @if (canPost()) {
       <!-- the attached image, already uploaded -->
@@ -129,6 +144,7 @@
                [style.color]="ink()"
                [class.on-dark]="onDark()"
                [(ngModel)]="draft"
+               (input)="onTyping()"
                placeholder="Message {{ channel()?.name }}" />
         <!-- needs text or an image, and no upload in progress -->
         <button type="submit" [disabled]="(!draft.trim() && !pendingImage()) || uploading()">Send</button>

@@ -7,10 +7,10 @@
 
 <!-- one message bar for the page. alert is read out straight away, status at the next pause. -->
 @if (formError()) {
-  <p class="banner error" role="alert">{{ formError() }}</p>
+  <p class="banner error" role="alert" animate.enter="fade-in">{{ formError() }}</p>
 }
 @if (formSuccess()) {
-  <p class="banner success" role="status">{{ formSuccess() }}</p>
+  <p class="banner success" role="status" animate.enter="fade-in">{{ formSuccess() }}</p>
 }
 
 <div class="dashboard-body">
@@ -122,7 +122,12 @@
             </p>
             <p class="group-desc">{{ group.description }}</p>
           </div>
-          <button type="button" (click)="onJoin(group)">Join</button>
+          <!-- joining needs an admin's approval, so once asked the button says so instead -->
+          @if (awaitingJoin(group)) {
+            <button type="button" disabled>Requested</button>
+          } @else {
+            <button type="button" (click)="onJoin(group)" [disabled]="joining() === group._id">Request to join</button>
+          }
         </div>
       }
 

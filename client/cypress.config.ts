@@ -30,6 +30,12 @@ export default defineConfig({
           return new Promise(resolve => entry.socket.emit('sendMessage', { body }, resolve));
         },
 
+        // this user starts typing, so the browser should show "x is typing"
+        socketTyping({ email }: { email: string }) {
+          sockets.get(email)?.socket.emit('typing');
+          return null;
+        },
+
         socketReceived({ email }: { email: string }) {
           return sockets.get(email)?.received ?? [];
         },

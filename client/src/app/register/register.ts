@@ -2,6 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Auth } from '../auth';
+import { emailProblem, passwordProblem, nameProblem, dobProblem, firstProblem } from '../validation';
 import { RouterLink } from '@angular/router';
 
 
@@ -32,9 +33,20 @@ export class Register {
     if (this.submitting()) {
       return;
     }
-    this.submitting.set(true);
     this.errormessage.set('');
     this.successmessage.set('');
+
+    // the same rules as the server, checked first so the user is told without a round trip
+    const problem = firstProblem(
+      emailProblem(this.email),
+      nameProblem('Display name', this.username, false),
+      dobProblem(this.dob),
+      passwordProblem(this.password));
+    if (problem) {
+      this.errormessage.set(problem);
+      return;
+    }
+    this.submitting.set(true);
 
     this.auth.register(this.email, this.password, this.username, this.dob).subscribe({
       next: res => {

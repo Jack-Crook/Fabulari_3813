@@ -18,6 +18,11 @@ function fakeChat() {
     notice: signal<RoomNotice | null>(null),
     error: signal(''),
     removed: signal(false),
+    typing: signal(''),
+    more: signal(false),
+    loadingOlder: signal(false),
+    notifyTyping: vi.fn(),
+    loadOlder: vi.fn(),
     joinRoom: vi.fn(),
     send: vi.fn(),
     leaveRoom: vi.fn(),
@@ -312,6 +317,36 @@ describe('ChatRoom', () => {
     expect(component.canPost()).toBe(false);
     expect(page.querySelector('.composer')).toBeNull();
     expect(page.querySelector('.chat-error')?.textContent).toContain('banned');
+  });
+
+  it('shows who is typing, by display name', async () => {
+    await build();
+    load(makeGroup(), [{ email: 'admin@test.com', username: 'Ada', avatarUrl: '' }]);
+    chat.typing.set('admin@test.com');
+    await fixture.whenStable();
+
+    expect((fixture.nativeElement as HTMLElement).querySelector('.typing')?.textContent).toContain('Ada is typing');
+  });
+
+  it('tells the service on every keystroke, and the service decides how often to send', async () => {
+    await build();
+    load();
+    component.onTyping();
+    expect(chat.notifyTyping).toHaveBeenCalled();
+  });
+
+  it('offers older messages only when there are more, and asks the service for them', async () => {
+    await build();
+    load();
+    chat.messages.set([makeMessage()]);
+    await fixture.whenStable();
+    const page = fixture.nativeElement as HTMLElement;
+    expect(page.querySelector('.more-button')).toBeNull();
+
+    chat.more.set(true);
+    await fixture.whenStable();
+    (page.querySelector('.more-button') as HTMLButtonElement).click();
+    expect(chat.loadOlder).toHaveBeenCalled();
   });
 
   it('shows only the time for today\'s messages, and the date as well for older ones', async () => {
