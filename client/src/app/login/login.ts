@@ -9,7 +9,6 @@ import { Auth, LoginResponse } from '../auth';
   selector: 'app-login',
   imports: [FormsModule, RouterLink],
   templateUrl: './login.html',
-  styleUrl: './login.css',
 })
 export class Login {
   private auth = inject(Auth);

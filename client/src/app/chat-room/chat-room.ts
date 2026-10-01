@@ -43,11 +43,13 @@ export class ChatRoom {
   // ChatService's own signals, not copies, so socket updates redraw the page
   messages = this.chat.messages;
   present = this.chat.present;
-  notice = this.chat.notice;        // "x joined" / "x left"
+  notice = this.chat.notice;        // who joined or left, shown by name in the template
+  removed = this.chat.removed;      // taken out of the room by the server
   error = this.chat.error;
 
-  // members only get the message box (the server refuses others anyway)
-  canPost = computed(() => this.group()?.memberEmails.includes(this.me) ?? false);
+  // members only get the message box (the server refuses others anyway), and it goes if the
+  // server takes us out of the room
+  canPost = computed(() => (this.group()?.memberEmails.includes(this.me) ?? false) && !this.removed());
 
   draft = '';   // plain, [(ngModel)] writes it
 

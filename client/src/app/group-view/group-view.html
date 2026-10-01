@@ -1,5 +1,6 @@
 <app-navbar></app-navbar>
 
+<main>
 @if (formError()) {
   <p class="banner error" role="alert">{{ formError() }}</p>
 }
@@ -10,7 +11,7 @@
 <div class="group-body">
 
   <!-- every group down the left, the current one outlined -->
-  <aside class="group-sidebar">
+  <aside class="group-sidebar" aria-label="All groups">
     <h2>Groups</h2>
 
     @for (item of groups(); track item._id) {
@@ -90,7 +91,7 @@
         @if (isMember() && !isGroupAdmin() && !isSuper) {
           <form class="propose-room" (ngSubmit)="onPropose()">
             <!-- aria-label, since a placeholder isn't a label -->
-            <input name="proposed" type="text" placeholder="Propose a new room" aria-label="Name of the room to propose"
+            <input name="proposed" type="text" maxlength="50" placeholder="Propose a new room" aria-label="Name of the room to propose"
                    [(ngModel)]="proposedName" required />
             <button type="submit">Propose</button>
           </form>
@@ -105,3 +106,4 @@
   </section>
 
 </div>
+</main>

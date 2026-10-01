@@ -1,9 +1,10 @@
 <app-navbar></app-navbar>
 
+<main>
 <div class="chat-body">
 
   <!-- left: the group's other rooms -->
-  <aside class="rooms-sidebar">
+  <aside class="rooms-sidebar" aria-label="Rooms in this group">
     <h2>Rooms</h2>
 
     @for (item of channels(); track item._id) {
@@ -34,8 +35,8 @@
     <p class="presence-strip">
       <span class="presence-label">In the room:</span>
       @for (person of present(); track person) {
-        <span class="presence-person">
-          {{ person }}
+        <span class="presence-person" [title]="person">
+          {{ nameFor(person) }}
           @if (isAdmin(person)) {
             <span class="admin-tag">Admin</span>
           }
@@ -46,15 +47,21 @@
       }
     </p>
 
-    <!-- join/leave notice. role="status" is read out without moving focus. -->
-    <p class="notice" role="status">{{ notice() }}</p>
+    <!-- join/leave notice, by display name. role="status" is read out without moving focus, and the
+         element is always there (only its text changes) so screen readers notice the change -->
+    <p class="notice" role="status">
+      @if (notice(); as n) {
+        {{ nameFor(n.email) }} {{ n.event }}
+      }
+    </p>
 
     @if (error()) {
       <p class="chat-error" role="alert">{{ error() }}</p>
     }
 
-    <!-- #scroller lets the component keep the newest message in view -->
-    <div class="messages" #scroller>
+    <!-- #scroller lets the component keep the newest message in view. role="log" makes a screen
+         reader announce each new message, and tabindex lets keyboard users scroll the history -->
+    <div class="messages" #scroller role="log" aria-label="Messages" tabindex="0">
       <!-- tracked by _id, so only new messages are added -->
       @for (message of messages(); track message._id) {
         <!-- mine on the right, others on the left (row-reverse in the css) -->
@@ -117,7 +124,7 @@
           {{ uploading() ? '…' : 'Image' }}
         </button>
 
-        <input name="draft" type="text" autocomplete="off" aria-label="Message"
+        <input name="draft" type="text" autocomplete="off" maxlength="2000" aria-label="Message"
                [style.background]="theme()"
                [style.color]="ink()"
                [class.on-dark]="onDark()"
@@ -130,12 +137,12 @@
   </section>
 
   <!-- right: who is in the room, live -->
-  <aside class="presence-sidebar">
+  <aside class="presence-sidebar" aria-label="People in this room">
     <h2>Currently In</h2>
 
     @for (person of present(); track person) {
-      <p class="person">
-        {{ person }}
+      <p class="person" [title]="person">
+        {{ nameFor(person) }}
         @if (isAdmin(person)) {
           <span class="admin-tag">Admin</span>
         }
@@ -148,3 +155,4 @@
   </aside>
 
 </div>
+</main>

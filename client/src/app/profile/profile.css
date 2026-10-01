@@ -43,6 +43,7 @@
   margin: 0;
   font-size: 18px;
   font-weight: 600;
+  overflow-wrap: anywhere;     /* a long name with no spaces wraps instead of running off a phone screen */
 }
 
 /* 'user' or 'super' */
@@ -77,7 +78,7 @@
 .locked {
   display: block;
   font-size: 12px;
-  color: #9CA3AF;
+  color: #6B7280;              /* 4.83:1 on white, #9CA3AF was only 2.54:1 */
 }
 
 /* Cancel is outlined so it doesn't compete with Save */

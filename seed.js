@@ -3,6 +3,8 @@
 //
 // the json uses string ids (g1, c1...) and mongo makes its own _id, so groups are loaded first
 // and a map from old id to new _id is used to rewrite the rooms' and requests' groupId.
+//
+// the indexes aren't made here: server.js creates them every time it starts (ensureIndexes).
 
 const fs = require('fs');
 const path = require('path');
@@ -93,15 +95,6 @@ async function seed() {
   if (bans.length) {
     await db.collection('banned').insertMany(bans);
   }
-
-  // unique emails and group names enforced by mongo itself. group names ignore case, with the
-  // same collation server.js queries with.
-  await db.collection('users').createIndex({ email: 1 }, { unique: true });
-  await db.collection('banned').createIndex({ email: 1 }, { unique: true });
-  await db.collection('groups').createIndex({ name: 1 }, { unique: true, collation: { locale: 'en', strength: 2 } });
-  // the request queues and audit page filter, then sort newest first
-  await db.collection('requests').createIndex({ status: 1, createdAt: -1 });
-  await db.collection('audit').createIndex({ type: 1, at: -1 });
 
   // warn about group members in the json with no account
   const emails = new Set(users.map(u => u.email));

@@ -1,6 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Navbar } from '../navbar/navbar';
@@ -19,6 +19,7 @@ export class AdminDashboard {
   private groupService = inject(GroupService);
   private requestService = inject(RequestService);
   private route = inject(ActivatedRoute);
+  private router = inject(Router);
   private auth = inject(Auth);
 
   private groupId = '';           // for reloading after an edit
@@ -215,6 +216,11 @@ export class AdminDashboard {
 
     this.groupService.removeMember(this.groupId, email, this.me).subscribe({
       next: () => {
+        // leaving yourself: this page is for admins of the group, and you're not even a member now
+        if (email === this.me) {
+          this.router.navigate(['/user-dashboard']);
+          return;
+        }
         this.actionSuccess.set(`${email} removed from this group.`);
         this.confirmingRemoveEmail.set('');
         this.load();
@@ -241,9 +247,13 @@ export class AdminDashboard {
 
     this.groupService.demoteAdmin(this.groupId, email, this.me).subscribe({
       next: () => {
-        this.actionSuccess.set(email === this.me
-          ? 'You are no longer an admin of this group.'
-          : `${email} is no longer an admin of this group.`);
+        // stepping down: every control on this page would now answer 403, so go back to the
+        // group, where you're still a member
+        if (email === this.me) {
+          this.router.navigate(['/groups', this.groupId]);
+          return;
+        }
+        this.actionSuccess.set(`${email} is no longer an admin of this group.`);
         this.load();
       },
       error: (err: HttpErrorResponse) => this.showError(err),
