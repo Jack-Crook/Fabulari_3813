@@ -1,34 +1,23 @@
 .super-admin-body {
   display: grid;
-  grid-template-columns: 1fr 1fr;   /* the four-quadrant layout from the wireframe */
+  /* the four-quadrant layout from the wireframe. minmax(0, 1fr) rather than 1fr, which can't shrink
+     below its content, so one long email in the audit log used to push the page wider than the screen */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 24px;
   padding: 24px;
   min-height: calc(100vh - 74px);
   background: #FAFAFA;
 }
 
+/* a grid item won't shrink below its content unless told it can */
+.panel {
+  min-width: 0;
+}
+
 h2 {
   font-size: 1.25rem;
   font-weight: 600;
   margin: 0 0 16px;
-}
-
-/* the feedback bar, same as the other dashboards */
-.banner {
-  margin: 0;
-  padding: 12px 24px;
-  font-size: 14px;
-  border-bottom: 1px solid #E2E4E9;
-}
-
-.banner.error {
-  background: #FEF2F2;
-  color: #B91C1C;
-}
-
-.banner.success {
-  background: #F0FDF4;
-  color: #15803D;
 }
 
 /* the short note under a panel heading, explaining spec rules like no unban */
@@ -74,7 +63,8 @@ h2 {
 /* details take the spare width, buttons stay on the right */
 .request-body {
   flex: 1;
-  min-width: 200px;
+  min-width: min(200px, 100%);   /* wraps under the buttons when there isn't room, never wider than the row */
+  overflow-wrap: anywhere;       /* a long email in "requested by" wraps */
 }
 
 .request-detail {
@@ -212,6 +202,7 @@ h2 {
   padding: 12px 16px;
   font-size: 14px;
   border-top: 1px solid #E2E4E9;
+  overflow-wrap: anywhere;       /* long emails and details wrap inside the cell */
 }
 
 /* the audit log scrolls inside its panel, header fixed */
@@ -226,12 +217,8 @@ h2 {
 
 @media (max-width: 768px) {
   .super-admin-body {
-    grid-template-columns: 1fr;   /* the four quadrants stack into one column */
+    grid-template-columns: minmax(0, 1fr);   /* the four quadrants stack into one column */
     padding: 16px;
-  }
-
-  .banner {
-    padding: 12px 16px;
   }
 
   .section-head {

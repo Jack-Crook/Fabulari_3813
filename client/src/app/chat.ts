@@ -12,6 +12,12 @@ export interface ChatMessage {
   at: string;             // ISO, so string order = date order
 }
 
+// a join or leave notice. the email, not a ready-made sentence, so the page can show the display name
+export interface RoomNotice {
+  email: string;
+  event: 'joined' | 'left';
+}
+
 // the joinRoom ack, sent only to the joiner
 interface JoinResult {
   history?: ChatMessage[];
@@ -33,8 +39,9 @@ export class ChatService {
   // property would update but the screen wouldn't redraw.
   messages = signal<ChatMessage[]>([]);
   present = signal<string[]>([]);      // who is in the room, from the presence event
-  notice = signal('');                 // "x joined" / "x left", shown briefly
+  notice = signal<RoomNotice | null>(null);   // someone joined or left, shown briefly
   error = signal('');
+  removed = signal(false);             // the server took us out of the room (removed, banned, room deleted)
 
   // one connection, reused for every room
   private connect(): Socket {
@@ -53,8 +60,18 @@ export class ChatService {
     socket.on('presence', (people: string[]) => this.present.set(people));
 
     // the spec wants a notice as well as the live list
-    socket.on('userJoined', ({ email }: { email: string }) => this.flash(`${email} joined`));
-    socket.on('userLeft', ({ email }: { email: string }) => this.flash(`${email} left`));
+    socket.on('userJoined', ({ email }: { email: string }) => this.flash(email, 'joined'));
+    socket.on('userLeft', ({ email }: { email: string }) => this.flash(email, 'left'));
+
+    // the server has taken us out of the room: we were removed or banned from the group, or the
+    // room or group was deleted. the reason is shown, and the page hides the message box.
+    socket.on('removedFromRoom', ({ reason }: { reason: string }) => {
+      this.currentRoom = undefined;     // so a reconnect doesn't try to rejoin
+      this.removed.set(true);
+      this.present.set([]);
+      this.notice.set(null);
+      this.error.set(reason);
+    });
 
     socket.on('connect_error', () => this.error.set('Lost connection to the chat server.'));
 
@@ -70,9 +87,10 @@ export class ChatService {
   }
 
   // shows a notice for 4s. the check stops an old timer clearing a newer notice.
-  private flash(text: string) {
-    this.notice.set(text);
-    setTimeout(() => this.notice.update(current => (current === text ? '' : current)), 4000);
+  private flash(email: string, event: RoomNotice['event']) {
+    const notice = { email, event };
+    this.notice.set(notice);
+    setTimeout(() => this.notice.update(current => (current === notice ? null : current)), 4000);
   }
 
   // the server checks membership, then remembers the email for this socket
@@ -82,8 +100,9 @@ export class ChatService {
 
     this.messages.set([]);     // clear the old room first so it never shows
     this.present.set([]);       // under the new room's name
-    this.notice.set('');
+    this.notice.set(null);
     this.error.set('');
+    this.removed.set(false);
 
     socket.emit('joinRoom', { channelId, email }, (res: JoinResult) => {
       // ignore a late reply from a room already left (quick room switching)
@@ -134,6 +153,7 @@ export class ChatService {
     this.currentRoom = undefined;     // so a reconnect doesn't rejoin
     this.messages.set([]);
     this.present.set([]);
-    this.notice.set('');
+    this.notice.set(null);
+    this.removed.set(false);
   }
 }

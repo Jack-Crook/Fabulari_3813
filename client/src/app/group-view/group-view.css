@@ -68,8 +68,7 @@
 .banner-desc {
   margin: 4px 0 0;
   font-size: 14px;
-  color: inherit;
-  opacity: 0.75;
+  color: inherit;              /* the full ink colour. fading it with opacity dropped it under 4.5:1 */
 }
 
 .banner-meta {
@@ -106,24 +105,6 @@
 
 .manage-link:hover {
   text-decoration: underline;
-}
-
-/* the feedback bar, same pattern as the dashboards */
-.banner {
-  margin: 0;
-  padding: 12px 24px;
-  font-size: 14px;
-  border-bottom: 1px solid #E2E4E9;
-}
-
-.banner.error {
-  background: #FEF2F2;
-  color: #B91C1C;
-}
-
-.banner.success {
-  background: #F0FDF4;
-  color: #15803D;
 }
 
 .rooms {
@@ -189,8 +170,7 @@
 
 .room-count {
   font-size: 12px;
-  opacity: 0.85;
-  flex-shrink: 0;
+  flex-shrink: 0;              /* no opacity: faded white on the blue pill was 3.74:1 */
 }
 
 .empty {
@@ -255,9 +235,5 @@
   .group-banner {
     text-align: left;
     padding: 16px;
-  }
-
-  .banner {
-    padding: 12px 16px;
   }
 }

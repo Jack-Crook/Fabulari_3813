@@ -1,7 +1,7 @@
-<div class="page">
+<main class="page">
   <div class="card">
     <img class="brand" src="/fabulari-logo.png" alt="Fabulari">
-    <h2>Create Account</h2>
+    <h1>Create Account</h1>
 
     <!-- runs onSubmit() on submit -->
     <form (ngSubmit)="onSubmit()">
@@ -14,7 +14,7 @@
       <div class="field">
         <label for="username">Display name <span class="optional">optional</span></label>
         <!-- blank defaults to the part of the email before the @ -->
-        <input id="username" name="username" type="text" [(ngModel)]="username" />
+        <input id="username" name="username" type="text" maxlength="50" [(ngModel)]="username" />
       </div>
 
       <div class="field">
@@ -43,4 +43,4 @@
 
     <p class="switch">Already have an account? <a routerLink="/login">Log in</a></p>
   </div>
-</div>
+</main>

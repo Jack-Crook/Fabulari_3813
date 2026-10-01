@@ -6,7 +6,7 @@ import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 
 import { ChatRoom } from './chat-room';
-import { ChatService, ChatMessage } from '../chat';
+import { ChatService, ChatMessage, RoomNotice } from '../chat';
 import { GroupMember } from '../group';
 import { testProviders, signIn, signOut, makeGroup, makeChannel, flushByUrl } from '../testing';
 
@@ -15,8 +15,9 @@ function fakeChat() {
   return {
     messages: signal<ChatMessage[]>([]),
     present: signal<string[]>([]),
-    notice: signal(''),
+    notice: signal<RoomNotice | null>(null),
     error: signal(''),
+    removed: signal(false),
     joinRoom: vi.fn(),
     send: vi.fn(),
     leaveRoom: vi.fn(),
@@ -274,6 +275,43 @@ describe('ChatRoom', () => {
     // not in the members list any more, e.g. banned since they wrote it
     expect(component.nameFor('gone@test.com')).toBe('gone@test.com');
     expect(component.initialFor('gone@test.com')).toBe('G');
+  });
+
+  it('lists who is in the room by display name, with the email on hover', async () => {
+    await build();
+    load(makeGroup(), [{ email: 'admin@test.com', username: 'Ada', avatarUrl: '' }]);
+    chat.present.set(['admin@test.com']);
+    await fixture.whenStable();
+
+    const person = (fixture.nativeElement as HTMLElement).querySelector('.person')!;
+    expect(person.textContent).toContain('Ada');
+    expect(person.getAttribute('title')).toBe('admin@test.com');
+  });
+
+  it('shows who joined by display name', async () => {
+    await build();
+    load(makeGroup(), [{ email: 'admin@test.com', username: 'Ada', avatarUrl: '' }]);
+    chat.notice.set({ email: 'admin@test.com', event: 'joined' });
+    await fixture.whenStable();
+
+    const notice = (fixture.nativeElement as HTMLElement).querySelector('.notice')!;
+    expect(notice.textContent?.trim()).toBe('Ada joined');
+  });
+
+  it('hides the message box once the server takes us out of the room', async () => {
+    await build('member@test.com');
+    load();
+    expect(component.canPost()).toBe(true);
+
+    // what the service does when the server emits removedFromRoom
+    chat.removed.set(true);
+    chat.error.set('You were banned from this group');
+    await fixture.whenStable();
+
+    const page = fixture.nativeElement as HTMLElement;
+    expect(component.canPost()).toBe(false);
+    expect(page.querySelector('.composer')).toBeNull();
+    expect(page.querySelector('.chat-error')?.textContent).toContain('banned');
   });
 
   it('shows only the time for today\'s messages, and the date as well for older ones', async () => {

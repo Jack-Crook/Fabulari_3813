@@ -5,14 +5,16 @@ const { describe, it, before, after, beforeEach, afterEach } = require('node:tes
 const assert = require('node:assert/strict');
 const { ObjectId } = require('mongodb');
 const { io: connect } = require('socket.io-client');
-const { startServer, reset, uploadImage } = require('./helpers');
+const { startServer, reset, api, uploadImage } = require('./helpers');
 
 let ctx;
 let ids;
+let call;           // REST calls, for the tests where a route changes who is in a room
 let open = [];      // every client a test opened, disconnected in afterEach
 
 before(async () => {
     ctx = await startServer('fabulari_test_sockets');
+    call = api(ctx.base);
 });
 after(() => ctx.stop());
 beforeEach(async () => {
@@ -145,6 +147,12 @@ describe('sendMessage', () => {
         assert.equal((await emit(socket, 'sendMessage', { body: '   ' })).error, 'Message cannot be empty');
     });
 
+    it('refuses a message over 2000 characters', async () => {
+        const { socket } = await joined('bob@test.com');
+        assert.match((await emit(socket, 'sendMessage', { body: 'x'.repeat(2001) })).error, /at most 2000/);
+        assert.equal(await ctx.db.collection('messages').countDocuments(), 0);
+    });
+
     it('broadcasts to everyone in the room, the sender included, and stores it', async () => {
         const alice = await joined('alice@test.com');
         const bob = await joined('bob@test.com');
@@ -191,6 +199,37 @@ describe('sendMessage', () => {
         assert.match(outside.error, /could not be found/);
         assert.match(madeUp.error, /could not be found/);
         assert.equal(await ctx.db.collection('messages').countDocuments(), 0);
+    });
+});
+
+
+describe('being taken out of a room', () => {
+    it('takes a member out when an admin removes them, so they stop receiving messages', async () => {
+        const alice = await joined('alice@test.com');
+        const bobArrived = waitFor(alice.socket, 'presence', list => list.includes('bob@test.com'));
+        const bob = await joined('bob@test.com');
+        await bobArrived;
+
+        const told = next(bob.socket, 'removedFromRoom');
+        const gone = waitFor(alice.socket, 'presence', list => !list.includes('bob@test.com'));
+        assert.equal((await call('DELETE', `/groups/${ids.groupId}/members/bob@test.com?actorEmail=alice@test.com`)).status, 200);
+
+        assert.deepEqual(await told, { reason: 'You are no longer a member of this group' });
+        assert.deepEqual(await gone, ['alice@test.com']);
+
+        // alice's next message doesn't reach bob any more
+        const bobHearsNothing = nothing(bob.socket, 'newMessage');
+        await emit(alice.socket, 'sendMessage', { body: 'after bob left' });
+        await bobHearsNothing;
+    });
+
+    it('closes a room for everyone in it when the room is deleted', async () => {
+        const bob = await joined('bob@test.com');
+        const told = next(bob.socket, 'removedFromRoom');
+        assert.equal((await call('DELETE', `/channels/${ids.channelId}?actorEmail=alice@test.com`)).status, 200);
+
+        assert.deepEqual(await told, { reason: 'This room has been deleted' });
+        assert.equal((await emit(bob.socket, 'sendMessage', { body: 'anyone?' })).error, 'Join a room first');
     });
 });
 

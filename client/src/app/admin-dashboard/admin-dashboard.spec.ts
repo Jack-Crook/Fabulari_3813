@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HttpTestingController } from '@angular/common/http/testing';
+import { Router } from '@angular/router';
 
 import { AdminDashboard } from './admin-dashboard';
 import { testProviders, signIn, signOut, makeGroup, makeChannel, makeRequest, flushByUrl } from '../testing';
@@ -184,6 +185,40 @@ describe('AdminDashboard', () => {
     component.startRemoving('member@test.com');
     component.confirmingRemoveEmail.set('');
     mock.expectNone(r => r.method === 'DELETE');
+  });
+
+  it('goes back to the group page after stepping down, since the admin controls would all fail now', async () => {
+    await build();
+    load(makeGroup({ _id: '', adminEmails: ['admin@test.com', 'member@test.com'] }));
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+
+    component.onDemote('admin@test.com');
+    mock.expectOne(r => r.method === 'DELETE' && r.url.includes('/admins/')).flush(makeGroup());
+
+    expect(navigate).toHaveBeenCalledWith(['/groups', '']);
+  });
+
+  it('goes to the dashboard after leaving the group from this page', async () => {
+    await build();
+    load(makeGroup({ _id: '', adminEmails: ['admin@test.com', 'member@test.com'] }));
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+
+    component.onRemoveMember('admin@test.com');
+    mock.expectOne(r => r.method === 'DELETE' && r.url.includes('/members/')).flush(makeGroup());
+
+    expect(navigate).toHaveBeenCalledWith(['/user-dashboard']);
+  });
+
+  it('stays on the page after demoting someone else', async () => {
+    await build();
+    load(makeGroup({ _id: '', adminEmails: ['admin@test.com', 'member@test.com'] }));
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+
+    component.onDemote('member@test.com');
+    mock.expectOne(r => r.method === 'DELETE' && r.url.includes('/admins/')).flush(makeGroup());
+
+    expect(navigate).not.toHaveBeenCalled();
+    expect(component.actionSuccess()).toContain('member@test.com');
   });
 
   it('asks before removing a member, with one box open under a member at a time', async () => {

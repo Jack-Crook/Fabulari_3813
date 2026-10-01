@@ -91,8 +91,7 @@
 }
 
 .chat-group {
-  font-size: 13px;
-  opacity: 0.85;
+  font-size: 13px;             /* full ink colour, a faded one could fail contrast on some themes */
 }
 
 /* only on phones, see the media query at the bottom */
@@ -163,7 +162,7 @@
 .message-sender {
   margin: 0 0 4px;
   font-size: 12px;
-  color: #6B7280;
+  color: #4B5563;              /* 6.46:1 on my own (blue) bubbles. #6B7280 was 4.13:1 there */
 }
 
 .admin-tag {
@@ -179,6 +178,7 @@
 .message-body {
   margin: 0;
   font-size: 14px;
+  overflow-wrap: anywhere;     /* a long link or word wraps inside the bubble instead of widening the chat */
 }
 
 /* the message box along the bottom */

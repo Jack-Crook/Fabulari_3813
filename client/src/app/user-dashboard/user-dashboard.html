@@ -1,5 +1,10 @@
 <app-navbar></app-navbar>
 
+<main>
+<!-- the page heading for screen readers. the design has none, the panels have their own h2s -->
+<h1 class="visually-hidden">Dashboard</h1>
+
+
 <!-- one message bar for the page. alert is read out straight away, status at the next pause. -->
 @if (formError()) {
   <p class="banner error" role="alert">{{ formError() }}</p>
@@ -31,17 +36,17 @@
 
         <div class="field">
           <label for="new-name">Group name</label>
-          <input id="new-name" name="new-name" type="text" [(ngModel)]="newName" required />
+          <input id="new-name" name="new-name" type="text" maxlength="50" [(ngModel)]="newName" required />
         </div>
 
         <div class="field">
           <label for="new-description">Description</label>
-          <input id="new-description" name="new-description" type="text" [(ngModel)]="newDescription" />
+          <input id="new-description" name="new-description" type="text" maxlength="500" [(ngModel)]="newDescription" />
         </div>
 
         <div class="field">
           <label for="new-age">Age limit (0 for no limit)</label>
-          <input id="new-age" name="new-age" type="number" min="0" [(ngModel)]="newAgeLimit" />
+          <input id="new-age" name="new-age" type="number" min="0" max="120" step="1" [(ngModel)]="newAgeLimit" />
         </div>
 
         <div class="field">
@@ -129,3 +134,4 @@
     </section>
   }
 </div>
+</main>

@@ -1,5 +1,10 @@
 <app-navbar></app-navbar>
 
+<main>
+<!-- the page heading for screen readers. the design shows the name in the settings pills instead -->
+<h1 class="visually-hidden">Manage {{ group()?.name }}</h1>
+
+
 <!-- one message bar for the page -->
 @if (actionError()) {
   <p class="banner error" role="alert">{{ actionError() }}</p>
@@ -37,17 +42,17 @@
       <form class="settings-form" (ngSubmit)="onSaveSettings()">
         <div class="field">
           <label for="edit-name">Group name</label>
-          <input id="edit-name" name="edit-name" type="text" [(ngModel)]="formName" required />
+          <input id="edit-name" name="edit-name" type="text" maxlength="50" [(ngModel)]="formName" required />
         </div>
 
         <div class="field">
           <label for="edit-description">Description</label>
-          <input id="edit-description" name="edit-description" type="text" [(ngModel)]="formDescription" />
+          <input id="edit-description" name="edit-description" type="text" maxlength="500" [(ngModel)]="formDescription" />
         </div>
 
         <div class="field">
           <label for="edit-age">Age limit (0 for no limit)</label>
-          <input id="edit-age" name="edit-age" type="number" min="0" [(ngModel)]="formAgeLimit" />
+          <input id="edit-age" name="edit-age" type="number" min="0" max="120" step="1" [(ngModel)]="formAgeLimit" />
           <!-- warned before saving, since raising it removes under-age members -->
           <span class="hint">Raising this removes members who are now under the limit.</span>
         </div>
@@ -77,7 +82,7 @@
     <!-- 409 for a duplicate name in this group -->
     <form class="add-room" (ngSubmit)="onAddRoom()">
       <!-- aria-label, since a placeholder isn't a label -->
-      <input id="new-room" name="new-room" type="text" placeholder="New room name" aria-label="New room name"
+      <input id="new-room" name="new-room" type="text" maxlength="50" placeholder="New room name" aria-label="New room name"
              [(ngModel)]="newRoomName" required />
       <button type="submit">Add Room</button>
     </form>
@@ -88,7 +93,7 @@
         @if (renamingChannelId() === channel._id) {
           <form class="rename-room" (ngSubmit)="onRenameRoom(channel)">
             <!-- the label names the room being renamed -->
-            <input name="rename" type="text" [(ngModel)]="renameValue" required
+            <input name="rename" type="text" maxlength="50" [(ngModel)]="renameValue" required
                    [attr.aria-label]="'New name for ' + channel.name" />
             <button type="submit" class="inline">Save</button>
             <button type="button" class="inline secondary" (click)="renamingChannelId.set('')">Cancel</button>
@@ -121,97 +126,101 @@
     }
 
     <h2>Members</h2>
-    <table class="members-table">
-        <thead>
-        <tr>
-          <th>Email</th>
-          <th>Role</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        <!-- members are stored as emails on the group -->
-        @for (email of group()?.memberEmails ?? []; track email) {
+    <!-- on a phone the table scrolls sideways inside this box instead of making the whole page scroll.
+         tabindex and the name let keyboard users scroll it too -->
+    <div class="table-scroll" tabindex="0" role="region" aria-label="Members">
+      <table class="members-table">
+          <thead>
           <tr>
-            <td>{{ email }}</td>
-            <td>
-              {{ roleOf(email) }}
-              @if (email === me) {
-                <span class="you-tag">you</span>
-              }
-            </td>
-            <td class="actions-cell">
-              <!-- the same buttons for everyone, stepping down uses the demote endpoint -->
-              @if (isAdmin(email)) {
-                <!-- disabled on the last admin (the server also answers 409) -->
-                <button type="button" class="inline secondary"
-                        [disabled]="isLastAdmin(email)"
-                        (click)="onDemote(email)">
-                  {{ email === me ? 'Step Down' : 'Demote' }}
-                </button>
-              } @else {
-                <button type="button" class="inline" (click)="onPromote(email)">Promote</button>
-              }
+            <th>Email</th>
+            <th>Role</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- members are stored as emails on the group -->
+          @for (email of group()?.memberEmails ?? []; track email) {
+            <tr>
+              <td>{{ email }}</td>
+              <td>
+                {{ roleOf(email) }}
+                @if (email === me) {
+                  <span class="you-tag">you</span>
+                }
+              </td>
+              <td class="actions-cell">
+                <!-- the same buttons for everyone, stepping down uses the demote endpoint -->
+                @if (isAdmin(email)) {
+                  <!-- disabled on the last admin (the server also answers 409) -->
+                  <button type="button" class="inline secondary"
+                          [disabled]="isLastAdmin(email)"
+                          (click)="onDemote(email)">
+                    {{ email === me ? 'Step Down' : 'Demote' }}
+                  </button>
+                } @else {
+                  <button type="button" class="inline" (click)="onPromote(email)">Promote</button>
+                }
 
-              <!-- this group only, the account still exists -->
-              <button type="button" class="danger"
-                      [disabled]="isLastAdmin(email)"
-                      (click)="startRemoving(email)">Remove</button>
-
-              <!-- opens the ban/report box below. not shown for yourself. -->
-              @if (email !== me) {
+                <!-- this group only, the account still exists -->
                 <button type="button" class="danger"
                         [disabled]="isLastAdmin(email)"
-                        (click)="startBanning(email)">Ban…</button>
-              }
-            </td>
-          </tr>
+                        (click)="startRemoving(email)">Remove</button>
 
-          <!-- the remove confirm, under the row -->
-          @if (confirmingRemoveEmail() === email) {
-            <tr class="ban-row">
-              <td colspan="3">
-                <p class="confirm-text" [id]="'confirm-remove-' + email">
-                  {{ email === me ? 'Leave this group?' : 'Remove ' + email + ' from this group?' }}
-                  They can join again later unless they're banned.
-                </p>
-                <div class="row-actions">
-                  <button type="button" class="danger solid" (click)="onRemoveMember(email)">
-                    {{ email === me ? 'Leave' : 'Remove' }}
-                  </button>
-                  <button type="button" class="inline secondary" appAutofocus
-                          [attr.aria-describedby]="'confirm-remove-' + email"
-                          (click)="confirmingRemoveEmail.set('')">Cancel</button>
-                </div>
+                <!-- opens the ban/report box below. not shown for yourself. -->
+                @if (email !== me) {
+                  <button type="button" class="danger"
+                          [disabled]="isLastAdmin(email)"
+                          (click)="startBanning(email)">Ban…</button>
+                }
               </td>
             </tr>
-          }
 
-          <!-- the ban box, under the row -->
-          @if (banningEmail() === email) {
-            <tr class="ban-row">
-              <td colspan="3">
-                <label [attr.for]="'ban-reason-' + email">Reason</label>
-                <input [id]="'ban-reason-' + email" name="ban-reason" type="text"
-                       placeholder="Why is this happening?" [(ngModel)]="banReason" />
-                <div class="row-actions">
-                  <!-- group ban: they lose this group only, and it can be lifted -->
-                  <button type="button" class="danger" (click)="onBanFromGroup(email)">
-                    Ban from this group
-                  </button>
-                  <!-- permanent system ban: only the super admin can do it, so this is a report -->
-                  <button type="button" class="danger" (click)="onReportUser(email)">
-                    Report for permanent ban
-                  </button>
-                  <button type="button" class="inline secondary" (click)="cancelBanning()">Cancel</button>
-                </div>
-              </td>
-            </tr>
-          }
-        }
-      </tbody>
+            <!-- the remove confirm, under the row -->
+            @if (confirmingRemoveEmail() === email) {
+              <tr class="ban-row">
+                <td colspan="3">
+                  <p class="confirm-text" [id]="'confirm-remove-' + email">
+                    {{ email === me ? 'Leave this group?' : 'Remove ' + email + ' from this group?' }}
+                    They can join again later unless they're banned.
+                  </p>
+                  <div class="row-actions">
+                    <button type="button" class="danger solid" (click)="onRemoveMember(email)">
+                      {{ email === me ? 'Leave' : 'Remove' }}
+                    </button>
+                    <button type="button" class="inline secondary" appAutofocus
+                            [attr.aria-describedby]="'confirm-remove-' + email"
+                            (click)="confirmingRemoveEmail.set('')">Cancel</button>
+                  </div>
+                </td>
+              </tr>
+            }
 
-    </table>
+            <!-- the ban box, under the row -->
+            @if (banningEmail() === email) {
+              <tr class="ban-row">
+                <td colspan="3">
+                  <label [attr.for]="'ban-reason-' + email">Reason</label>
+                  <input [id]="'ban-reason-' + email" name="ban-reason" type="text"
+                         placeholder="Why is this happening?" [(ngModel)]="banReason" />
+                  <div class="row-actions">
+                    <!-- group ban: they lose this group only, and it can be lifted -->
+                    <button type="button" class="danger" (click)="onBanFromGroup(email)">
+                      Ban from this group
+                    </button>
+                    <!-- permanent system ban: only the super admin can do it, so this is a report -->
+                    <button type="button" class="danger" (click)="onReportUser(email)">
+                      Report for permanent ban
+                    </button>
+                    <button type="button" class="inline secondary" (click)="cancelBanning()">Cancel</button>
+                  </div>
+                </td>
+              </tr>
+            }
+          }
+        </tbody>
+
+      </table>
+    </div>
 
     <!-- the group's banned list -->
     <h2>Banned From This Group</h2>
@@ -228,7 +237,7 @@
   </section>
 
   <!-- right column: requests this admin actions -->
-  <aside class="admin-side">
+  <aside class="admin-side" aria-label="Room proposals">
     <h2>Room Proposals</h2>
     <p class="side-note">
       Members propose rooms and an admin of this group approves or rejects them. Joining is
@@ -267,3 +276,4 @@
   </aside>
 
 </div>
+</main>

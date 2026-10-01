@@ -1,5 +1,10 @@
 <app-navbar></app-navbar>
 
+<main>
+<!-- the page heading for screen readers. each panel has its own visible h2 -->
+<h1 class="visually-hidden">Super admin</h1>
+
+
 <!-- one message bar for the page -->
 @if (actionError()) {
   <p class="banner error" role="alert">{{ actionError() }}</p>
@@ -84,7 +89,8 @@
       Every registered account. The super admin can't create, edit or deactivate one, only ban
       it permanently, and only from a group admin's report.
     </p>
-    <div class="scroll-list">
+    <!-- scrolls, so it takes keyboard focus (tabindex) and is named, or keyboard users couldn't scroll it -->
+    <div class="scroll-list" tabindex="0" role="region" aria-label="All accounts">
       @for (user of users(); track user.email) {
         <div class="member-row">
           <span class="member-email">{{ user.email }}</span>
@@ -146,7 +152,7 @@
       </select>
     </div>
 
-    <div class="scroll-list">
+    <div class="scroll-list" tabindex="0" role="region" aria-label="Audit log entries">
       <table class="data-table">
         <thead>
           <tr><th>Date</th><th>Type</th><th>Actor</th><th>Detail</th></tr>
@@ -170,3 +176,4 @@
   </section>
 
 </div>
+</main>

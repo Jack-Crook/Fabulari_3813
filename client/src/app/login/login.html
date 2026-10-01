@@ -1,7 +1,7 @@
-<div class="page">
+<main class="page">
   <div class="card">
     <img class="brand" src="/fabulari-logo.png" alt="Fabulari">
-    <h2>Welcome Back!</h2>
+    <h1>Welcome Back!</h1>
     
 
     <!-- runs onSubmit() on submit -->
@@ -15,9 +15,6 @@
     <label for="password">Password</label>
     <input id="password" name="password" type="password" [(ngModel)]="password" required />
   </div>
-
-  <!-- from the wireframe, does nothing yet -->
-  <a class="forgot" href="#">Forgot your password?</a>
 
   <!-- disabled during a login so a double click can't send two -->
   <button type="submit" [disabled]="submitting()">{{ submitting() ? 'Logging in…' : 'Log In' }}</button>
@@ -36,5 +33,4 @@
 
     <p class="switch">Don't have an account? <a routerLink="/register">Register</a></p>
   </div>
-</div>
-
+</main>

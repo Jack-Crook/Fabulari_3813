@@ -64,8 +64,59 @@ function looksLikeEmail(email) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-// case-insensitive matching for group and room names. same collation as the unique index in seed.js.
+// case-insensitive matching for group and room names. same collation as the unique index in ensureIndexes().
 const CASE_INSENSITIVE = { collation: { locale: 'en', strength: 2 } };
+
+// length limits, so one request can't store a novel or break the layout
+const MAX_NAME = 50;            // group, room and display names
+const MAX_TEXT = 500;           // descriptions and bios
+const MAX_MESSAGE = 2000;       // one chat message
+
+// a theme is what <input type="color"> produces: # and six hex digits
+const HEX_COLOUR = /^#[0-9a-f]{6}$/i;
+
+// 0 (no limit) to 120, whole years only
+function validAgeLimit(value) {
+    const years = Number(value);
+    return Number.isInteger(years) && years >= 0 && years <= 120;
+}
+
+// why a date of birth can't be stored, or null if it can. '' is allowed, it means not set.
+function dobProblem(dob) {
+    if (!dob) {
+        return null;
+    }
+    const age = ageFrom(dob);
+    if (age === null) {
+        return 'That is not a valid date of birth';
+    }
+    if (age < 0) {
+        return 'Date of birth can\'t be in the future';
+    }
+    return null;
+}
+
+// the group's details on create and on edit. returns why they're refused, or null.
+// undefined means not sent, which is fine: the create uses defaults and the edit leaves it alone.
+function groupDetailsProblem({ name, description, ageLimit, theme }) {
+    if (name !== undefined && String(name).trim().length > MAX_NAME) {
+        return `Group names can be at most ${MAX_NAME} characters`;
+    }
+    if (description !== undefined && String(description).length > MAX_TEXT) {
+        return `Descriptions can be at most ${MAX_TEXT} characters`;
+    }
+    if (ageLimit !== undefined && !validAgeLimit(ageLimit)) {
+        return 'Age limit must be a whole number from 0 to 120';
+    }
+    if (theme !== undefined && !HEX_COLOUR.test(String(theme))) {
+        return 'Theme must be a colour like #5FA8D3';
+    }
+    return null;
+}
+
+// the reply when a conditional update below matches nothing: the group changed between the
+// route's checks and its write, e.g. two admins acting at the same moment
+const GROUP_CHANGED = 'The group changed at the same time. Refresh and try again.';
 
 // what a user looks like in every response: no password, no _id
 function publicUser(user) {
@@ -203,6 +254,15 @@ app.post('/register', async (req, res) => {
             return res.status(400).json({ error: 'Password must be at least 6 characters' });
     }
 
+        if (String(username ?? '').trim().length > MAX_NAME) {
+            return res.status(400).json({ error: `Display names can be at most ${MAX_NAME} characters` });
+    }
+
+    const badDob = dobProblem(dob);
+        if (badDob) {
+            return res.status(400).json({ error: badDob });
+    }
+
     const existingUser = await users.findOne({ email: cleanEmail });
         if (existingUser) {
             return res.status(409).json({ error: 'Email is already registered' });
@@ -296,18 +356,25 @@ app.put('/users/:email', async (req, res) => {
             if (!String(username).trim()) {
                 return res.status(400).json({ error: 'Username cannot be empty' });
         }
+            if (String(username).trim().length > MAX_NAME) {
+                return res.status(400).json({ error: `Display names can be at most ${MAX_NAME} characters` });
+        }
             changes.username = String(username).trim();
     }
 
         if (dob !== undefined) {
-            // '' clears it, anything else has to be a real date
-            if (dob && ageFrom(dob) === null) {
-                return res.status(400).json({ error: 'That is not a valid date of birth' });
+            // '' clears it, anything else has to be a real date that isn't in the future
+            const badDob = dobProblem(dob);
+            if (badDob) {
+                return res.status(400).json({ error: badDob });
         }
             changes.dob = dob;
     }
 
         if (bio !== undefined) {
+            if (String(bio).length > MAX_TEXT) {
+                return res.status(400).json({ error: `Bios can be at most ${MAX_TEXT} characters` });
+        }
             changes.bio = String(bio);
     }
 
@@ -318,10 +385,13 @@ app.put('/users/:email', async (req, res) => {
             changes.password = await bcrypt.hash(password, SALT_ROUNDS);    // hashed here too
     }
 
+    // nothing sent, nothing to save or log
+        if (!Object.keys(changes).length) {
+            return res.status(200).json(publicUser(user));
+    }
+
     // returnDocument: 'after' returns the saved record
-    const updated = Object.keys(changes).length
-        ? await users.findOneAndUpdate({ email }, { $set: changes }, { returnDocument: 'after' })
-        : user;
+    const updated = await users.findOneAndUpdate({ email }, { $set: changes }, { returnDocument: 'after' });
 
     await logAudit('Profile Updated', email, 'Edited their own profile');
     res.status(200).json(publicUser(updated));
@@ -347,6 +417,11 @@ app.patch('/groups/:id', async (req, res) => {
     }
         if (!group.adminEmails.includes(actor)) {
             return res.status(403).json({ error: 'Only an admin of this group can edit it' });   // 403 = not allowed
+    }
+
+    const badDetails = groupDetailsProblem({ name, description, ageLimit, theme });
+        if (badDetails) {
+            return res.status(400).json({ error: badDetails });
     }
 
     const changes = {};
@@ -398,6 +473,10 @@ app.patch('/groups/:id', async (req, res) => {
     const updated = normaliseGroup(await groups.findOneAndUpdate(
         { _id: group._id }, update, { returnDocument: 'after' }));
 
+    // anyone removed who is sitting in one of the group's rooms is taken out of it
+    await removeFromRooms(room => booted.includes(room.email) && String(room.groupId) === String(group._id),
+        'You were removed from this group by its new age limit');
+
     await logAudit('Group Edited', actor, `Edited group "${updated.name}"`
         + (booted.length ? `, removed ${booted.length} member(s) under the new age limit` : ''));
     res.status(200).json({ group: updated, booted });   // booted so the UI can say who was removed
@@ -424,6 +503,7 @@ app.delete('/groups/:id', async (req, res) => {
 
     await groups.deleteOne({ _id: group._id });
     await channels.deleteMany({ groupId: group._id });     // rooms go with their group
+    await removeFromRooms(room => String(room.groupId) === String(group._id), 'This group has been deleted');
     await closePendingRequests({ groupId: group._id }, 'The group was deleted', actor);
     await logAudit('Group Deleted', actor, `Deleted group "${group.name}" and its rooms`);
     res.status(200).json({ message: 'Group deleted' });
@@ -484,9 +564,14 @@ app.post('/groups/:id/members', async (req, res) => {     // join a group
             return res.status(403).json({ error: tooYoung });
     }
 
-    // $push appends in place, so two joins at once can't overwrite each other
+    // the check and the write in one step: the filter only matches while they aren't a member,
+    // so two joins at the same moment can't both add them
     const updated = normaliseGroup(await groups.findOneAndUpdate(
-        { _id: group._id }, { $push: { memberEmails: email } }, { returnDocument: 'after' }));
+        { _id: group._id, memberEmails: { $ne: email } },
+        { $push: { memberEmails: email } }, { returnDocument: 'after' }));
+        if (!updated) {
+            return res.status(409).json({ error: 'User is already in this group' });
+    }
 
     await logAudit('Group Joined', email, `Joined group "${group.name}"`);
     res.status(200).json(updated);
@@ -507,15 +592,27 @@ app.delete('/groups/:id/members/:email', async (req, res) => {    // leave, or a
             return res.status(403).json({ error: 'Only an admin of this group can remove a member' });
     }
 
+        if (!group.memberEmails.includes(email)) {
+            return res.status(404).json({ error: 'That user is not a member of this group' });
+    }
         if (group.adminEmails.includes(email) && group.adminEmails.length === 1) {   // a group always keeps an admin
             return res.status(409).json({ error: 'Cannot remove the only admin of this group' });
     }
 
-    // removed from both lists in one write
+    // removed from both lists in one write. the filter repeats the last admin rule, so it holds even
+    // if two admins act at once: it only matches if they aren't an admin, or a second admin exists
+    // ('adminEmails.1' is the second entry in the array)
     const updated = normaliseGroup(await groups.findOneAndUpdate(
-        { _id: group._id },
+        { _id: group._id, $or: [{ adminEmails: { $ne: email } }, { 'adminEmails.1': { $exists: true } }] },
         { $pull: { memberEmails: email, adminEmails: email } },
         { returnDocument: 'after' }));
+        if (!updated) {
+            return res.status(409).json({ error: GROUP_CHANGED });
+    }
+
+    // if they're in one of the group's rooms right now, they stop receiving its messages
+    await removeFromRooms(room => room.email === email && String(room.groupId) === String(group._id),
+        'You are no longer a member of this group');
 
     await logAudit('Member Removed', actor || email, `${email} left or was removed from "${group.name}"`);
     res.status(200).json(updated);
@@ -536,6 +633,12 @@ app.post('/groups/:id/bans', async (req, res) => {
         if (!group.adminEmails.includes(actor)) {
             return res.status(403).json({ error: 'Only an admin of this group can ban a member' });
     }
+        if (!email) {
+            return res.status(400).json({ error: 'Email is required' });
+    }
+        if (!(await users.findOne({ email }))) {
+            return res.status(404).json({ error: 'User not found' });
+    }
         if (group.adminEmails.includes(email) && group.adminEmails.length === 1) {
             return res.status(409).json({ error: 'Promote another admin before banning the last one' });
     }
@@ -543,11 +646,19 @@ app.post('/groups/:id/bans', async (req, res) => {
             return res.status(409).json({ error: 'That user is already banned from this group' });
     }
 
-    // out of both lists and onto the banned list, in one write
+    // out of both lists and onto the banned list, in one write. the filter repeats the two checks
+    // above so they still hold if someone else changes the group at the same moment.
     const updated = normaliseGroup(await groups.findOneAndUpdate(
-        { _id: group._id },
+        { _id: group._id, bannedEmails: { $ne: email },
+          $or: [{ adminEmails: { $ne: email } }, { 'adminEmails.1': { $exists: true } }] },
         { $pull: { memberEmails: email, adminEmails: email }, $push: { bannedEmails: email } },
         { returnDocument: 'after' }));
+        if (!updated) {
+            return res.status(409).json({ error: GROUP_CHANGED });
+    }
+
+    await removeFromRooms(room => room.email === email && String(room.groupId) === String(group._id),
+        'You were banned from this group');
 
     await logAudit('Group Ban', actor, `Banned ${email} from "${group.name}"${reason ? `, reason: ${reason}` : ''}`);
     res.status(200).json(updated);
@@ -594,8 +705,13 @@ app.post('/groups/:id/admins', async (req, res) => {
             return res.status(409).json({ error: 'That user is already an admin of this group' });
     }
 
+    // only matches while they're a member and not yet an admin, so a double click adds them once
     const updated = normaliseGroup(await groups.findOneAndUpdate(
-        { _id: group._id }, { $push: { adminEmails: email } }, { returnDocument: 'after' }));
+        { _id: group._id, memberEmails: email, adminEmails: { $ne: email } },
+        { $push: { adminEmails: email } }, { returnDocument: 'after' }));
+        if (!updated) {
+            return res.status(409).json({ error: 'That user is already an admin of this group' });
+    }
 
     await logAudit('Admin Promoted', actor, `Promoted ${email} to admin of "${group.name}"`);
     res.status(200).json(updated);
@@ -621,8 +737,14 @@ app.delete('/groups/:id/admins/:email', async (req, res) => {
             return res.status(409).json({ error: 'A group must always have at least one admin' });
     }
 
-    const updated = normaliseGroup(await groups.findOneAndUpdate(       // still a member, just not an admin
-        { _id: group._id }, { $pull: { adminEmails: email } }, { returnDocument: 'after' }));
+    // still a member, just not an admin. the filter only matches while a second admin exists, so
+    // two admins demoting each other at the same moment can't leave the group with none.
+    const updated = normaliseGroup(await groups.findOneAndUpdate(
+        { _id: group._id, adminEmails: email, 'adminEmails.1': { $exists: true } },
+        { $pull: { adminEmails: email } }, { returnDocument: 'after' }));
+        if (!updated) {
+            return res.status(409).json({ error: 'A group must always have at least one admin' });
+    }
 
     await logAudit('Admin Demoted', actor,
         actor === email ? `Stepped down as admin of "${group.name}"` : `Demoted ${email} in "${group.name}"`);
@@ -646,11 +768,15 @@ app.get('/channels', async (req, res) => {        // all rooms, or one group's w
 });
 
 app.post('/channels', async (req, res) => {       // an admin creates a room directly
-    const { groupId, name } = req.body;
+    const { groupId } = req.body;
+    const name = String(req.body.name ?? '').trim();       // trimmed first, so '   ' counts as missing
     const actor = normaliseEmail(req.body.actorEmail);
 
         if (!groupId || !name) {
             return res.status(400).json({ error: 'Group id and channel name are required' });
+    }
+        if (name.length > MAX_NAME) {
+            return res.status(400).json({ error: `Room names can be at most ${MAX_NAME} characters` });
     }
 
     const id = toObjectId(groupId);
@@ -665,12 +791,12 @@ app.post('/channels', async (req, res) => {       // an admin creates a room dir
     }
 
     // names are unique within a group, not across groups
-    const existingChannel = await channels.findOne({ groupId: id, name: String(name).trim() }, CASE_INSENSITIVE);
+    const existingChannel = await channels.findOne({ groupId: id, name }, CASE_INSENSITIVE);
         if (existingChannel) {
             return res.status(409).json({ error: 'That group already has a channel with this name' });
     }
 
-    const newChannel = { groupId: id, name: String(name).trim() };     // groupId stored as an ObjectId
+    const newChannel = { groupId: id, name };     // groupId stored as an ObjectId
     await channels.insertOne(newChannel);
     await logAudit('Room Created', actor, `Created room "${newChannel.name}" in "${group.name}"`);
     res.status(201).json(newChannel);
@@ -695,6 +821,9 @@ app.patch('/channels/:id', async (req, res) => {
     const cleanName = String(name ?? '').trim();
         if (!cleanName) {
             return res.status(400).json({ error: 'Room name cannot be empty' });
+    }
+        if (cleanName.length > MAX_NAME) {
+            return res.status(400).json({ error: `Room names can be at most ${MAX_NAME} characters` });
     }
     const clash = await channels.findOne(
         { _id: { $ne: channel._id }, groupId: channel.groupId, name: cleanName }, CASE_INSENSITIVE);
@@ -727,6 +856,8 @@ app.delete('/channels/:id', async (req, res) => {     // an admin deletes a room
     // messages can't outlive their room
     await deleteMessages({ channelId: channel._id });
     await channels.deleteOne({ _id: channel._id });
+    // anyone still in it is taken out, so they can't keep posting into a room that's gone
+    await removeFromRooms(room => room.channelId === String(channel._id), 'This room has been deleted');
     await logAudit('Room Deleted', actor, `Deleted room "${channel.name}"`);
     res.status(200).json({ message: 'Channel deleted' });
 });
@@ -802,6 +933,10 @@ app.post('/requests', async (req, res) => {
                 if (!name) {
                     return res.status(400).json({ error: 'Group name is required' });
             }
+            const badDetails = groupDetailsProblem(details);
+                if (badDetails) {
+                    return res.status(400).json({ error: badDetails });
+            }
                 if (await nameTaken(name)) {
                     return res.status(409).json({ error: 'A group with that name already exists' });
             }
@@ -840,6 +975,9 @@ app.post('/requests', async (req, res) => {
                 if (!roomName) {
                     return res.status(400).json({ error: 'Room name is required' });
             }
+                if (roomName.length > MAX_NAME) {
+                    return res.status(400).json({ error: `Room names can be at most ${MAX_NAME} characters` });
+            }
                 if (await channels.findOne({ groupId: targetGroupId, name: roomName }, CASE_INSENSITIVE)) {
                     return res.status(409).json({ error: 'That group already has a channel with this name' });
             }
@@ -869,6 +1007,10 @@ app.post('/requests', async (req, res) => {
             }
                 if (target === requester) {
                     return res.status(400).json({ error: 'You cannot report yourself' });
+            }
+                // an admin reports people from their own group: its members, or someone they've banned from it
+                if (!group.memberEmails.includes(target) && !group.bannedEmails.includes(target)) {
+                    return res.status(404).json({ error: 'You can only report someone who is in, or banned from, this group' });
             }
                 if (!String(details.reason ?? '').trim()) {
                     return res.status(400).json({ error: 'A reason is required to report a user' });
@@ -945,85 +1087,105 @@ app.post('/requests/:id/approve', async (req, res) => {
         }
     }
 
-    // carry the request out
-    switch (request.type) {
-        case 'group-create': {
-            // re-checked, the name may have been taken while the request waited
-            const wantedName = String(request.payload.name ?? '').trim();
-                if (await nameTaken(wantedName)) {
-                    return res.status(409).json({ error: 'A group with that name already exists' });
-            }
-            const created = await createGroupRecord(request.payload, request.requestedBy);
-            await logAudit('Group Created', actor, `Approved "${created.name}", ${request.requestedBy} is its first admin`);
-            break;
-        }
-
-        case 'group-delete': {
-            const group = await groups.findOne({ _id: request.groupId });
-                if (!group) {
-                    return res.status(404).json({ error: 'Group not found' });
-            }
-            // same order as DELETE /groups/:id
-            const doomed = await channels.find({ groupId: group._id }).toArray();
-            await deleteMessages({ channelId: { $in: doomed.map(c => c._id) } });
-
-            await groups.deleteOne({ _id: group._id });
-            await channels.deleteMany({ groupId: group._id });
-            // every other pending request for this group. this one is marked approved below.
-            await closePendingRequests({ groupId: group._id, _id: { $ne: request._id } }, 'The group was deleted', actor);
-            await logAudit('Group Deleted', actor, `Approved deletion of "${group.name}" and its rooms`);
-            break;
-        }
-
-        case 'channel-create': {
-            const roomName = String(request.payload.name).trim();
-                // re-checked, an admin may have made the same room meanwhile
-                if (await channels.findOne({ groupId: request.groupId, name: roomName }, CASE_INSENSITIVE)) {
-                    return res.status(409).json({ error: 'That group already has a channel with this name' });
-            }
-            await channels.insertOne({ groupId: request.groupId, name: roomName });
-            await logAudit('Room Created', actor, `Approved room "${roomName}" proposed by ${request.requestedBy}`);
-            break;
-        }
-
-        case 'user-ban': {
-            const target = normaliseEmail(request.payload.email);
-                // re-checked, they may have become a group's only admin since the report
-                const onlyAdminOf = await groups.findOne({ adminEmails: target, 'adminEmails.1': { $exists: false } });
-                if (onlyAdminOf) {
-                    return res.status(409).json({ error: `${target} is the only admin of "${onlyAdminOf.name}". A replacement admin must be assigned before the ban.` });
-            }
-
-            // permanent ban: delete the account (and picture), remove from every group,
-            // and add the email to the banned list so /register refuses it
-            const bannedUser = await users.findOne({ email: target });
-            await removeUploadedFile(bannedUser?.avatarUrl);
-            await users.deleteOne({ email: target });
-
-            await groups.updateMany(
-                { $or: [{ memberEmails: target }, { adminEmails: target }] },
-                { $pull: { memberEmails: target, adminEmails: target } });
-
-            await banned.insertOne({
-                email: target,
-                reason: request.payload.reason ?? '',
-                reportedBy: request.requestedBy,
-                bannedAt: new Date().toISOString(),
-                bannedBy: actor,
-            });
-            // close their pending requests, e.g. a group-create that would get a deleted admin
-            await closePendingRequests({ requestedBy: target }, 'The requester was permanently banned', actor);
-            await logAudit('User Banned', actor, `Permanently banned ${target}. Reason: ${request.payload.reason ?? 'no reason given'}`);
-            break;
-        }
-    }
-
-    const updated = await requests.findOneAndUpdate(
-        { _id: request._id },
+    // claimed before anything is carried out. the update only matches while the request is still
+    // pending, so a double click, or two admins at once, can't both carry it out: the second gets null.
+    const claimed = await requests.findOneAndUpdate(
+        { _id: request._id, status: 'pending' },
         { $set: { status: 'approved', resolvedAt: new Date().toISOString(), resolvedBy: actor } },
         { returnDocument: 'after' });
+        if (!claimed) {
+            return res.status(409).json({ error: 'That request has already been actioned' });
+    }
 
-    res.status(200).json(updated);
+    // puts it back to pending when a re-check below refuses it, so it can still be actioned later
+    const release = () => requests.updateOne(
+        { _id: request._id }, { $set: { status: 'pending', resolvedAt: '', resolvedBy: '' } });
+
+    // carry the request out
+    try {
+        switch (request.type) {
+            case 'group-create': {
+                // re-checked, the name may have been taken while the request waited
+                const wantedName = String(request.payload.name ?? '').trim();
+                    if (await nameTaken(wantedName)) {
+                        await release();
+                        return res.status(409).json({ error: 'A group with that name already exists' });
+                }
+                const created = await createGroupRecord(request.payload, request.requestedBy);
+                await logAudit('Group Created', actor, `Approved "${created.name}", ${request.requestedBy} is its first admin`);
+                break;
+            }
+
+            case 'group-delete': {
+                const group = await groups.findOne({ _id: request.groupId });
+                    if (!group) {
+                        await release();
+                        return res.status(404).json({ error: 'Group not found' });
+                }
+                // same order as DELETE /groups/:id
+                const doomed = await channels.find({ groupId: group._id }).toArray();
+                await deleteMessages({ channelId: { $in: doomed.map(c => c._id) } });
+
+                await groups.deleteOne({ _id: group._id });
+                await channels.deleteMany({ groupId: group._id });
+                await removeFromRooms(room => String(room.groupId) === String(group._id), 'This group has been deleted');
+                // this request is already marked approved, so only the group's other requests are still pending
+                await closePendingRequests({ groupId: group._id }, 'The group was deleted', actor);
+                await logAudit('Group Deleted', actor, `Approved deletion of "${group.name}" and its rooms`);
+                break;
+            }
+
+            case 'channel-create': {
+                const roomName = String(request.payload.name).trim();
+                    // re-checked, an admin may have made the same room meanwhile
+                    if (await channels.findOne({ groupId: request.groupId, name: roomName }, CASE_INSENSITIVE)) {
+                        await release();
+                        return res.status(409).json({ error: 'That group already has a channel with this name' });
+                }
+                await channels.insertOne({ groupId: request.groupId, name: roomName });
+                await logAudit('Room Created', actor, `Approved room "${roomName}" proposed by ${request.requestedBy}`);
+                break;
+            }
+
+            case 'user-ban': {
+                const target = normaliseEmail(request.payload.email);
+                    // re-checked, they may have become a group's only admin since the report
+                    const onlyAdminOf = await groups.findOne({ adminEmails: target, 'adminEmails.1': { $exists: false } });
+                    if (onlyAdminOf) {
+                        await release();
+                        return res.status(409).json({ error: `${target} is the only admin of "${onlyAdminOf.name}". A replacement admin must be assigned before the ban.` });
+                }
+
+                // permanent ban: delete the account (and picture), remove from every group,
+                // and add the email to the banned list so /register refuses it
+                const bannedUser = await users.findOne({ email: target });
+                await removeUploadedFile(bannedUser?.avatarUrl);
+                await users.deleteOne({ email: target });
+
+                await groups.updateMany(
+                    { $or: [{ memberEmails: target }, { adminEmails: target }] },
+                    { $pull: { memberEmails: target, adminEmails: target } });
+                await removeFromRooms(room => room.email === target, 'Your account has been permanently banned');
+
+                await banned.insertOne({
+                    email: target,
+                    reason: request.payload.reason ?? '',
+                    reportedBy: request.requestedBy,
+                    bannedAt: new Date().toISOString(),
+                    bannedBy: actor,
+                });
+                // close their pending requests, e.g. a group-create that would get a deleted admin
+                await closePendingRequests({ requestedBy: target }, 'The requester was permanently banned', actor);
+                await logAudit('User Banned', actor, `Permanently banned ${target}. Reason: ${request.payload.reason ?? 'no reason given'}`);
+                break;
+            }
+        }
+    } catch (err) {
+        await release();    // a failure part way through shouldn't leave it marked approved
+        throw err;          // express 5 passes it on to the error handler
+    }
+
+    res.status(200).json(claimed);
 });
 
 app.post('/requests/:id/reject', async (req, res) => {
@@ -1064,8 +1226,10 @@ app.post('/requests/:id/reject', async (req, res) => {
         }
     }
 
+    // only while it's still pending, the same claim as approve, so an approve and a reject sent at
+    // the same moment can't both succeed
     const updated = await requests.findOneAndUpdate(
-        { _id: request._id },
+        { _id: request._id, status: 'pending' },
         { $set: {
             status: 'rejected',
             reason,                 // shown on the requester's profile
@@ -1073,6 +1237,9 @@ app.post('/requests/:id/reject', async (req, res) => {
             resolvedBy: actor,
         } },
         { returnDocument: 'after' });
+        if (!updated) {
+            return res.status(409).json({ error: 'That request has already been actioned' });
+    }
 
     await logAudit('Request Rejected', actor, `${request.summary}. Rejected: ${reason}`);
     res.status(200).json(updated);
@@ -1229,6 +1396,16 @@ app.delete('/users/:email/avatar', async (req, res) => {
 // express 5 passes a rejected promise from an async route here, so a failed mongo call gets a
 // 500 instead of hanging. four arguments marks it as the error handler.
 app.use((err, req, res, next) => {
+    // a body that isn't valid JSON: express.json() throws before any route runs. that's the
+    // client's mistake, so a 400, not a 500
+    if (err.type === 'entity.parse.failed') {
+        return res.status(400).json({ error: 'The request body is not valid JSON' });
+    }
+    // mongo's duplicate key error from a unique index: two requests got past a route's own check
+    // at the same moment (e.g. registering one email twice at once) and the index stopped the second
+    if (err.code === 11000) {
+        return res.status(409).json({ error: 'That already exists' });
+    }
     console.error(err);
     res.status(500).json({ error: 'Something went wrong on the server' });
 });
@@ -1240,6 +1417,10 @@ function registerSocketHandlers() {
   io.on('connection', socket => {
     // the room this socket is in, so disconnect can clean up directly
     let joined = null;      // { channelId, groupId, email }
+
+    // so removeFromRooms() can see which room this socket is in, and take it out
+    socket.data.room = () => joined;
+    socket.data.leave = () => leaveCurrentRoom();
 
     socket.on('joinRoom', async ({ channelId, email }, ack) => {
       try {
@@ -1319,6 +1500,9 @@ function registerSocketHandlers() {
         if (!text && !image) {
           return ack?.({ error: 'Message cannot be empty' });
         }
+        if (text.length > MAX_MESSAGE) {
+          return ack?.({ error: `Messages can be at most ${MAX_MESSAGE} characters` });
+        }
 
         const message = {
           channelId: new ObjectId(joined.channelId),
@@ -1383,6 +1567,43 @@ function peopleIn(channelId) {
   return room ? [...new Set(room.values())] : [];   // Set removes the two-tab duplicate
 }
 
+// takes everyone whose room matches out of it, and tells them why. used when someone is removed or
+// banned, or a room or group is deleted. without it, a person removed from a group while sitting in
+// one of its rooms kept receiving its messages until they left the page.
+// `match` is given the { channelId, groupId, email } of each connected socket's room.
+async function removeFromRooms(match, reason) {
+  for (const socket of io.sockets.sockets.values()) {
+    const room = socket.data.room?.();
+    if (room && match(room)) {
+      await socket.data.leave();
+      socket.emit('removedFromRoom', { reason });
+    }
+  }
+}
+
+// the database enforces these itself, on top of each route's own check: one account per email, a
+// banned email listed once, and group names unique ignoring case. the rest make the common reads
+// fast: the request queues and audit log filter then sort newest first, room history oldest first.
+async function ensureIndexes() {
+  const wanted = [
+    [users, { email: 1 }, { unique: true }],
+    [banned, { email: 1 }, { unique: true }],
+    [groups, { name: 1 }, { unique: true, ...CASE_INSENSITIVE }],
+    [requests, { status: 1, createdAt: -1 }, {}],
+    [audit, { type: 1, at: -1 }, {}],
+    [messages, { channelId: 1, at: 1 }, {}],
+  ];
+  for (const [collection, keys, options] of wanted) {
+    try {
+      await collection.createIndex(keys, options);      // does nothing if it already exists
+    } catch (err) {
+      // existing data that already breaks a unique rule stops that index being built. the server
+      // still starts, and the routes' own checks still apply.
+      console.warn(`Could not create an index on ${collection.collectionName}: ${err.message}`);
+    }
+  }
+}
+
 // port 0 (any free port) is used by the tests. returns the mongo client so the caller can close it.
 async function start(port = PORT) {
   const client = new MongoClient(MONGO_URL);
@@ -1397,8 +1618,7 @@ async function start(port = PORT) {
   banned = db.collection('banned');
   messages = db.collection('messages');
 
-  // room history, oldest first
-  await messages.createIndex({ channelId: 1, at: 1 });
+  await ensureIndexes();
 
   registerSocketHandlers();      // after the collections exist
 

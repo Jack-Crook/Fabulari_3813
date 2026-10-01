@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { App } from './app';
+import { routes } from './app.routes';
 import { testProviders } from './testing';
 
 describe('App', () => {
@@ -22,6 +23,13 @@ describe('App', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     // the root is just the outlet, each page brings its own navbar
     expect(compiled.querySelector('router-outlet')).toBeTruthy();
+  });
+
+  it('gives every page its own browser title', () => {
+    // the redirects have no component, so only the real pages are checked
+    const pages = routes.filter(route => route.component);
+    expect(pages.every(route => typeof route.title === 'string' && route.title.endsWith('| Fabulari'))).toBe(true);
+    expect(new Set(pages.map(route => route.title)).size).toBe(pages.length);
   });
 });
 

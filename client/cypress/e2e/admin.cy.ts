@@ -180,3 +180,29 @@ describe('Group admin', () => {
     cy.contains('Group not found.').should('be.visible');
   });
 });
+
+
+describe('Stepping down as a group admin', () => {
+  const owner = newUser('stepowner');
+  const second = newUser('stepsecond');
+  let group: TestGroup;
+
+  before(() => {
+    register(owner);
+    register(second);
+    createGroup(owner, `E2E Step ${unique()}`).then(created => {
+      group = created;
+      joinGroup(group._id, second);
+      cy.request('POST', `${API}/groups/${group._id}/admins`, { email: second.email, actorEmail: owner.email });
+    });
+  });
+
+  it('takes you back to the group page, since the admin controls would all fail now', () => {
+    visitAs(owner, `/admin-dashboard/${group._id}`);
+    cy.contains('.members-table tbody tr', owner.email).within(() => cy.contains('button', 'Step Down').click());
+
+    cy.url().should('match', new RegExp(`/groups/${group._id}$`));
+    cy.contains('a', 'Manage this group').should('not.exist');
+    cy.contains('h1', group.name).should('be.visible');
+  });
+});
