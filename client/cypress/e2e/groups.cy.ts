@@ -63,17 +63,51 @@ describe('Groups and requests', () => {
       cy.contains('.pending-row', groupName).should('not.exist');
     });
 
-    it('lets an adult find it in Discover and join', () => {
+    it('lets an adult find it in Discover and ask to join', () => {
       visitAs(joiner, '/user-dashboard');
 
       // filters as you type
       cy.get('.discover-search').type(groupName);
       cy.get('.discover-row').should('have.length', 1);
       cy.contains('.discover-row', groupName).within(() => {
-        cy.contains('button', 'Join').click();
+        cy.contains('button', 'Request to join').click();
       });
 
-      cy.get('[role="status"]').should('contain', `Joined ${groupName}.`);
+      // not in yet: it waits for an admin, and the button says it's been asked
+      cy.get('[role="status"]').should('contain', `Asked to join ${groupName}`);
+      cy.contains('.pending-row', `Join "${groupName}"`).should('be.visible');
+      cy.contains('.discover-row', groupName).contains('button', 'Requested').should('be.disabled');
+      cy.contains('.my-groups .group-row', groupName).should('not.exist');
+    });
+
+    it('shows a new join request on the admin page live, without a reload', () => {
+      cy.request(`${API}/groups`).then(({ body: groups }) => {
+        const group = groups.find((g: { name: string }) => g.name === groupName);
+        visitAs(owner, `/admin-dashboard/${group._id}`);
+        cy.contains('h2', 'Requests').should('be.visible');
+
+        // someone asks to join while the admin has the page open: the socket tells the page,
+        // and the request appears in the panel
+        const latecomer = newUser('latecomer');
+        register(latecomer);
+        cy.request('POST', `${API}/requests`, { type: 'group-join', requestedBy: latecomer.email, groupId: group._id });
+        cy.contains('.admin-side .request-row', latecomer.email).should('be.visible');
+      });
+    });
+
+    it('lets the group\'s admin approve the request, and then they\'re in', () => {
+      cy.request(`${API}/groups`).then(({ body: groups }) => {
+        const group = groups.find((g: { name: string }) => g.name === groupName);
+        visitAs(owner, `/admin-dashboard/${group._id}`);
+      });
+      // the joiner's row: the latecomer from the test above is waiting too
+      cy.contains('.admin-side .request-row', joiner.email).within(() => {
+        cy.contains('button', 'Approve').click();
+      });
+      cy.get('[role="status"]').should('contain', `Approved: Join "${groupName}"`);
+      cy.contains('.members-table', joiner.email).should('be.visible');
+
+      visitAs(joiner, '/user-dashboard');
       cy.contains('.my-groups .group-row', groupName).should('be.visible');
     });
 
@@ -83,12 +117,13 @@ describe('Groups and requests', () => {
       // every group is visible whatever your age...
       cy.get('.discover-search').type(groupName);
       cy.contains('.discover-row', groupName).within(() => {
-        cy.contains('button', 'Join').click();
+        cy.contains('button', 'Request to join').click();
       });
 
-      // ...but joining is refused with the reason
+      // ...but asking is rejected straight away, no admin needed, and they're told why
       cy.get('[role="alert"]').should('contain', 'You must be at least 18');
       cy.contains('.my-groups .group-row', groupName).should('not.exist');
+      cy.contains('.pending-row', groupName).should('not.exist');
     });
 
     it('lets a member leave', () => {

@@ -5,8 +5,9 @@ import { HttpClient } from '@angular/common/http';
 //   group-create    user -> super admin
 //   group-delete    group admin -> super admin
 //   channel-create  member -> group admin
+//   group-join      user -> group admin (too young is rejected automatically)
 //   user-ban        group admin reports -> super admin bans permanently
-export type RequestType = 'group-create' | 'group-delete' | 'channel-create' | 'user-ban';
+export type RequestType = 'group-create' | 'group-delete' | 'channel-create' | 'group-join' | 'user-ban';
 
 export interface AppRequest {
   _id: string;
@@ -39,6 +40,9 @@ export interface BannedUser {
   bannedAt: string;
   bannedBy: string;
 }
+
+// how many audit entries come at a time, the same as the server's default
+export const AUDIT_PAGE = 100;
 
 @Service()
 export class RequestService {
@@ -77,8 +81,13 @@ export class RequestService {
   }
 
   // GET /audit?type=, filtered and sorted on the server
-  getAudit(type = '') {
-    return this.http.get<AuditEntry[]>(`${this.apiUrl}/audit`, { params: type ? { type } : {} });
+  // a page of AUDIT_PAGE entries. skip is how many the page already has, for "Show older entries".
+  getAudit(type = '', skip = 0) {
+    const params: Record<string, string> = { limit: String(AUDIT_PAGE), skip: String(skip) };
+    if (type) {
+      params['type'] = type;
+    }
+    return this.http.get<AuditEntry[]>(`${this.apiUrl}/audit`, { params });
   }
 
   // GET /audit/types, the types in the log, for the filter dropdown

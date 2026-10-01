@@ -2,10 +2,10 @@
 
 <main>
 @if (formError()) {
-  <p class="banner error" role="alert">{{ formError() }}</p>
+  <p class="banner error" role="alert" animate.enter="fade-in">{{ formError() }}</p>
 }
 @if (formSuccess()) {
-  <p class="banner success" role="status">{{ formSuccess() }}</p>
+  <p class="banner success" role="status" animate.enter="fade-in">{{ formSuccess() }}</p>
 }
 
 <div class="group-body">
@@ -47,13 +47,18 @@
         <a class="manage-link" [routerLink]="['/admin-dashboard', current._id]">Manage this group →</a>
       }
 
-      <!-- anyone can see a group, only members can chat. non-members get a join button instead of room links. the super admin can't join. -->
+      <!-- anyone can see a group, only members can chat. non-members can ask to join instead of
+           getting room links, and an admin approves it. the super admin can't join. -->
       @if (!isMember() && !isSuper) {
         <div class="join-bar">
-          <p>You aren't a member of this group yet. Join it to chat in its rooms.</p>
-          <button type="button" (click)="onJoin()" [disabled]="joining()">
-            {{ joining() ? 'Joining…' : 'Join group' }}
-          </button>
+          @if (myJoinRequest()) {
+            <p>You've asked to join this group. An admin will review your request.</p>
+          } @else {
+            <p>You aren't a member of this group yet. Ask to join it to chat in its rooms.</p>
+            <button type="button" (click)="onJoin()" [disabled]="joining()">
+              {{ joining() ? 'Sending…' : 'Request to join' }}
+            </button>
+          }
         </div>
       }
 

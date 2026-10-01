@@ -46,6 +46,13 @@ export class ChatRoom {
   notice = this.chat.notice;        // who joined or left, shown by name in the template
   removed = this.chat.removed;      // taken out of the room by the server
   error = this.chat.error;
+  typing = this.chat.typing;        // who else is typing, '' for no one
+  more = this.chat.more;            // older messages can be loaded
+  loadingOlder = this.chat.loadingOlder;
+
+  // the list's height just before older messages are added at the top, so the view can stay on the
+  // same message instead of jumping to the bottom. null when nothing is being loaded.
+  private heightBeforeOlder: number | null = null;
 
   // members only get the message box (the server refuses others anyway), and it goes if the
   // server takes us out of the room
@@ -92,6 +99,13 @@ export class ChatRoom {
     // scroll to the newest message after each render. reading messages() makes it re-run.
     afterRenderEffect(() => {
       this.messages();
+      const list = this.scroller()?.nativeElement;
+      // older messages went in at the top: keep the same message in view instead of jumping down
+      if (list && this.heightBeforeOlder !== null) {
+        list.scrollTop = list.scrollHeight - this.heightBeforeOlder;
+        this.heightBeforeOlder = null;
+        return;
+      }
       this.scrollToBottom();
     });
 
@@ -100,6 +114,17 @@ export class ChatRoom {
   }
 
   // also called when an image loads, since it has no height until then
+  // "Load older messages" at the top of the list
+  loadOlder() {
+    this.heightBeforeOlder = this.scroller()?.nativeElement.scrollHeight ?? null;
+    this.chat.loadOlder();
+  }
+
+  // every keystroke in the message box. the service only sends one every couple of seconds.
+  onTyping() {
+    this.chat.notifyTyping();
+  }
+
   scrollToBottom() {
     const list = this.scroller()?.nativeElement;
     if (list) {

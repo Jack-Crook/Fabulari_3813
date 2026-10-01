@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, DestroyRef } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -6,7 +6,8 @@ import { Navbar } from '../navbar/navbar';
 import { Autofocus } from '../autofocus';
 import { Auth, AppUser } from '../auth';
 import { GroupService, Group } from '../group';
-import { RequestService, AppRequest, AuditEntry, BannedUser } from '../request';
+import { RequestService, AppRequest, AuditEntry, BannedUser, AUDIT_PAGE } from '../request';
+import { ChatService } from '../chat';
 
 @Component({
   selector: 'app-super-admin-dashboard',
@@ -27,6 +28,7 @@ export class SuperAdminDashboard {
   groups = signal<Group[]>([]);
   bannedUsers = signal<BannedUser[]>([]);
   auditLog = signal<AuditEntry[]>([]);
+  moreAudit = signal(false);       // a full page came back, so there may be older entries
   auditTypes = signal<string[]>([]);
 
   // filtering happens on the server, so changing this refetches
@@ -44,6 +46,11 @@ export class SuperAdminDashboard {
 
   constructor() {
     this.load();
+
+    // live: a request raised or actioned anywhere refreshes this page. stops
+    // listening when the page goes.
+    const stop = inject(ChatService).onRequestsChanged(() => this.load());
+    inject(DestroyRef).onDestroy(stop);
   }
 
   private load() {
@@ -58,8 +65,21 @@ export class SuperAdminDashboard {
     this.loadAudit();
   }
 
+  // the newest page, starting again from the top
   private loadAudit() {
-    this.requestService.getAudit(this.auditFilter()).subscribe(entries => this.auditLog.set(entries));
+    this.requestService.getAudit(this.auditFilter()).subscribe(entries => {
+      this.auditLog.set(entries);
+      this.moreAudit.set(entries.length === AUDIT_PAGE);
+    });
+  }
+
+  // the next page, added under the ones already shown. the log can grow without limit, so it's
+  // read a page at a time instead of all at once.
+  onShowOlderAudit() {
+    this.requestService.getAudit(this.auditFilter(), this.auditLog().length).subscribe(entries => {
+      this.auditLog.update(shown => [...shown, ...entries]);
+      this.moreAudit.set(entries.length === AUDIT_PAGE);
+    });
   }
 
   onFilterAudit(type: string) {
@@ -135,6 +155,11 @@ export class SuperAdminDashboard {
   // a reason is required (400 without), the requester sees it on their profile
   onReject(request: AppRequest) {
     this.clearMessages();
+
+    if (!this.rejectReason.trim()) {
+      this.actionError.set('A reason is required when rejecting a request');
+      return;
+    }
 
     this.requestService.reject(request._id, this.me, this.rejectReason).subscribe({
       next: () => {

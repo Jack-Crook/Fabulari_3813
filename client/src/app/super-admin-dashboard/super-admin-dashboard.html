@@ -7,10 +7,10 @@
 
 <!-- one message bar for the page -->
 @if (actionError()) {
-  <p class="banner error" role="alert">{{ actionError() }}</p>
+  <p class="banner error" role="alert" animate.enter="fade-in">{{ actionError() }}</p>
 }
 @if (actionSuccess()) {
-  <p class="banner success" role="status">{{ actionSuccess() }}</p>
+  <p class="banner success" role="status" animate.enter="fade-in">{{ actionSuccess() }}</p>
 }
 
 <div class="super-admin-body">
@@ -46,7 +46,7 @@
         </div>
 
         @if (rejectingId() === request._id) {
-          <div class="reject-box">
+          <div class="reject-box" animate.enter="fade-in">
             <label [attr.for]="'reject-' + request._id">Reason for rejection</label>
             <!-- required, 400 without. the requester sees it on their profile. -->
             <input [id]="'reject-' + request._id" name="reject-reason" type="text"
@@ -58,7 +58,7 @@
           </div>
         } @else if (confirmingId() === request._id) {
           <!-- bans and group deletions can't be undone, so they ask first. focus goes to Cancel, and aria-describedby reads the question out. -->
-          <div class="reject-box">
+          <div class="reject-box" animate.enter="fade-in">
             <p class="confirm-text" [id]="'confirm-' + request._id">
               {{ request.summary }}? {{ consequenceOf(request) }}
             </p>
@@ -172,6 +172,10 @@
     </div>
     @if (auditLog().length === 0) {
       <p class="empty">Nothing logged for this filter.</p>
+    }
+    <!-- a page at a time, newest first -->
+    @if (moreAudit()) {
+      <button type="button" class="more-button" (click)="onShowOlderAudit()">Show older entries</button>
     }
   </section>
 

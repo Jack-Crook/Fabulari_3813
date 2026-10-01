@@ -22,6 +22,14 @@ export interface RoomNotice {
 interface JoinResult {
   history?: ChatMessage[];
   present?: string[];
+  more?: boolean;       // older messages exist than the ones sent
+  error?: string;
+}
+
+// the loadOlder ack: the page of messages before the oldest one shown
+interface OlderResult {
+  messages?: ChatMessage[];
+  more?: boolean;
   error?: string;
 }
 
@@ -42,6 +50,12 @@ export class ChatService {
   notice = signal<RoomNotice | null>(null);   // someone joined or left, shown briefly
   error = signal('');
   removed = signal(false);             // the server took us out of the room (removed, banned, room deleted)
+  typing = signal('');                 // the email of whoever is typing right now, '' for no one
+  more = signal(false);                // older messages exist than the ones loaded
+  loadingOlder = signal(false);
+
+  private typingTimer?: ReturnType<typeof setTimeout>;
+  private lastTypingSent = 0;
 
   // one connection, reused for every room
   private connect(): Socket {
@@ -58,6 +72,14 @@ export class ChatService {
     });
 
     socket.on('presence', (people: string[]) => this.present.set(people));
+
+    // someone else is typing. cleared after 3s unless another one arrives, since there's no
+    // "stopped typing" event: going quiet is how it stops
+    socket.on('typing', ({ email }: { email: string }) => {
+      this.typing.set(email);
+      clearTimeout(this.typingTimer);
+      this.typingTimer = setTimeout(() => this.typing.set(''), 3000);
+    });
 
     // the spec wants a notice as well as the live list
     socket.on('userJoined', ({ email }: { email: string }) => this.flash(email, 'joined'));
@@ -103,6 +125,8 @@ export class ChatService {
     this.notice.set(null);
     this.error.set('');
     this.removed.set(false);
+    this.typing.set('');
+    this.more.set(false);
 
     socket.emit('joinRoom', { channelId, email }, (res: JoinResult) => {
       // ignore a late reply from a room already left (quick room switching)
@@ -114,6 +138,7 @@ export class ChatService {
         return;
       }
       this.messages.set(res.history ?? []);   // already oldest first
+      this.more.set(res.more ?? false);
       this.present.set(res.present ?? []);
     });
   }
@@ -148,6 +173,46 @@ export class ChatService {
   }
 
   // leaving the page doesn't disconnect the shared socket, so leave explicitly
+  // the 50 messages before the oldest one shown, put in front of the list. a room's history can be
+  // any length, so it comes a page at a time instead of all at once.
+  loadOlder() {
+    const oldest = this.messages()[0];
+    if (!this.socket || !oldest || this.loadingOlder()) {
+      return;
+    }
+    this.loadingOlder.set(true);
+    this.socket.emit('loadOlder', { before: oldest._id }, (res: OlderResult) => {
+      this.loadingOlder.set(false);
+      if (res?.error) {
+        this.error.set(res.error);
+        return;
+      }
+      this.messages.update(list => [...(res.messages ?? []), ...list]);
+      this.more.set(res.more ?? false);
+    });
+  }
+
+  // tells the room I'm typing. called on every keystroke but sent at most every 2s, which is plenty
+  // for a 3s indicator and saves a message per key
+  notifyTyping() {
+    const now = Date.now();
+    if (!this.socket || now - this.lastTypingSent < 2000) {
+      return;
+    }
+    this.lastTypingSent = now;
+    this.socket.emit('typing');
+  }
+
+  // calls `callback` with the group id whenever a request is raised or actioned anywhere, so a
+  // page showing requests or memberships can refetch. returns the function that stops listening,
+  // for the page to call when it's destroyed.
+  onRequestsChanged(callback: (groupId: string | null) => void): () => void {
+    const socket = this.connect();
+    const handler = ({ groupId }: { groupId: string | null }) => callback(groupId);
+    socket.on('requestsChanged', handler);
+    return () => socket.off('requestsChanged', handler);
+  }
+
   leaveRoom() {
     this.socket?.emit('leaveRoom');
     this.currentRoom = undefined;     // so a reconnect doesn't rejoin
@@ -155,5 +220,7 @@ export class ChatService {
     this.present.set([]);
     this.notice.set(null);
     this.removed.set(false);
+    this.typing.set('');
+    this.more.set(false);
   }
 }

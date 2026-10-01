@@ -5,6 +5,7 @@ import { TestBed } from '@angular/core/testing';
 import { Group, Channel } from './group';
 import { AppRequest } from './request';
 import { AppUser } from './auth';
+import { ChatService } from './chat';
 
 // shared setup for every spec file.
 //
@@ -15,7 +16,22 @@ export function testProviders() {
     provideRouter([]),            // ActivatedRoute and RouterLink need it
     provideHttpClient(),
     provideHttpClientTesting(),   // after provideHttpClient, it overrides its backend
+    { provide: ChatService, useValue: fakeLiveUpdates() },   // no real socket in unit tests
   ];
+}
+
+// pages listen for live request updates through ChatService.onRequestsChanged. this stands in for
+// it, and keeps the page's callback so a test can pretend the server announced a change.
+// (the chat room spec provides its own, fuller fake, which replaces this one.)
+export const liveUpdates: { announce: ((groupId: string | null) => void) | null } = { announce: null };
+
+function fakeLiveUpdates() {
+  return {
+    onRequestsChanged(callback: (groupId: string | null) => void) {
+      liveUpdates.announce = callback;
+      return () => { liveUpdates.announce = null; };
+    },
+  };
 }
 
 // answers the requests a component makes

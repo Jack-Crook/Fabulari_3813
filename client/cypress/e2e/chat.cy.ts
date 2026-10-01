@@ -17,7 +17,7 @@ describe('Chat room', () => {
     register(outsider);
     createGroup(admin, `E2E Chat ${unique()}`).then(group => {
       groupId = group._id;
-      joinGroup(group._id, member);
+      joinGroup(group._id, member, admin);
       createRoom(group._id, 'General', admin).then(room => {
         channelId = room._id;
         roomPage = `/groups/${group._id}/channels/${room._id}`;
@@ -74,6 +74,10 @@ describe('Chat room', () => {
     cy.contains('.presence-sidebar', member.username).should('be.visible');
     cy.get('.notice').should('contain', `${member.username} joined`);
 
+    // they start typing, and the browser says so by name
+    cy.task('socketTyping', { email: member.email });
+    cy.get('.typing').should('contain', `${member.username} is typing`);
+
     // their message shows under their name
     cy.task('socketSend', { email: member.email, body: 'Hi from the other user' })
       .its('ok').should('equal', true);
@@ -120,7 +124,7 @@ describe('Chat room', () => {
 
     // lifted again, so the member can be used by the tests after this one
     cy.request('DELETE', `${API}/groups/${groupId}/bans/${encodeURIComponent(member.email)}?actorEmail=${encodeURIComponent(admin.email)}`);
-    joinGroup(groupId, member);
+    joinGroup(groupId, member, admin);
   });
 
   it("refuses someone who isn't a member of the group", () => {

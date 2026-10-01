@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HttpTestingController } from '@angular/common/http/testing';
 
 import { UserDashboard } from './user-dashboard';
-import { testProviders, signIn, signOut, makeGroup, makeRequest, flushByUrl } from '../testing';
+import { testProviders, signIn, signOut, makeGroup, makeRequest, flushByUrl, liveUpdates } from '../testing';
 
 describe('UserDashboard', () => {
   let component: UserDashboard;
@@ -85,18 +85,38 @@ describe('UserDashboard', () => {
     expect(component.formSuccess()).toContain('first admin');
   });
 
-  it('surfaces the auto rejection when the user is under the age limit', async () => {
+  it('asks to join rather than joining, and says an admin will review it', async () => {
+    await build('member@test.com');
+    flushByUrl(mock, { '/groups': groups, '/requests': [] });
+
+    component.onJoin(groups[1]);
+    const req = mock.expectOne(r => r.method === 'POST' && r.url.endsWith('/requests'));
+    expect(req.request.body).toEqual({ type: 'group-join', requestedBy: 'member@test.com', groupId: 'g2', payload: {} });
+    req.flush(makeRequest({ type: 'group-join', status: 'pending', groupId: 'g2' }));
+
+    expect(component.formSuccess()).toContain('An admin of the group will review it');
+  });
+
+  it('shows the reason when a request to join is rejected straight away for being too young', async () => {
     await build('member@test.com');
     flushByUrl(mock, { '/groups': groups, '/requests': [] });
 
     component.onJoin(groups[1]);
 
-    // every group is visible, the age check happens on join (403 with the reason)
-    mock.expectOne('http://localhost:3000/groups/g2/members')
-      .flush({ error: 'You must be at least 16 to join this group.' },
-             { status: 403, statusText: 'Forbidden' });
+    // every group is visible, the age check happens when you ask to join
+    mock.expectOne(r => r.method === 'POST' && r.url.endsWith('/requests'))
+      .flush(makeRequest({ type: 'group-join', status: 'rejected', reason: 'You must be at least 16 to join this group.' }));
 
     expect(component.formError()).toContain('at least 16');
+    expect(component.formSuccess()).toBe('');
+  });
+
+  it('knows which groups it has already asked to join', async () => {
+    await build('member@test.com');
+    flushByUrl(mock, { '/groups': groups, '/requests': [makeRequest({ type: 'group-join', groupId: 'g2' })] });
+
+    expect(component.awaitingJoin(groups[1])).toBe(true);
+    expect(component.awaitingJoin(groups[0])).toBe(false);
   });
 
   it('surfaces the 409 when the last admin tries to leave', async () => {
@@ -111,5 +131,29 @@ describe('UserDashboard', () => {
              { status: 409, statusText: 'Conflict' });
 
     expect(component.formError()).toContain('only admin');
+  });
+
+  it('checks the group request before sending it', async () => {
+    await build('member@test.com');
+    flushByUrl(mock, { '/groups': groups, '/requests': [] });
+
+    component.newName = '  ';
+    component.onRequestGroup();
+    expect(component.formError()).toBe('Group name is required');
+
+    component.newName = 'Chess';
+    component.newAgeLimit = 200;
+    component.onRequestGroup();
+    expect(component.formError()).toContain('Age limit');
+
+    mock.expectNone(r => r.method === 'POST');
+  });
+
+  it('refreshes when the server announces a request change, e.g. my join was approved', async () => {
+    await build('member@test.com');
+    flushByUrl(mock, { '/groups': groups, '/requests': [] });
+
+    liveUpdates.announce?.('g2');
+    expect(mock.match(r => r.url.endsWith('/groups')).length).toBe(1);
   });
 });

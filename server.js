@@ -216,7 +216,15 @@ async function closePendingRequests(filter, reason, actor) {
         { $set: { status: 'rejected', reason, resolvedAt: new Date().toISOString(), resolvedBy: actor } });
     if (result.modifiedCount) {
         await logAudit('Requests Closed', actor, `${result.modifiedCount} pending request(s) closed: ${reason}`);
+        announceRequestsChanged(filter.groupId);
     }
+}
+
+// tells every open page that a request was raised or actioned, so the queues and dashboards update
+// straight away instead of on the next reload. only the group id is sent: each page then refetches
+// what it's allowed to see over REST, so nothing private goes out to everyone.
+function announceRequestsChanged(groupId) {
+    io.emit('requestsChanged', { groupId: groupId ? String(groupId) : null });
 }
 
 // deletes one uploaded file by its stored path. '' means nothing to delete.
@@ -525,57 +533,8 @@ app.get('/groups/:id/members', async (req, res) => {
     })));
 });
 
-app.post('/groups/:id/members', async (req, res) => {     // join a group
-    const email = normaliseEmail(req.body.email);
-
-        if (!email) {
-            return res.status(400).json({ error: 'Email is required' });
-    }
-
-    // you can only join for yourself
-        if (normaliseEmail(req.body.actorEmail) !== email) {
-            return res.status(403).json({ error: 'You can only join a group yourself' });
-    }
-
-    const user = await users.findOne({ email });
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
-    }
-
-    const groupId = toObjectId(req.params.id);
-    const group = normaliseGroup(groupId && await groups.findOne({ _id: groupId }));
-        if (!group) {
-            return res.status(404).json({ error: 'Group not found' });
-    }
-
-        if (user.role === 'super') {
-            return res.status(409).json({ error: 'The super admin cannot be added to a group' });
-    }
-        if (group.memberEmails.includes(email)) {
-            return res.status(409).json({ error: 'User is already in this group' });
-    }
-        if (group.bannedEmails.includes(email)) {
-            return res.status(403).json({ error: 'You are banned from this group' });
-    }
-
-    // every group is visible, but joining one you're too young for is refused
-    const tooYoung = ageProblem(user, group);
-        if (tooYoung) {
-            return res.status(403).json({ error: tooYoung });
-    }
-
-    // the check and the write in one step: the filter only matches while they aren't a member,
-    // so two joins at the same moment can't both add them
-    const updated = normaliseGroup(await groups.findOneAndUpdate(
-        { _id: group._id, memberEmails: { $ne: email } },
-        { $push: { memberEmails: email } }, { returnDocument: 'after' }));
-        if (!updated) {
-            return res.status(409).json({ error: 'User is already in this group' });
-    }
-
-    await logAudit('Group Joined', email, `Joined group "${group.name}"`);
-    res.status(200).json(updated);
-});
+// there's no route to join a group directly. joining is a group-join request that an admin of the
+// group approves (POST /requests, then POST /requests/:id/approve), so it can't be skipped.
 
 app.delete('/groups/:id/members/:email', async (req, res) => {    // leave, or an admin removes a member
     const email = normaliseEmail(req.params.email);
@@ -659,6 +618,9 @@ app.post('/groups/:id/bans', async (req, res) => {
 
     await removeFromRooms(room => room.email === email && String(room.groupId) === String(group._id),
         'You were banned from this group');
+    // a request to join that's still waiting can't be approved now
+    await closePendingRequests({ type: 'group-join', groupId: group._id, requestedBy: email },
+        'You were banned from this group', actor);
 
     await logAudit('Group Ban', actor, `Banned ${email} from "${group.name}"${reason ? `, reason: ${reason}` : ''}`);
     res.status(200).json(updated);
@@ -865,12 +827,13 @@ app.delete('/channels/:id', async (req, res) => {     // an admin deletes a room
 
 //requests routes
 //
-// four actions have to be asked for:
+// five actions have to be asked for:
 //   group-create   user -> super admin, with the group's details up front
 //   group-delete   group admin -> super admin
 //   channel-create member -> group admin
+//   group-join     user -> group admin (too young is rejected automatically)
 //   user-ban       group admin reports a user -> super admin bans permanently
-// one collection with a type field, since approve/reject work the same for all four.
+// one collection with a type field, since approve/reject work the same for all five.
 
 const SUPER_TYPES = ['group-create', 'group-delete', 'user-ban'];   // the super admin's types, the rest go to group admins
 
@@ -925,6 +888,7 @@ app.post('/requests', async (req, res) => {
     const targetGroupId = groupId ? toObjectId(groupId) : null;     // null for group-create
     const details = payload ?? {};
     let summary = '';
+    let autoRejected = null;      // why a request was refused on the spot, with no admin needed
 
     // validation per type
     switch (type) {
@@ -1027,25 +991,52 @@ app.post('/requests', async (req, res) => {
             break;
         }
 
+        case 'group-join': {
+            const group = normaliseGroup(targetGroupId && await groups.findOne({ _id: targetGroupId }));
+                if (!group) {
+                    return res.status(404).json({ error: 'Group not found' });
+            }
+                if (group.memberEmails.includes(requester)) {
+                    return res.status(409).json({ error: 'You are already in this group' });
+            }
+                if (group.bannedEmails.includes(requester)) {
+                    return res.status(403).json({ error: 'You are banned from this group' });
+            }
+                if (await requests.findOne({ status: 'pending', type: 'group-join', groupId: targetGroupId, requestedBy: requester })) {
+                    return res.status(409).json({ error: 'You have already asked to join this group' });
+            }
+            summary = `Join "${group.name}"`;
+            // too young, or no date of birth to check: refused straight away rather than waiting for
+            // an admin. it's still saved, as rejected with the reason, so it shows on their profile.
+            autoRejected = ageProblem(requesterUser, group);
+            break;
+        }
+
         default:
             return res.status(400).json({ error: 'Unknown request type' });
     }
 
+    const now = new Date().toISOString();
     const newRequest = {
         type,
-        status: 'pending',      // -> approved or rejected. no cancelling
+        status: autoRejected ? 'rejected' : 'pending',      // -> approved or rejected. no cancelling
         summary,                // the wording every queue shows
         requestedBy: requester,
         groupId: targetGroupId,
         payload: details,
-        createdAt: new Date().toISOString(),
-        resolvedAt: '',
-        resolvedBy: '',
-        reason: '',             // set on rejection
+        createdAt: now,
+        resolvedAt: autoRejected ? now : '',
+        resolvedBy: autoRejected ? 'automatic' : '',
+        reason: autoRejected ?? '',     // set on rejection
     };
 
     await requests.insertOne(newRequest);
     await logAudit('Request Raised', requester, summary);
+        if (autoRejected) {
+            await logAudit('Request Rejected', 'automatic', `${summary}. Rejected: ${autoRejected}`);
+    }
+    announceRequestsChanged(targetGroupId);
+    // 201 either way, the request was recorded. the client checks status to tell the user which.
     res.status(201).json(newRequest);
 });
 
@@ -1147,6 +1138,30 @@ app.post('/requests/:id/approve', async (req, res) => {
                 break;
             }
 
+            case 'group-join': {
+                const group = normaliseGroup(await groups.findOne({ _id: request.groupId }));
+                    if (!group) {
+                        await release();
+                        return res.status(404).json({ error: 'Group not found' });
+                }
+                // re-checked: they may have been banned, or the age limit raised, while it waited
+                    if (group.bannedEmails.includes(request.requestedBy)) {
+                        await release();
+                        return res.status(409).json({ error: 'They have been banned from this group since asking. Reject it instead.' });
+                }
+                const requester = await users.findOne({ email: request.requestedBy });
+                    if (ageProblem(requester, group)) {
+                        await release();
+                        return res.status(409).json({ error: 'They no longer meet this group\'s age limit. Reject it instead.' });
+                }
+                // only adds them if they aren't a member already, so they can't be in the list twice
+                await groups.updateOne(
+                    { _id: group._id, memberEmails: { $ne: request.requestedBy } },
+                    { $push: { memberEmails: request.requestedBy } });
+                await logAudit('Group Joined', request.requestedBy, `Joined group "${group.name}", approved by ${actor}`);
+                break;
+            }
+
             case 'user-ban': {
                 const target = normaliseEmail(request.payload.email);
                     // re-checked, they may have become a group's only admin since the report
@@ -1185,6 +1200,7 @@ app.post('/requests/:id/approve', async (req, res) => {
         throw err;          // express 5 passes it on to the error handler
     }
 
+    announceRequestsChanged(request.groupId);
     res.status(200).json(claimed);
 });
 
@@ -1242,6 +1258,7 @@ app.post('/requests/:id/reject', async (req, res) => {
     }
 
     await logAudit('Request Rejected', actor, `${request.summary}. Rejected: ${reason}`);
+    announceRequestsChanged(request.groupId);
     res.status(200).json(updated);
 });
 
@@ -1252,12 +1269,18 @@ app.get('/bans', async (req, res) => {        // every permanently banned accoun
     res.status(200).json(await banned.find().toArray());
 });
 
-// the audit log, newest first, optionally filtered by type
+// the audit log, newest first, optionally filtered by type, AUDIT_PAGE entries at a time
+const AUDIT_PAGE = 100;
 app.get('/audit', async (req, res) => {
     const { type } = req.query;
     const query = type ? { type } : {};
 
-    res.status(200).json(await audit.find(query).sort({ at: -1 }).toArray());
+    // a page at a time, so a log that grows for years isn't sent in one go. `skip` is how many the
+    // client already has, and the "Show older" button asks for the next page.
+    const limit = Math.min(Number(req.query.limit) || AUDIT_PAGE, 500);
+    const skip = Math.max(Number(req.query.skip) || 0, 0);
+
+    res.status(200).json(await audit.find(query).sort({ at: -1 }).skip(skip).limit(limit).toArray());
 });
 
 // the types actually in the log, for the filter dropdown
@@ -1455,12 +1478,14 @@ function registerSocketHandlers() {
         }
         presence.get(roomKey).set(socket.id, cleanEmail);
 
-        // the newest 50, reversed into reading order (oldest first)
-        const history = (await messages.find({ channelId: id })
-          .sort({ at: -1 }).limit(HISTORY_LIMIT).toArray()).reverse();
+        // the newest 50, reversed into reading order (oldest first). one extra is fetched only to
+        // know whether older messages exist, so the page can offer to load them
+        const newest = await messages.find({ channelId: id })
+          .sort({ at: -1 }).limit(HISTORY_LIMIT + 1).toArray();
+        const history = newest.slice(0, HISTORY_LIMIT).reverse();
 
         // history and presence go only to the joiner
-        ack?.({ history, present: peopleIn(roomKey) });
+        ack?.({ history, present: peopleIn(roomKey), more: newest.length > HISTORY_LIMIT });
 
         // socket.to excludes the joiner, io.to includes everyone
         socket.to(roomKey).emit('userJoined', { email: cleanEmail });
@@ -1518,6 +1543,35 @@ function registerSocketHandlers() {
       } catch (err) {
         console.error(err);
         ack?.({ error: 'Could not send that message' });
+      }
+    });
+
+    // the 50 messages before the oldest one the page has, for "Load older messages". a room's
+    // history can be any length, so it's sent a page at a time rather than all at once
+    socket.on('loadOlder', async ({ before }, ack) => {
+      try {
+        if (!joined) {
+          return ack?.({ error: 'Join a room first' });
+        }
+        const beforeId = toObjectId(before);
+        if (!beforeId) {
+          return ack?.({ error: 'Bad message id' });
+        }
+        // _id order is the order they were stored in, so "older" is a smaller _id
+        const page = await messages.find({ channelId: new ObjectId(joined.channelId), _id: { $lt: beforeId } })
+          .sort({ _id: -1 }).limit(HISTORY_LIMIT + 1).toArray();
+        ack?.({ messages: page.slice(0, HISTORY_LIMIT).reverse(), more: page.length > HISTORY_LIMIT });
+      } catch (err) {
+        console.error(err);
+        ack?.({ error: 'Could not load older messages' });
+      }
+    });
+
+    // "x is typing", to everyone else in the room. not stored, and the client sends it at most
+    // every couple of seconds while someone types
+    socket.on('typing', () => {
+      if (joined) {
+        socket.to(joined.channelId).emit('typing', { email: joined.email });
       }
     });
 

@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed } from '@angular/core';
+import { Component, inject, signal, computed, DestroyRef } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';     // formats ISO dates in the template
@@ -7,6 +7,8 @@ import { Navbar } from '../navbar/navbar';
 import { Auth, AppUser, ProfileChanges } from '../auth';
 import { GroupService, Group } from '../group';
 import { RequestService, AppRequest } from '../request';
+import { ChatService } from '../chat';
+import { nameProblem, textProblem, dobProblem, passwordProblem, firstProblem } from '../validation';
 
 @Component({
   selector: 'app-profile',
@@ -69,6 +71,11 @@ export class Profile {
 
   constructor() {
     this.load();
+
+    // live: a request raised or actioned anywhere (e.g. mine approved) refreshes this page. stops
+    // listening when the page goes.
+    const stop = inject(ChatService).onRequestsChanged(() => this.load());
+    inject(DestroyRef).onDestroy(stop);
   }
 
   private load() {
@@ -164,9 +171,20 @@ export class Profile {
     if (this.saving()) {
       return;
     }
-    this.saving.set(true);
     this.formError.set('');
     this.formSuccess.set('');
+
+    // checked here first, the server checks the same again. a blank password means "keep it"
+    const problem = firstProblem(
+      nameProblem('Display name', this.formUsername),
+      dobProblem(this.formDob),
+      textProblem('Bio', this.formBio),
+      passwordProblem(this.formPassword, false));
+    if (problem) {
+      this.formError.set(problem);
+      return;
+    }
+    this.saving.set(true);
 
     // no email (the identifier) and no role (or you could promote yourself)
     const changes: ProfileChanges = {
@@ -201,6 +219,7 @@ export class Profile {
       'group-create': 'New group',
       'group-delete': 'Delete group',
       'channel-create': 'New room',
+      'group-join': 'Join group',
       'user-ban': 'Ban user',
     };
     return labels[type] ?? type;

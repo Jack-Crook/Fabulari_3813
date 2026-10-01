@@ -18,8 +18,11 @@ describe('GroupView', () => {
   }
 
   // the test router has no :id, so the group id is ''
-  function load(group = makeGroup({ _id: '' }), proposals: any[] = []) {
-    flushByUrl(mock, { '/groups': [group], '/channels': [makeChannel()], '/requests': proposals });
+  // two requests calls: the group's room proposals, and my own pending request to join
+  function load(group = makeGroup({ _id: '' }), proposals: any[] = [], myJoinRequests: any[] = []) {
+    flushByUrl(mock, { '/groups': [group], '/channels': [makeChannel()] });
+    mock.match(r => r.url.includes('/requests')).forEach(req =>
+      req.flush(req.request.params.get('type') === 'group-join' ? myJoinRequests : proposals));
   }
 
   beforeEach(async () => {
@@ -109,36 +112,44 @@ describe('GroupView', () => {
     await fixture.whenStable();
 
     const page = fixture.nativeElement as HTMLElement;
-    expect(page.querySelector('.join-bar button')?.textContent).toContain('Join group');
+    expect(page.querySelector('.join-bar button')?.textContent).toContain('Request to join');
     expect(page.querySelector('a.room-row')).toBeNull();
     expect(page.querySelector('.room-row.locked')?.textContent).toContain('Join to chat');
   });
 
-  it('joins from the group page and then shows the rooms as links', async () => {
+  it('asks to join from the group page, and says an admin will review it', async () => {
     await build('stranger@test.com');
     load();
 
     component.onJoin();
-    const req = mock.expectOne(r => r.method === 'POST' && r.url.endsWith('/members'));
-    expect(req.request.body).toEqual({ email: 'stranger@test.com', actorEmail: 'stranger@test.com' });
-    req.flush(makeGroup({ _id: '' }));
+    const req = mock.expectOne(r => r.method === 'POST' && r.url.endsWith('/requests'));
+    expect(req.request.body).toEqual({ type: 'group-join', requestedBy: 'stranger@test.com', groupId: '', payload: {} });
+    req.flush(makeRequest({ type: 'group-join', status: 'pending', groupId: '' }));
 
-    load(makeGroup({ _id: '', memberEmails: ['admin@test.com', 'stranger@test.com'] }));
-    await fixture.whenStable();
-    expect(component.formSuccess()).toContain('Joined');
-    expect((fixture.nativeElement as HTMLElement).querySelector('a.room-row')).not.toBeNull();
+    expect(component.formSuccess()).toContain('An admin of the group will review it');
+    expect(component.joining()).toBe(false);
   });
 
-  it('shows the server\'s reason when joining is refused', async () => {
+  it('shows the reason when the request is rejected straight away for being too young', async () => {
     await build('stranger@test.com');
     load();
 
     component.onJoin();
-    mock.expectOne(r => r.url.endsWith('/members'))
-      .flush({ error: 'You must be at least 18 to join this group.' }, { status: 403, statusText: 'Forbidden' });
+    mock.expectOne(r => r.method === 'POST' && r.url.endsWith('/requests'))
+      .flush(makeRequest({ type: 'group-join', status: 'rejected', reason: 'You must be at least 18 to join this group.' }));
 
     expect(component.formError()).toContain('at least 18');
     expect(component.joining()).toBe(false);
+  });
+
+  it('says the request is waiting instead of offering the button again', async () => {
+    await build('stranger@test.com');
+    load(makeGroup({ _id: '' }), [], [makeRequest({ type: 'group-join', requestedBy: 'stranger@test.com' })]);
+    await fixture.whenStable();
+
+    const bar = (fixture.nativeElement as HTMLElement).querySelector('.join-bar')!;
+    expect(bar.textContent).toContain('asked to join');
+    expect(bar.querySelector('button')).toBeNull();
   });
 
   it('gives the super admin no join button, since they can\'t be a member', async () => {

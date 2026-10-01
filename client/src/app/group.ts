@@ -64,12 +64,6 @@ export class GroupService {
     return this.http.patch<GroupEditResponse>(`${this.apiUrl}/groups/${groupId}`, { ...changes, actorEmail });
   }
 
-  // POST /groups/:id/members, join. you can only join yourself, and the server answers 403
-  // if you're under the age limit or banned from the group.
-  joinGroup(groupId: string, email: string) {
-    return this.http.post<Group>(`${this.apiUrl}/groups/${groupId}/members`, { email, actorEmail: email });
-  }
-
   // DELETE /groups/:id/members/:email, leave or remove. 409 if it would leave no admin.
   // the email is encoded since + and # would change the url's meaning.
   removeMember(groupId: string, email: string, actorEmail: string) {

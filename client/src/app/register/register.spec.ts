@@ -38,6 +38,8 @@ describe('Register', () => {
   });
 
   it('says so when the first account on the system becomes the super admin', () => {
+    component.email = 'first@test.com';
+    component.password = 'pw1234';
     component.onSubmit();
 
     // the first account on an empty system becomes the super admin, and the server says so
@@ -48,6 +50,8 @@ describe('Register', () => {
   });
 
   it('shows the server\'s message when the email is already taken', () => {
+    component.email = 'first@test.com';
+    component.password = 'pw1234';
     component.onSubmit();
 
     mock.expectOne('http://localhost:3000/register')
@@ -57,6 +61,8 @@ describe('Register', () => {
   });
 
   it('shows the server\'s message when the email is permanently banned', () => {
+    component.email = 'first@test.com';
+    component.password = 'pw1234';
     component.onSubmit();
 
     // a banned email can never register again
@@ -65,5 +71,25 @@ describe('Register', () => {
       { status: 403, statusText: 'Forbidden' });
 
     expect(component.errormessage()).toContain('permanently banned');
+  });
+
+  it('checks the form before sending: email format, password length and a future date of birth', () => {
+    component.email = 'not-an-email';
+    component.password = 'pw1234';
+    component.onSubmit();
+    expect(component.errormessage()).toBe('That is not a valid email address');
+
+    component.email = 'new@test.com';
+    component.password = '123';
+    component.onSubmit();
+    expect(component.errormessage()).toBe('Password must be at least 6 characters');
+
+    component.password = 'pw1234';
+    component.dob = '2999-01-01';
+    component.onSubmit();
+    expect(component.errormessage()).toContain('future');
+
+    // none of them reached the server
+    mock.expectNone('http://localhost:3000/register');
   });
 });

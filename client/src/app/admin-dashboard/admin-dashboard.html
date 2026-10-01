@@ -7,10 +7,10 @@
 
 <!-- one message bar for the page -->
 @if (actionError()) {
-  <p class="banner error" role="alert">{{ actionError() }}</p>
+  <p class="banner error" role="alert" animate.enter="fade-in">{{ actionError() }}</p>
 }
 @if (actionSuccess()) {
-  <p class="banner success" role="status">{{ actionSuccess() }}</p>
+  <p class="banner success" role="status" animate.enter="fade-in">{{ actionSuccess() }}</p>
 }
 
 <div class="admin-body">
@@ -103,7 +103,7 @@
           </form>
         } @else if (confirmingDeleteId() === channel._id) {
           <!-- deleting takes every message, so it asks first and says so. focus goes to Cancel, and aria-describedby reads the question out. -->
-          <div class="confirm-box">
+          <div class="confirm-box" animate.enter="fade-in">
             <p class="confirm-text" [id]="'confirm-delete-' + channel._id">
               Delete "{{ channel.name }}" and every message in it? This can't be undone.
             </p>
@@ -240,11 +240,11 @@
   </section>
 
   <!-- right column: requests this admin actions -->
-  <aside class="admin-side" aria-label="Room proposals">
-    <h2>Room Proposals</h2>
+  <aside class="admin-side" aria-label="Join requests and room proposals">
+    <h2>Requests</h2>
     <p class="side-note">
-      Members propose rooms and an admin of this group approves or rejects them. Joining is
-      direct, so there are no join requests to action here.
+      People ask to join this group, and members propose rooms. An admin of this group approves or
+      rejects them. Anyone under the age limit is turned down automatically.
     </p>
 
     @for (request of proposals(); track request._id) {
@@ -254,7 +254,7 @@
 
         @if (rejectingId() === request._id) {
           <!-- a reason is required (400 without) -->
-          <div class="reject-box">
+          <div class="reject-box" animate.enter="fade-in">
             <label [attr.for]="'reject-' + request._id">Reason for rejection</label>
             <input [id]="'reject-' + request._id" name="reject-reason" type="text"
                    [(ngModel)]="rejectReason" placeholder="Required" />
@@ -274,7 +274,7 @@
     }
 
     @if (proposals().length === 0) {
-      <p class="empty">No pending proposals.</p>
+      <p class="empty">No pending requests.</p>
     }
   </aside>
 

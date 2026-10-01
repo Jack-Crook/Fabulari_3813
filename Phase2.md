@@ -24,7 +24,7 @@
 | R6 | A user can set and remove a profile picture, shown in the navbar and next to their chat messages. **(Phase 2)** | `POST` / `DELETE /users/:email/avatar`; `Profile`, `Navbar`, `ChatRoom` |
 | R7 | Profiles are private. Other members only see a name and picture. | `GET /groups/:id/members` returns only email, username and picture |
 | R8 | Every group is visible to every user, whatever their age. | `GET /groups`; Discover on `UserDashboard`; `GroupView` |
-| R9 | Joining is refused if the user is under the group's age limit, or has no date of birth set. | `POST /groups/:id/members` → `ageProblem()` (403) |
+| R9 | Joining a group needs approval from one of its admins. A user under the group's age limit, or with no date of birth set, is rejected automatically and told why, with no admin needed. | `POST /requests` (`group-join`) → `POST /requests/:id/approve`; `ageProblem()` rejects too-young requests on the spot, and approval re-checks it. There is no direct join route. |
 | R10 | The age limit belongs to the group and covers every room in it. | `groups.ageLimit`; `joinRoom` only admits members |
 | R11 | Raising the age limit removes members who no longer meet it (never an admin). | `PATCH /groups/:id` (`$pullAll`, returns `booted`) |
 | R12 | A group is created by request to the super admin, with title, description, age limit and colour supplied up front. The requester becomes its first admin. | `POST /requests` (`group-create`) → `POST /requests/:id/approve` → `createGroupRecord()`. There is no direct create route. |
@@ -45,18 +45,21 @@
 | R27 | A user who is a group's only admin can't be banned until a replacement admin is assigned. | `POST /requests` (`user-ban`, 409), re-checked at approval |
 | R28 | Group-level bans are separate from system bans and can be lifted. A group admin sees their group's member list and banned list. | `POST` / `DELETE /groups/:id/bans`; `AdminDashboard` |
 | R29 | The super admin sees every permanently banned account, and an audit log filterable by type in date order. | `GET /bans`, `GET /audit?type=`, `GET /audit/types`; `logAudit()` on every change |
-| R30 | The super admin cannot be a member or admin of any group. | `POST /groups/:id/members` (409) |
+| R30 | The super admin cannot be a member or admin of any group. | `POST /requests` refuses the super admin (403), and joining is only by request |
 | R31 | Real-time text messages. **(Phase 2)** | socket.io `sendMessage` → `newMessage`; `ChatService` |
 | R32 | Image messages. **(Phase 2)** | `POST /uploads` then `sendMessage { imageUrl }` |
 | R33 | A live list of who is in the room, plus a notification when someone joins or leaves, both by display name. **(Phase 2)** | In-memory `presence` map; `presence`, `userJoined`, `userLeft` events; `ChatRoom` sidebar and mobile strip |
 | R34 | An indicator in chat when the sender is that group's admin. | `ChatRoom.isAdmin()` |
 | R35 | Only members can enter or post in a room. Membership is re-checked on every message, and someone removed or banned, or whose room or group is deleted, is taken out of the room straight away and stops receiving its messages. **(Phase 2)** | `joinRoom`, `sendMessage`, `POST /uploads` (403); `removeFromRooms()` and the `removedFromRoom` event |
 | R36 | Data persists in MongoDB. **(Phase 2)** | 7 collections, loaded by `seed.js` |
-| R37 | Input is checked on the server: names up to 50 characters, descriptions and bios up to 500, messages up to 2000; a theme must be a hex colour; an age limit is a whole number from 0 to 120; a date of birth can't be in the future. | `groupDetailsProblem()`, `dobProblem()` and the `MAX_*` limits in `server.js` (400); `maxlength` on the matching inputs |
+| R37 | Input is checked in the browser before it's sent, and again on the server: names up to 50 characters, descriptions and bios up to 500, messages up to 2000; a theme must be a hex colour; an age limit is a whole number from 0 to 120; a date of birth can't be in the future. | Client: `validation.ts`, run by every form before sending, plus `maxlength` on the inputs. Server: `groupDetailsProblem()`, `dobProblem()` and the `MAX_*` limits in `server.js` (400) |
 | R38 | Two requests at the same moment can't break a rule: a member is added once, a request is carried out once, and an approve and a reject can't both succeed. | Conditional updates (the check is in the update's filter), requests claimed with `status: 'pending'`, unique indexes, and a 409 from the error handler |
+| R39 | Real time beyond chat messages: "x is typing" in a room, and request queues and dashboards update live when a request is raised or actioned (a new join request appears on the admin's page, an approved join appears on the user's dashboard). **(Phase 2)** | socket.io `typing` and `requestsChanged` events; `ChatService.onRequestsChanged()` |
+| R40 | Large data sets are read a page at a time: a room's history 50 messages at a time ("Load older messages"), the audit log 100 entries at a time ("Show older entries"). | `loadOlder` socket event; `GET /audit?limit=&skip=` |
 
 ### Assumptions and known limitations
 
+- **The email is the username.** Users log in with their email address and password. The spec makes the email the unique identifier for an account, and display names are optional and don't have to be unique, so the email is what a user types to log in.
 - **Identity is self-asserted.** Every REST write route takes an `actorEmail` from the client and checks the rules against it (admin of this group, your own profile, super admin only). The rules are enforced on the server, but the server trusts the email it is given. There are no sessions or tokens, so a modified client could claim to be someone else. The fix would be a JWT issued at login and checked in Express middleware and in the socket handshake.
 - **The socket join trusts the email too.** `joinRoom` checks that the email is a member of the group, but takes the email from the client. Once joined, `sendMessage` takes the sender from the socket's own join, never from the payload, so a message can't be posted under a different name than the one that joined.
 - **Read routes are open.** `GET /users`, `/groups`, `/requests`, `/audit` and `/bans` don't check who is asking. The route guards stop the wrong pages showing, not the data being fetched.
@@ -97,9 +100,8 @@ Identity comes from `actorEmail`: in the body for POST/PUT/PATCH, and in the que
 | PATCH | `/groups/:id` | A group admin edits name, description, theme or age limit. Raising the age limit removes under-age members, and takes them out of the group's rooms. | 200 `{ group, booted }` · 400 empty or over-50 name, description over 500, age limit not 0 to 120, theme not a hex colour · 403 not an admin of this group · 404 · 409 name already taken |
 | DELETE | `/groups/:id` | Delete a group, its rooms, their messages and images, close its pending requests, and take everyone out of its rooms. | 200 · 403 not the super admin · 404 |
 | GET | `/groups/:id/members` | Email, username and picture of each member, for the chat room. | 200 · 404 |
-| POST | `/groups/:id/members` | Join a group (`email` must equal `actorEmail`). | 200 · 400 no email · 403 joining for someone else, banned from this group, under the age limit or no date of birth · 404 user or group · 409 already a member (also two joins at once), or the super admin |
 | DELETE | `/groups/:id/members/:email` | Leave a group, or an admin removes a member. Takes them out of the group's rooms. | 200 · 403 neither yourself nor an admin · 404 group, or not a member · 409 the only admin, or the group changed at the same time |
-| POST | `/groups/:id/bans` | A group admin bans a member from this group (removes them, takes them out of its rooms, and blocks rejoining). | 200 · 400 no email · 403 not an admin · 404 group or user · 409 the only admin, already banned, or the group changed at the same time |
+| POST | `/groups/:id/bans` | A group admin bans a member from this group (removes them, takes them out of its rooms, and stops them asking to join again). | 200 · 400 no email · 403 not an admin · 404 group or user · 409 the only admin, already banned, or the group changed at the same time |
 | DELETE | `/groups/:id/bans/:email` | Lift a group-level ban. | 200 · 403 not an admin · 404 |
 | POST | `/groups/:id/admins` | Promote a member to admin. | 200 · 403 not an admin · 404 group, or the user isn't a member · 409 already an admin (also a double click) |
 | DELETE | `/groups/:id/admins/:email` | Demote an admin, or step down yourself. | 200 · 403 not an admin · 404 group, or the user isn't an admin · 409 the last admin (also when two admins demote each other at once) |
@@ -108,11 +110,11 @@ Identity comes from `actorEmail`: in the body for POST/PUT/PATCH, and in the que
 | PATCH | `/channels/:id` | A group admin renames a room. | 200 · 400 empty name, or over 50 · 403 · 404 · 409 name clash |
 | DELETE | `/channels/:id` | A group admin deletes a room, its messages and their images, and takes anyone in it out. | 200 · 403 · 404 |
 | GET | `/requests` | Filter by `status`, `type`, `groupId`, `requestedBy`, and `scope=super` or `scope=group`. Newest first. | 200 |
-| POST | `/requests` | Raise a `group-create`, `group-delete`, `channel-create` or `user-ban` request, each validated for its type. | 201 · 400 missing type or name, unknown type, name over 50, invalid group details (description, age limit, theme), ban report with no reason, reporting yourself · 403 super admin raising, not an admin or member of the group, target is the super admin · 404 user, group or target, target not in (or banned from) the group · 409 duplicate pending request, name taken, target is a group's only admin |
-| POST | `/requests/:id/approve` | Carry the request out: create the group, delete the group, create the room, or permanently ban the user. The request is claimed first (one update from `pending` to `approved`), so it's carried out once; if a re-check then refuses it, it goes back to pending. | 200 · 403 your own request, or not the right authority for this type · 404 request, actor or group · 409 already actioned (including a second approve at the same moment), requester no longer exists, name or room taken since, target became a group's only admin |
+| POST | `/requests` | Raise a `group-create`, `group-delete`, `channel-create`, `group-join` or `user-ban` request, each validated for its type. A `group-join` from someone under the age limit (or with no date of birth) is saved already rejected, with the reason, and comes back as a 201 with `status: 'rejected'`. | 201 · 400 missing type or name, unknown type, name over 50, invalid group details (description, age limit, theme), ban report with no reason, reporting yourself · 403 super admin raising, not an admin or member of the group, target is the super admin, asking to join a group you're banned from · 404 user, group or target, target not in (or banned from) the group · 409 duplicate pending request, name taken, target is a group's only admin, asking to join a group you're already in |
+| POST | `/requests/:id/approve` | Carry the request out: create the group, delete the group, create the room, add the member to the group, or permanently ban the user. The request is claimed first (one update from `pending` to `approved`), so it's carried out once; if a re-check then refuses it, it goes back to pending. | 200 · 403 your own request, or not the right authority for this type · 404 request, actor or group · 409 already actioned (including a second approve at the same moment), requester no longer exists, name or room taken since, target became a group's only admin, the person asking to join has since been banned or is now under the age limit |
 | POST | `/requests/:id/reject` | Reject with a required reason, which the requester sees on their profile. | 200 · 400 no reason · 403 your own request, or not the right authority · 404 · 409 already actioned (including an approve at the same moment) |
 | GET | `/bans` | Every permanently banned account. | 200 |
-| GET | `/audit` | The audit log, newest first, optionally `?type=`. | 200 |
+| GET | `/audit` | The audit log, newest first, optionally `?type=`. A page at a time: `?limit=` (default 100, at most 500) and `?skip=` (how many the page already has). | 200 |
 | GET | `/audit/types` | The distinct types in the log, sorted, for the filter dropdown. | 200 |
 | POST | `/uploads` | Upload a chat image (multipart: `email`, `channelId`, then `image`). Members only. | 201 `{ imageUrl }` · 400 wrong type or unreadable upload · 403 not a member (the file is deleted) · 413 over 5 MB |
 | GET | `/uploads/:file` | **Not a route handler**: `express.static` serving uploaded images with `X-Content-Type-Options: nosniff`. | 200 · 404 |
@@ -126,7 +128,9 @@ The socket server runs on the same HTTP server as Express. The client opens one 
 
 | Direction | Event | Payload / ack |
 |---|---|---|
-| client → server | `joinRoom` | `{ channelId, email }`. Ack: `{ history, present }` (the last 50 messages oldest first, plus who is in the room), or `{ error }` for a bad id, an unknown room, or a non-member. Leaves any previous room first. |
+| client → server | `joinRoom` | `{ channelId, email }`. Ack: `{ history, present, more }` (the last 50 messages oldest first, who is in the room, and whether older messages exist), or `{ error }` for a bad id, an unknown room, or a non-member. Leaves any previous room first. |
+| client → server | `loadOlder` | `{ before }`, the id of the oldest message shown. Ack: `{ messages, more }`, the 50 before it oldest first, or `{ error }` if not joined. |
+| client → server | `typing` | No payload. Sent while typing, at most every 2 seconds. |
 | client → server | `sendMessage` | `{ body, imageUrl? }`, with no sender. Ack: `{ ok: true }`, or `{ error }` if not joined, empty, over 2000 characters, the image wasn't issued by `/uploads`, or the sender is no longer a member. |
 | client → server | `leaveRoom` | No payload. Removes this socket from the room and presence. |
 | client → server | `disconnect` | Built in (closed tab, lost network). Handled the same as `leaveRoom`. |
@@ -134,6 +138,8 @@ The socket server runs on the same HTTP server as Express. The client opens one 
 | server → client | `presence` | `string[]` of the emails in the room, sent to everyone in it after every join and leave. |
 | server → client | `userJoined` | `{ email }`, sent to everyone **except** the joiner (`socket.to`). |
 | server → client | `userLeft` | `{ email }`, sent to everyone still in the room. |
+| server → client | `typing` | `{ email }`, to everyone in the room except the typist. The page shows "x is typing…" for 3 seconds. |
+| server → client | `requestsChanged` | `{ groupId }` (null for a request with no group), to every connected page when a request is raised, approved, rejected or closed. Only the id goes out: the admin page, group page, dashboards and profile then refetch what they're allowed to see over REST. |
 | server → client | `removedFromRoom` | `{ reason }`, sent to someone the server has just taken out of their room: they were removed or banned from the group, or the room or group was deleted. The page shows the reason and hides the message box. |
 
 ### Data structures
@@ -177,14 +183,14 @@ The client is Angular 22 in `client/`. Every component is standalone (no NgModul
 |---|---|
 | `App` (`app-root`) | The root. Its template is only `<router-outlet>`. |
 | `Navbar` (`app-navbar`) | Shared header imported by every signed-in page. It shows the Dashboard link, a Group Admin link on a group you admin, a Super Admin link for the super admin, and an account menu (avatar or initial) with your name, email, Profile and Logout. The menu closes on an outside click, Escape or navigation. |
-| `Login` (`app-login`) | Email and password form. Stores the session in localStorage and goes to the dashboard. Ignores a double submit. |
-| `Register` (`app-register`) | Signup with optional display name and date of birth. Tells the first account it became the super admin. |
-| `UserDashboard` (`app-user-dashboard`) | My Groups (with Leave), Discover with live search and Join, the group-request form, and your pending requests. The super admin sees All Groups instead. |
+| `Login` (`app-login`) | Email and password form. Checks both are filled in, stores the session in localStorage and goes to the dashboard. Ignores a double submit. |
+| `Register` (`app-register`) | Signup with optional display name and date of birth, checked in the browser before sending (email format, password length, date not in the future). Tells the first account it became the super admin. |
+| `UserDashboard` (`app-user-dashboard`) | My Groups (with Leave), Discover with live search and Request to join (shows Requested while waiting, or the reason if too young), the group-request form, and your pending requests. The super admin sees All Groups instead. |
 | `Profile` (`app-profile`) | View and edit your own profile (everything except email), upload or remove a profile picture, the groups you admin, and your pending and rejected requests with reasons. |
-| `GroupView` (`app-group-view`) | A group's banner in its theme colour and its rooms. Members open rooms and propose new ones; non-members see a Join button and locked rooms. |
-| `ChatRoom` (`app-chat-room`) | The live chat. Room list, messages with avatars, names, admin tags and dates, text and image composer, the presence list (a strip on mobile) and join/leave notices, both by display name. If the server takes you out of the room, it shows why and hides the message box. Holds no chat state of its own. |
-| `AdminDashboard` (`app-admin-dashboard`) | One group's admin page: edit settings, request deletion, add, rename and delete rooms, promote, demote, remove, group-ban or report members, lift bans, and approve or reject room proposals. Irreversible actions ask for confirmation. Stepping down goes back to the group page, and leaving goes to the dashboard. |
-| `SuperAdminDashboard` (`app-super-admin-dashboard`) | Four panels: the pending request queue (approve, or reject with a reason; bans and group deletions ask for confirmation), every account, permanently banned accounts, and the audit log with a type filter. |
+| `GroupView` (`app-group-view`) | A group's banner in its theme colour and its rooms. Members open rooms and propose new ones; non-members see a Request to join button (or that their request is waiting) and locked rooms. |
+| `ChatRoom` (`app-chat-room`) | The live chat. Room list, messages with avatars, names, admin tags and dates, text and image composer, the presence list (a strip on mobile) and join/leave notices, both by display name. "x is typing…", and "Load older messages" for history beyond the last 50, keeping your place. If the server takes you out of the room, it shows why and hides the message box. Holds no chat state of its own. |
+| `AdminDashboard` (`app-admin-dashboard`) | One group's admin page: edit settings, request deletion, add, rename and delete rooms, promote, demote, remove, group-ban or report members, lift bans, and approve or reject join requests and room proposals. A link goes back to the group page. Irreversible actions ask for confirmation. Stepping down goes back to the group page, and leaving goes to the dashboard. |
+| `SuperAdminDashboard` (`app-super-admin-dashboard`) | Four panels: the pending request queue (approve, or reject with a reason; bans and group deletions ask for confirmation), every account, permanently banned accounts, and the audit log with a type filter, 100 entries at a time with "Show older entries". The queue updates live. |
 | `Autofocus` (directive, `[appAutofocus]`) | Focuses the Cancel button when a confirm box appears, so keyboard focus isn't lost and Enter backs out. |
 
 ### Services
@@ -192,9 +198,10 @@ The client is Angular 22 in `client/`. Every component is standalone (no NgModul
 | Service | Owns |
 |---|---|
 | `Auth` (`auth.ts`) | Who is signed in: the localStorage session, exposed as the `session` signal so the navbar redraws when it changes. Also register, login, and the users endpoints: fetch, update profile, upload or remove a profile picture. |
-| `GroupService` (`group.ts`) | Groups and channels: list, edit, join, leave or remove, ban and unban, promote and demote, the member list for chat, and room create, rename and delete. |
-| `RequestService` (`request.ts`) | The request queue (raise, approve, reject, with filters and `scope`), the audit log and its types, and the permanent ban list. |
-| `ChatService` (`chat.ts`) | The single socket.io connection for the whole app, and the live chat state as signals: `messages`, `present`, `notice`, `error`, `removed`. Join, send, leave, rejoin after a reconnect, the chat image upload, and being taken out of a room by the server. |
+| `GroupService` (`group.ts`) | Groups and channels: list, edit, leave or remove, ban and unban, promote and demote, the member list for chat, and room create, rename and delete. |
+| `RequestService` (`request.ts`) | The request queue (raise, approve, reject, with filters and `scope`), which is also how a user asks to join a group, the audit log and its types, and the permanent ban list. |
+| `ChatService` (`chat.ts`) | The single socket.io connection for the whole app, and the live chat state as signals: `messages`, `present`, `notice`, `error`, `removed`, `typing`, `more`. Join, send, leave, rejoin after a reconnect, the chat image upload, loading older messages, sending "typing", being taken out of a room by the server, and `onRequestsChanged()`, which the dashboards, group page, admin page and profile use to refresh live. |
+| `validation.ts` *(functions, not a service)* | `emailProblem()`, `passwordProblem()`, `nameProblem()`, `textProblem()`, `ageLimitProblem()`, `dobProblem()`: the same rules as the server, run by each form before it sends anything, so the user is told straight away. |
 | `theme.ts` *(functions, not a service)* | `contrastRatio()` and `readableInk()`: the WCAG contrast maths that picks dark or light text for any group theme. |
 
 ### Models
@@ -210,7 +217,7 @@ The client is Angular 22 in `client/`. Every component is standalone (no NgModul
 | `GroupMember` | `group.ts` | email, username, avatarUrl. Only what the chat room needs, because profiles are private. |
 | `GroupEditResponse` | `group.ts` | `{ group, booted }`: the saved group and anyone the new age limit removed. |
 | `GroupChanges` | `group.ts` | The fields a group admin can edit, all optional. |
-| `RequestType` | `request.ts` | `'group-create' \| 'group-delete' \| 'channel-create' \| 'user-ban'` |
+| `RequestType` | `request.ts` | `'group-create' \| 'group-delete' \| 'channel-create' \| 'group-join' \| 'user-ban'` |
 | `AppRequest` | `request.ts` | One request. `payload` is type-specific; `reason` is only set on a rejection. |
 | `AuditEntry` | `request.ts` | `_id`, at, type, actor, detail. |
 | `BannedUser` | `request.ts` | email, reason, reportedBy, bannedAt, bannedBy. |
@@ -257,18 +264,40 @@ All in [`design/`](design/). The last column lists what changed in the built app
 |---|---|---|---|
 | Login | [`Login_wireframe.png`](design/Login_wireframe.png) | [`Mobile_login.PNG`](design/Mobile_login.PNG) | Register link; error and success messages |
 | User dashboard | [`User_Dashboard_Wireframe.png`](design/User_Dashboard_Wireframe.png) | [`Mobile_dashboard.PNG`](design/Mobile_dashboard.PNG) | "Request Group" form instead of direct create; Leave buttons; pending requests; account menu replaces the bottom-left user card |
-| Group / channel view | [`Group_Channel_view_wireframe.png`](design/Group_Channel_view_wireframe.png) | None | Propose-a-room form, proposed rooms list, Join bar and locked rooms for non-members |
+| Group / channel view | [`Group_Channel_view_wireframe.png`](design/Group_Channel_view_wireframe.png) | None | Propose-a-room form, proposed rooms list, Request to join bar and locked rooms for non-members |
 | Chat room | [`In_chatroom_wireframe.png`](design/In_chatroom_wireframe.png) | None | Live presence list (a strip on mobile), join/leave notice, avatars, image attach and preview, dates on older messages, mobile Back link |
-| Group admin | [`admin_view_wireframe.png`](design/admin_view_wireframe.png) | None | Editable settings, room management, promote/demote/remove/ban/report, banned list, room proposals instead of join requests, confirm boxes |
+| Group admin | [`admin_view_wireframe.png`](design/admin_view_wireframe.png) | None | Editable settings, room management, promote/demote/remove/ban/report, banned list, a Requests panel for join requests and room proposals, a link back to the group, confirm boxes |
 | Super admin | [`super_admin_wireframes.png`](design/super_admin_wireframes.png) | None | No Un-ban button and no direct Ban (the spec forbids both); approve/reject with reasons; audit type filter; confirm boxes |
 | Profile | None | None | Not wireframed: edit form, profile picture, groups administered, pending and rejected requests |
+
+### The app as built (revised storyboards)
+
+Screenshots of the finished app with the seed data, at desktop width (1280px) and on a phone (390px), in [`design/screens/`](design/screens/).
+
+| Screen | Desktop | Phone |
+|---|---|---|
+| Login | ![Login, desktop](design/screens/01-login-desktop.png) | ![Login, phone](design/screens/02-login-phone.png) |
+| Register | ![Register, desktop](design/screens/03-register-desktop.png) | |
+| Dashboard | ![Dashboard, desktop](design/screens/04-dashboard-desktop.png) | ![Dashboard, phone](design/screens/05-dashboard-phone.png) |
+| Group page | ![Group page, desktop](design/screens/06-group-desktop.png) | |
+| Chat room | ![Chat room, desktop](design/screens/07-chat-desktop.png) | ![Chat room, phone](design/screens/08-chat-phone.png) |
+| Group admin | ![Group admin, desktop](design/screens/09-group-admin-desktop.png) | ![Group admin, phone](design/screens/10-group-admin-phone.png) |
+| Super admin | ![Super admin, desktop](design/screens/11-super-admin-desktop.png) | |
+| Profile | ![Profile, desktop](design/screens/12-profile-desktop.png) | |
+
+### Large data sets
+
+- **Paging.** A room sends its newest 50 messages on joining, and "Load older messages" fetches 50 more at a time over the socket. The audit log comes 100 entries at a time with "Show older entries". Neither ever sends everything at once.
+- **Indexes** on every query that filters or sorts (see §2), so the request queues, audit log and room history stay fast as they grow.
+- **Searching and scrolling.** Discover filters as you type, and long lists (the super admin's accounts and audit log, the chat history) scroll inside their own panels instead of stretching the page.
+- **Long values** (emails, links, names) wrap instead of widening the layout, and names, descriptions and messages have length limits.
 
 ### Responsive methodology
 
 - Designed for desktop first, then reduced for phones with one breakpoint, `@media (max-width: 768px)`, in each page's CSS.
 - The same components are used at both sizes; there are no separate mobile pages. Under 768px, side panels are hidden or stacked, for example the chat room hides the room list and the "Currently In" sidebar.
 - Anything hidden on mobile has a replacement so nothing is lost: a presence strip under the chat banner and a Back link in the banner.
-- The main buttons (the full width form buttons, the navbar links and account menu, the mobile Back link) are at least 44px tall. Buttons inside a row, like Approve, Join and Edit, are 32 to 36px, above the 24px minimum WCAG 2.2 AA sets, which the accessibility test checks.
+- The main buttons (the full width form buttons, the navbar links and account menu, the mobile Back link) are at least 44px tall. Buttons inside a row, like Approve, Request to join and Edit, are 32 to 36px, above the 24px minimum WCAG 2.2 AA sets, which the accessibility test checks.
 - Nothing makes a page scroll sideways on a phone. Grid columns are `minmax(0, 1fr)` so long content can't widen them, long emails and links wrap, and the admin page's members table scrolls inside its own box. The accessibility test checks every page at 375px.
 
 ### Accessibility
@@ -281,6 +310,7 @@ All in [`design/`](design/). The last column lists what changed in the built app
 - **Keyboard.** All controls are real buttons and links. There is a visible `:focus-visible` outline. The account menu closes on Escape and returns focus to its button. Confirm boxes put focus on Cancel, so Enter backs out, and use `aria-describedby` so the question is read out. Boxes that scroll (the chat history, the super admin's lists, the members table on a phone) take keyboard focus, so they can be scrolled without a mouse.
 - **Checked automatically.** `accessibility.cy.ts` runs axe-core (the engine behind browser accessibility audits) on every page at desktop and phone width, against WCAG 2.2 A and AA and axe's best-practice rules. It finds no violations.
 - **Images.** The logo and chat images have alt text. Avatars use `alt=""` because the name is written next to them.
+- **Motion.** New chat messages, message bars, confirm boxes and the account menu fade in (Angular's `animate.enter`). The animation is switched off for anyone whose system asks for reduced motion.
 
 ## 5. Testing
 
@@ -290,6 +320,29 @@ Three levels of automated testing:
 - **Client unit tests** use Vitest through Angular's `ng test`, with jsdom and TestBed. The HTTP backend is replaced with Angular's testing backend, so each test checks what a component or service requested and gives it a fixed reply. Shared setup (providers, sign in, data builders) is in `testing.ts`. No application code was changed to suit the tests.
 - **End to end tests** use Cypress, against the real app, server and database (see below).
 
+### How to run the tests
+
+All three need MongoDB running on `localhost:27017`.
+
+```bash
+# server integration tests (repo root). starts its own server on a free port and its own test databases
+npm install
+npm test
+
+# client unit tests
+cd client
+npm install
+npx ng test --watch=false
+
+# end to end tests (Cypress). needs the app running in two other terminals first:
+#   npm run seed && npm start      (repo root, the API on :3000)
+#   cd client && npx ng serve      (the app on :4200)
+cd client
+npx cypress run                    # or npx cypress open, to watch them run in a browser
+```
+
+The end to end tests create their own accounts and groups with a timestamp in the name, so they can be run again and again; `npm run seed` afterwards gives a clean demo. They switch the app's small fade-in animations off (`cypress/support/e2e.ts`), because headless browsers don't always run CSS animations.
+
 ### Automated test suite
 
 **Server: integration tests** (`test/`, run with `npm test` from the repo root, needs `mongod`)
@@ -298,14 +351,15 @@ Three levels of automated testing:
 |---|---|---|
 | `api.test.js`: auth and users | 20 | health check; a body that isn't JSON is a 400, not a 500; first account becomes super admin; bcrypt hash stored, never the password; email normalised; 400 on missing fields, bad email, short password, long display name, future date of birth; 403 on a banned email; the same email registered twice at once makes one account and a 409; identical 401 for wrong password and unknown email; password never returned; profile edit own-only (403), role not editable, changed password re-hashed, long bio refused, an empty edit saves and logs nothing |
 | `api.test.js`: profile pictures | 5 | your own picture stored with a random file name, returned on the account and served; replacing it deletes the old file; someone else's picture 403 with no file left on disk; SVG refused (400); remove clears it and deletes the file, own account only |
-| `api.test.js`: groups | 32 | list; edit admin-only (403); malformed id is 404, not 500; theme, age limit and name length checked (400); a name another group has (409); raising the age limit boots under-age members but never an admin; delete super-admin-only and cascades rooms and messages; member list returns only email, name and picture; join, already-in and super admin (409), joining for someone else (403), too young or no date of birth (403); three joins at once add the member once; leave and remove, removing a non-member is 404; last admin can't be removed, banned or demoted (409); a ban needs a real account (400, 404); group ban blocks rejoin, lifting it allows it; promote and demote, a double promote adds them once; two admins demoting each other at once still leaves one admin |
+| `api.test.js`: groups | 26 | list; edit admin-only (403); malformed id is 404, not 500; theme, age limit and name length checked (400); a name another group has (409); raising the age limit boots under-age members but never an admin; delete super-admin-only and cascades rooms and messages; member list returns only email, name and picture; leave and remove, removing a non-member is 404; last admin can't be removed, banned or demoted (409); a ban needs a real account (400, 404); a group ban blocks asking to join again, lifting it allows it; promote and demote, a double promote adds them once; two admins demoting each other at once still leaves one admin |
+| `api.test.js`: joining a group | 8 | there's no direct join route (404); a request waits for an admin and approving adds the member; only the group's admins can approve it, not the super admin or a member; someone too young, or with no date of birth, is rejected straight away with the reason; a member, the super admin, someone banned and a second request are refused; the age limit is re-checked at approval; a ban closes a waiting request |
 | `api.test.js`: channels | 10 | list all / by group, malformed group id gives `[]`; admin creates, member gets 403 (must propose); duplicate name in a group (409); a blank or over-long name (400); rename rules (403, 400, 409); delete admin-only and removes its messages |
 | `api.test.js`: requests | 25 | `scope` splits the super admin and group admin queues; `requestedBy` filter; super admin can't raise requests (403); duplicate pending name (409); invalid or over-long group and room details (400); member-only proposals, admin-only deletion requests; ban report needs a reason (400), only for someone in the admin's group (404), and won't target a group's only admin (409); approve carries out all four types; nobody approves their own (403); can't action twice (409); name re-checked at approval time (409), and the request goes back to pending; two approves at once carry it out once; an approve and a reject at once can't both succeed; approved ban deletes the account and blocks re-registering; a ban closes the banned user's pending requests; a request from a deleted account can't be approved (409); deleting a group closes its other pending requests; reject needs a reason (400) and has the same authority check |
-| `api.test.js`: bans and audit | 3 | banned list; audit newest first and filterable by type; distinct sorted types, refused actions not logged |
+| `api.test.js`: bans and audit | 4 | banned list; audit newest first and filterable by type; a page at a time with `limit` and `skip`; distinct sorted types, refused actions not logged |
 | `api.test.js`: uploads | 5 | member upload gets a random file name and is served with `nosniff`; non-member 403 and the file is removed from disk; SVG refused (400); over 5 MB refused (413); unknown file 404 |
-| `sockets.test.js` | 18 | members only can join; bad or unknown room refused; history and presence in the join ack; `userJoined` to others but not the joiner; history replayed oldest first; must join before sending; empty and over-2000-character messages refused; `newMessage` reaches the sender too and is stored; sender taken from the join, not the payload; a sender removed from the group after joining is refused; uploaded image sends, an image url the server never issued is refused; a member removed by an admin is taken out of the room (`removedFromRoom`, presence updated) and stops receiving messages; deleting a room takes everyone out of it; leave and disconnect both send `userLeft` and update presence, no ghost entries |
+| `sockets.test.js` | 21 | members only can join; bad or unknown room refused; history and presence in the join ack; `userJoined` to others but not the joiner; history replayed oldest first; must join before sending; empty and over-2000-character messages refused; `newMessage` reaches the sender too and is stored; sender taken from the join, not the payload; a sender removed from the group after joining is refused; uploaded image sends, an image url the server never issued is refused; a member removed by an admin is taken out of the room (`removedFromRoom`, presence updated) and stops receiving messages; deleting a room takes everyone out of it; `typing` reaches the others but not the typist; joining sends the newest 50 and says there are more, `loadOlder` sends the rest; raising a request announces `requestsChanged` with only the group id; leave and disconnect both send `userLeft` and update presence, no ghost entries |
 
-**Result: 2 files, 118 tests, 118 passed, about 2s** (run six times in a row to check the tests that send requests at the same moment are stable).
+**Result: 2 files, 124 tests, 124 passed, about 2s** (run six times in a row to check the tests that send requests at the same moment are stable).
 
 **Client: unit tests** (`client/`, Vitest via `ng test`)
 
@@ -317,17 +371,18 @@ Three levels of automated testing:
 | `theme.spec.ts` | 7 | WCAG contrast end points (21:1 and 1:1), symmetric, short hex form, dark vs light ink choice, every seeded theme passes AA 4.5:1, safe fallback on a bad value |
 | `guards.spec.ts` | 6 | `authGuard`, `superAdminGuard` and `groupAdminGuard`, each allowing and redirecting |
 | `app.spec.ts` | 3 | root component creates and renders the router outlet; every page route has its own title |
-| `login.spec.ts` | 4 | stores the user (including the picture) on success, shows the server's error, ignores a double submit |
-| `register.spec.ts` | 5 | ordinary signup clears the form, first-account super admin message, server errors shown |
+| `login.spec.ts` | 5 | stores the user (including the picture) on success, shows the server's error, ignores a double submit, asks for both fields before sending anything |
+| `register.spec.ts` | 6 | ordinary signup clears the form, first-account super admin message, server errors shown; email format, password length and a future date of birth caught before sending |
 | `navbar.spec.ts` | 10 | Super Admin link only for the super admin; Group Admin link only on a group this user admins; account menu shows the initial, opens with name, email, Profile and Logout; shows the uploaded picture; closes on Escape and an outside click; logout clears the session and goes to login |
-| `user-dashboard.spec.ts` | 7 | My Groups / Discover split, super admin view, search filter, group request instead of create, age-limit rejection and last-admin 409 surfaced |
-| `group-view.spec.ts` | 11 | admin / member / non-member recognised, propose a room instead of creating it, 409 surfaced, pending proposals listed; non-member gets a Join button and locked rooms; joining sends `actorEmail` and unlocks the rooms; a refused join shows the server's reason; no Join button for the super admin |
-| `chat-room.spec.ts` | 23 | joins the room in the url, admin indicator, theme colour and fallback, socket messages and presence rendered, send trims and clears, empty send blocked, image upload rules (type and 5 MB checked before uploading), image with and without text, members-only composer, leaves on destroy; sender's picture and display name shown, with initial and email fallbacks; presence list and join notice by display name; the message box goes when the server takes you out of the room; time only for today, date for older messages |
-| `profile.spec.ts` | 10 | loads from the server not `localStorage`, age from date of birth, pending vs rejected requests, groups administered, blank password not sent, server errors shown; picture uploads and refreshes the session; bad type or over 5 MB refused before uploading; picture removed |
-| `super-admin-dashboard.spec.ts` | 9 | only super admin request types fetched, audit refetched on filter change, approve, 400 on a rejection with no reason, request type labels; approving a ban asks first and says what it will do; a new group approves straight away |
-| `admin-dashboard.spec.ts` | 17 | last admin flagged, actor sent with settings, booted members reported, deletion and ban go through requests, direct group ban, own-proposal 403 surfaced, rejection reason sent; deleting a room asks first and focuses Cancel; cancelling sends nothing; remove asks first, one box open per member; stepping down goes to the group page, leaving goes to the dashboard, demoting someone else stays put |
+| `user-dashboard.spec.ts` | 11 | My Groups / Discover split, super admin view, search filter, group request instead of create; asking to join sends a `group-join` request and says an admin will review it; a request rejected for being too young shows the reason; knows which groups it has already asked to join; last-admin 409 surfaced; the group request is checked before sending; refreshes when the server announces a request change |
+| `group-view.spec.ts` | 12 | admin / member / non-member recognised, propose a room instead of creating it, 409 surfaced, pending proposals listed; non-member gets a Request to join button and locked rooms; asking sends a `group-join` request; a request rejected for being too young shows the reason; a waiting request replaces the button; no join button for the super admin |
+| `validation.spec.ts` | 7 | email, password, name, text length, age limit and date of birth rules, and `firstProblem()` |
+| `chat-room.spec.ts` | 26 | joins the room in the url, admin indicator, theme colour and fallback, socket messages and presence rendered, send trims and clears, empty send blocked, image upload rules (type and 5 MB checked before uploading), image with and without text, members-only composer, leaves on destroy; sender's picture and display name shown, with initial and email fallbacks; presence list and join notice by display name; the message box goes when the server takes you out of the room; "x is typing" by display name; every keystroke tells the service; "Load older messages" only when there are more; time only for today, date for older messages |
+| `profile.spec.ts` | 11 | loads from the server not `localStorage`, age from date of birth, pending vs rejected requests, groups administered, blank password not sent, an invalid date of birth caught before saving, server errors shown; picture uploads and refreshes the session; bad type or over 5 MB refused before uploading; picture removed |
+| `super-admin-dashboard.spec.ts` | 11 | only super admin request types fetched, audit refetched on filter change, approve, a rejection without a reason stopped before sending, request type labels; approving a ban asks first and says what it will do; a new group approves straight away; the audit log a page at a time; the queue refreshes when a change is announced |
+| `admin-dashboard.spec.ts` | 20 | last admin flagged, actor sent with settings, booted members reported, deletion and ban go through requests, direct group ban, own-proposal 403 surfaced, rejection reason sent; deleting a room asks first and focuses Cancel; cancelling sends nothing; remove asks first, one box open per member; stepping down goes to the group page, leaving goes to the dashboard, demoting someone else stays put; links back to the group page; a room name and a rejection reason checked before sending; refreshes for its own group's requests only |
 
-**Result: 15 files, 135 tests, 135 passed.**
+**Result: 16 files, 158 tests, 158 passed.**
 
 **End to end: Cypress** (`client/cypress/e2e/`, run with `npx cypress run` from `client/`)
 
@@ -342,14 +397,14 @@ The two suites above test the halves separately. The client tests replace the se
 |---|---|---|
 | `auth.cy.ts` | 5 | register through the form; the same email twice (409); log in, land on the dashboard, password not in `localStorage`, navbar names the account; wrong password (401) stays on login with no session; logout from the account menu clears the session and the guard then bounces `/user-dashboard` |
 | `guards.cy.ts` | 8 | signed out: `/user-dashboard`, `/profile`, `/super-admin-dashboard`, `/groups/:id` and an unknown URL all go to `/login`; an ordinary user is sent from the super admin dashboard and from another group's admin page back to their dashboard, with no Super Admin link; the super admin gets in |
-| `groups.cy.ts` | 8 | request a group from the dashboard and see it awaiting approval; a second request for the same name refused; super admin approves; requester is its first admin with the age badge; an adult finds it in Discover and joins; a user under the 18+ limit is automatically refused with the reason; leaving; rejecting needs a reason (400 shown), and the requester sees that reason on their profile |
+| `groups.cy.ts` | 10 | request a group from the dashboard and see it awaiting approval; a second request for the same name refused; super admin approves; requester is its first admin with the age badge; an adult finds it in Discover and asks to join (shown as Requested and awaiting approval, not yet a member); a new join request appears on the admin's open page without a reload; the group's admin approves it on the admin page and they're in; a user under the 18+ limit is rejected straight away with the reason; leaving; rejecting needs a reason (400 shown), and the requester sees that reason on their profile |
 | `admin.cy.ts` | 9 | Manage link from the group page; edit settings, where raising the age limit removes the under-age member and says who; add, rename and delete a room, the delete confirm focusing Cancel and Cancel keeping the room; a member proposes a room and the admin approves it; promote and demote; group ban and lifting it; report for a permanent ban, super admin approves through the confirm step, account in the banned list and the email refused at registration; request group deletion, super admin approves, group gone and its page says "Group not found."; stepping down takes you back to the group page without the Manage link |
-| `chat.cy.ts` | 7 | send a message with Enter, shown as your own with the admin indicator; history still there after a reload; a second user joins (presence list and "joined" notice, by display name), their message appears under their display name, the browser's message reaches them, and their disconnect shows "left" and removes them from the list; send an image (upload, preview, sent, loaded from the server); a member banned while in the room is told why and loses the message box; a non-member and the super admin are refused the room with no message box |
+| `chat.cy.ts` | 7 | send a message with Enter, shown as your own with the admin indicator; history still there after a reload; a second user joins (presence list and "joined" notice, by display name), "is typing" shows by name, their message appears under their display name, the browser's message reaches them, and their disconnect shows "left" and removes them from the list; send an image (upload, preview, sent, loaded from the server); a member banned while in the room is told why and loses the message box; a non-member and the super admin are refused the room with no message box |
 | `accessibility.cy.ts` | 8 | axe-core on every page (login with and without an error, register, dashboard with the request form open, group page as member and non-member, chat room with messages and a long link, group admin, super admin, profile viewing and editing) at 1280px and 375px: no WCAG 2.2 A/AA or best-practice violations, and nothing wider than the screen; every page has its own title |
 
-**Result: 6 files, 45 tests, 45 passed, about 25s** (run repeatedly on 2026-10-01 to check it doesn't depend on the database).
+**Result: 6 files, 47 tests, 47 passed, about 25s** (run repeatedly on 2026-10-01 to check it doesn't depend on the database).
 
-**Total: 298 automated tests, all passing**: 118 server, 135 client, 45 end to end.
+**Total: 329 automated tests, all passing**: 124 server, 158 client, 47 end to end.
 
 ### Manual and integration testing
 
@@ -361,13 +416,29 @@ The two suites above test the halves separately. The client tests replace the se
 
 ### Gaps
 
-- The end to end tests only run in Cypress's built-in Electron browser, not in Firefox or Safari.
+- The end to end suite is run in Cypress's built-in Electron browser. The screenshots in §4 were taken with it in Firefox, but the suite isn't run there routinely, and not in Safari.
 - The tests are run by hand. There is no CI running them on every push.
 - The end to end tests rely on the seeded super admin account (`test@test.com`).
 - axe can't judge everything, for example whether the reading order makes sense to a screen reader user. A manual pass with a real screen reader would still be worth doing.
 - No load testing, for example many users in one room.
 
 ## 6. Git Strategy
+
+### Repository layout
+
+```
+server.js            Express routes, socket.io events, MongoDB access
+seed.js              loads data/*.json into MongoDB (npm run seed)
+data/                the demo data
+test/                server integration tests (node --test)
+client/src/app/      the Angular app: one folder per page, plus the services, guards and validation
+client/cypress/      end to end tests
+design/              Phase 1 wireframes, and screens/ with the finished app
+Phase2.md            this document
+README.md            how to run it, and the demo accounts
+```
+
+### Version control
 
 - Every feature was built on its own `feature/*` branch and merged into `main` when it worked, for example `feature/socket`, `feature/image-messages`, `feature/pfp`, `feature/pre-submission-fixes` and `feature/cypress-e2e`.
 - Phase 1 was submitted at `592a880`, tagged `phase-1-submission`. Phase 2 starts at `092dd60`, tagged `phase-2-start`.

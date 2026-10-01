@@ -23,11 +23,11 @@
 
     <!-- role="alert" is read out straight away by screen readers, role="status" at the next pause -->
     @if (errormessage()) {
-  <p class="error" role="alert">{{ errormessage() }}</p>
+  <p class="error" role="alert" animate.enter="fade-in">{{ errormessage() }}</p>
 }
 
 @if (successmessage()) {
-  <p class="success" role="status">{{ successmessage() }}</p>
+  <p class="success" role="status" animate.enter="fade-in">{{ successmessage() }}</p>
 }
 
 

@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, DestroyRef } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
@@ -8,6 +8,8 @@ import { Autofocus } from '../autofocus';
 import { Auth } from '../auth';
 import { GroupService, Group, Channel } from '../group';
 import { RequestService, AppRequest } from '../request';
+import { ChatService } from '../chat';
+import { nameProblem, textProblem, ageLimitProblem, firstProblem } from '../validation';
 
 @Component({
   selector: 'app-admin-dashboard',
@@ -28,7 +30,7 @@ export class AdminDashboard {
   // signals, because they're set inside subscribe callbacks and this app is zoneless
   group = signal<Group | undefined>(undefined);   // the group in the url
   channels = signal<Channel[]>([]);
-  proposals = signal<AppRequest[]>([]);           // pending room proposals
+  proposals = signal<AppRequest[]>([]);           // pending join requests and room proposals
 
   newRoomName = '';               // plain, [(ngModel)] writes it
 
@@ -63,6 +65,15 @@ export class AdminDashboard {
       this.groupId = params.get('groupId') ?? '';
       this.load();
     });
+
+    // live: a new join request or room proposal for this group shows up without a refresh.
+    // stops listening when the page goes.
+    const stop = inject(ChatService).onRequestsChanged(groupId => {
+      if (groupId === this.groupId) {
+        this.load();
+      }
+    });
+    inject(DestroyRef).onDestroy(stop);
   }
 
   private load() {
@@ -120,6 +131,16 @@ export class AdminDashboard {
   onSaveSettings() {
     this.clearMessages();
 
+    // checked here first, the server checks the same again
+    const problem = firstProblem(
+      nameProblem('Group name', this.formName),
+      textProblem('Description', this.formDescription),
+      ageLimitProblem(this.formAgeLimit));
+    if (problem) {
+      this.actionError.set(problem);
+      return;
+    }
+
     const changes = {
       name: this.formName,
       description: this.formDescription,
@@ -155,6 +176,12 @@ export class AdminDashboard {
   onAddRoom() {                     // POST /channels
     this.clearMessages();
 
+    const problem = nameProblem('Room name', this.newRoomName);
+    if (problem) {
+      this.actionError.set(problem);
+      return;
+    }
+
     this.groupService.createChannel(this.groupId, this.newRoomName, this.me).subscribe({
       next: created => {
         this.actionSuccess.set(`Room "${created.name}" created.`);
@@ -173,6 +200,12 @@ export class AdminDashboard {
 
   onRenameRoom(channel: Channel) {  // PATCH /channels/:id
     this.clearMessages();
+
+    const problem = nameProblem('Room name', this.renameValue);
+    if (problem) {
+      this.actionError.set(problem);
+      return;
+    }
 
     this.groupService.renameChannel(channel._id, this.renameValue, this.me).subscribe({
       next: updated => {
@@ -302,6 +335,11 @@ export class AdminDashboard {
   onReportUser(email: string) {
     this.clearMessages();
 
+    if (!this.banReason.trim()) {
+      this.actionError.set('A reason is required to report a user');
+      return;
+    }
+
     this.requestService.raise('user-ban', this.me, { email, reason: this.banReason }, this.groupId).subscribe({
       next: () => {
         this.actionSuccess.set(`${email} reported to the super admin for a permanent ban.`);
@@ -312,7 +350,7 @@ export class AdminDashboard {
     });
   }
 
-  // room proposals from members
+  // join requests and room proposals for this group
 
   onApproveProposal(request: AppRequest) {
     this.clearMessages();
@@ -339,6 +377,11 @@ export class AdminDashboard {
   // a reason is required (400 without)
   onRejectProposal(request: AppRequest) {
     this.clearMessages();
+
+    if (!this.rejectReason.trim()) {
+      this.actionError.set('A reason is required when rejecting a request');
+      return;
+    }
 
     this.requestService.reject(request._id, this.me, this.rejectReason).subscribe({
       next: () => {

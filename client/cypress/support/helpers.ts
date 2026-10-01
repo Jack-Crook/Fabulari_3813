@@ -79,6 +79,9 @@ export function createRoom(groupId: string, name: string, admin: TestUser): Cypr
     .then(({ body }) => body);
 }
 
-export function joinGroup(groupId: string, user: TestUser) {
-  return cy.request('POST', `${API}/groups/${groupId}/members`, { email: user.email, actorEmail: user.email });
+// joining needs an admin's approval: the user asks, then an admin of the group approves it
+export function joinGroup(groupId: string, user: TestUser, admin: TestUser) {
+  return cy.request('POST', `${API}/requests`, { type: 'group-join', requestedBy: user.email, groupId })
+    .then(({ body: request }) =>
+      cy.request('POST', `${API}/requests/${request._id}/approve`, { actorEmail: admin.email }));
 }

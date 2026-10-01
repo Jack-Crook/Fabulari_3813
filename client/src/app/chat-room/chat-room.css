@@ -1,6 +1,25 @@
-.chat-body {
+/* the page is exactly the screen's height: the navbar, then the chat filling whatever is left, so
+   only the message list scrolls and the message box stays on screen. this used to subtract a fixed
+   74px for the navbar, but on a phone the navbar wraps taller and the message box ended up below
+   the bottom of the screen. dvh is the visible height on phones, where 100vh includes the hidden
+   address bar. */
+:host {
   display: flex;
-  height: calc(100vh - 74px);   /* fixed height so the message area scrolls on its own */
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+}
+
+main {
+  flex: 1;
+  min-height: 0;                /* lets it shrink to the space left, instead of growing to fit */
+  display: flex;
+}
+
+.chat-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
   background: #FAFAFA;
 }
 
@@ -190,6 +209,7 @@
 
 .composer {
   display: flex;                /* input and send button side by side */
+  flex-direction: row;          /* the global form rule stacks fields in a column */
   gap: 8px;
   align-items: center;
   padding: 16px 24px 24px;
@@ -310,6 +330,14 @@
 
 .presence-label {
   color: #6B7280;
+}
+
+/* "x is typing", a fixed height so it doesn't push the message box up and down */
+.typing {
+  min-height: 18px;
+  margin: 0 24px 4px;
+  font-size: 12px;
+  color: #4B5563;
 }
 
 @media (max-width: 768px) {

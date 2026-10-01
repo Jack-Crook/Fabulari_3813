@@ -3,7 +3,7 @@ import { HttpTestingController } from '@angular/common/http/testing';
 import { Router } from '@angular/router';
 
 import { AdminDashboard } from './admin-dashboard';
-import { testProviders, signIn, signOut, makeGroup, makeChannel, makeRequest, flushByUrl } from '../testing';
+import { testProviders, signIn, signOut, makeGroup, makeChannel, makeRequest, flushByUrl, liveUpdates } from '../testing';
 
 describe('AdminDashboard', () => {
   let component: AdminDashboard;
@@ -82,6 +82,8 @@ describe('AdminDashboard', () => {
     await build();
     load(makeGroup({ _id: '' }));
 
+    component.startEditingSettings();
+    component.formAgeLimit = 18;
     component.onSaveSettings();
     mock.expectOne(r => r.method === 'PATCH')
       .flush({ group: makeGroup({ ageLimit: 18 }), booted: ['kid@test.com'] });
@@ -239,5 +241,31 @@ describe('AdminDashboard', () => {
     expect(component.banningEmail()).toBe('');     // opening one closes the other
     expect(component.confirmingRemoveEmail()).toBe('member@test.com');
     mock.expectNone(r => r.method === 'DELETE');
+  });
+
+  it('checks a room name and a rejection reason before sending anything', async () => {
+    await build();
+    load();
+
+    component.newRoomName = '';
+    component.onAddRoom();
+    expect(component.actionError()).toBe('Room name is required');
+
+    component.rejectReason = '';
+    component.onRejectProposal(makeRequest());
+    expect(component.actionError()).toContain('reason is required');
+
+    mock.expectNone(r => r.method === 'POST');
+  });
+
+  it('refreshes when a request for this group is announced, and ignores other groups', async () => {
+    await build();
+    load();
+
+    liveUpdates.announce?.('some-other-group');
+    expect(mock.match(r => r.url.includes('/requests')).length).toBe(0);
+
+    liveUpdates.announce?.('');       // this page's group, '' in the test router
+    expect(mock.match(r => r.url.includes('/requests')).length).toBe(1);
   });
 });

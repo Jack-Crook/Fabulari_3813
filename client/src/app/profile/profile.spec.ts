@@ -110,17 +110,29 @@ describe('Profile', () => {
     req.flush(makeUser({ username: 'New Name' }));
   });
 
-  it('shows the server\'s message when the date of birth is invalid', async () => {
+  it('checks the form before saving: an invalid date of birth never reaches the server', async () => {
     await build();
     flushByUrl(mock, { '/users/': makeUser(), '/groups': [], '/requests': [] });
 
+    component.formUsername = 'member';
     component.formDob = 'not a date';
     component.onSave();
 
-    mock.expectOne(r => r.method === 'PUT')
-      .flush({ error: 'That is not a valid date of birth' }, { status: 400, statusText: 'Bad Request' });
-
+    mock.expectNone(r => r.method === 'PUT');
     expect(component.formError()).toContain('valid date of birth');
+    expect(component.saving()).toBe(false);
+  });
+
+  it('shows the server\'s message when it refuses the save', async () => {
+    await build();
+    flushByUrl(mock, { '/users/': makeUser(), '/groups': [], '/requests': [] });
+
+    component.formUsername = 'member';
+    component.onSave();
+    mock.expectOne(r => r.method === 'PUT')
+      .flush({ error: 'You can only edit your own profile' }, { status: 403, statusText: 'Forbidden' });
+
+    expect(component.formError()).toContain('own profile');
     expect(component.saving()).toBe(false);
   });
 

@@ -47,6 +47,8 @@ describe('Login', () => {
   });
 
   it('shows the server\'s message when the credentials are wrong', () => {
+    component.email = 'a@b.com';
+    component.password = 'wrong-password';
     component.onSubmit();
 
     // the server's { error } body
@@ -59,6 +61,8 @@ describe('Login', () => {
   });
 
   it('ignores a second submit while the first is still in flight', () => {
+    component.email = 'a@b.com';
+    component.password = 'pw1234';
     component.onSubmit();
     component.onSubmit();   // a double click on the button
 
@@ -66,5 +70,15 @@ describe('Login', () => {
     mock.expectOne('http://localhost:3000/login').flush({
       message: 'ok', email: 'a@b.com', role: 'user', username: 'ab', dob: '', bio: '', createdAt: '',
     });
+  });
+
+  it('asks for both fields before sending anything', () => {
+    component.email = 'a@b.com';
+    component.onSubmit();
+
+    // checked in the browser first, no request
+    mock.expectNone('http://localhost:3000/login');
+    expect(component.errormessage()).toBe('Password is required');
+    expect(component.submitting()).toBe(false);
   });
 });
