@@ -19,8 +19,7 @@ cd client
 npx ng serve                # the app, http://localhost:4200
 ```
 
-To use a different database, set `MONGO_URL` (default `mongodb://localhost:27017`) and `DB_NAME`
-(default `fabulari`) before `npm start` and `npm run seed`.
+
 
 ## Demo accounts
 
@@ -32,9 +31,6 @@ All three have the password `pw123`.
 | `jack@123` | Admin of Book Club, Robotics (16+) and Film Club (18+) |
 | `hello@hello.com` | A member of Book Club, 14 years old, so the age limits refuse them |
 
-To try the chat with two people, log in as `jack@123` and `hello@hello.com` in two different
-browsers (or one normal and one private window, since tabs share the login) and open Book Club's
-General room in both.
 
 ## Tests
 

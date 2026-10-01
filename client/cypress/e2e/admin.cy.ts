@@ -26,13 +26,16 @@ describe('Group admin', () => {
     });
   });
 
-  it('opens the admin page from the group page', () => {
+  it('opens the admin page from the group page, and goes back to it', () => {
     visitAs(admin, `/groups/${group._id}`);
 
     // admins only
     cy.contains('a', 'Manage this group').click();
     cy.url().should('include', adminPage);
     cy.contains('h2', 'Group Settings').should('be.visible');
+
+    cy.contains('a', 'Back to group').click();
+    cy.url().should('match', new RegExp(`/groups/${group._id}$`));
   });
 
   it('edits the settings, and raising the age limit removes an under-age member', () => {

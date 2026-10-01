@@ -221,6 +221,15 @@ describe('AdminDashboard', () => {
     expect(component.actionSuccess()).toContain('member@test.com');
   });
 
+  it('links back to the group\'s own page', async () => {
+    await build();
+    load();
+
+    const back = (fixture.nativeElement as HTMLElement).querySelector('a.page-back');
+    expect(back?.textContent).toContain('Back to group');
+    expect(back?.getAttribute('href')).toMatch(/^\/groups/);     // the test router's group id is ''
+  });
+
   it('asks before removing a member, with one box open under a member at a time', async () => {
     await build();
     load();

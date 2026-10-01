@@ -17,6 +17,9 @@
 
   <!-- left column: the group -->
   <section class="admin-main">
+    <!-- back to the group's own page, where its rooms are. the navbar only links to the dashboard -->
+    <a class="page-back" [routerLink]="['/groups', groupId]">‹ Back to group</a>
+
     <div class="section-head">
       <h2>Group Settings</h2>
       @if (!editingSettings()) {

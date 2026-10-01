@@ -251,3 +251,20 @@ label {
     padding: 12px 16px;
   }
 }
+
+/* "‹ Back to group" at the top of the group admin page. here rather than in admin-dashboard.css,
+   which is at angular's 4 kB per-component budget */
+.page-back {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;              /* touch target, the same as the chat room's Back link */
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0b68db;                /* the app's link blue, the same as "Manage this group" */
+  text-decoration: none;
+}
+
+.page-back:hover {
+  text-decoration: underline;
+}

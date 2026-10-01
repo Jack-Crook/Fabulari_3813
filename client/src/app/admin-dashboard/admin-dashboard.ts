@@ -1,6 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Navbar } from '../navbar/navbar';
@@ -11,7 +11,7 @@ import { RequestService, AppRequest } from '../request';
 
 @Component({
   selector: 'app-admin-dashboard',
-  imports: [Navbar, FormsModule, DatePipe, Autofocus],
+  imports: [Navbar, RouterLink, FormsModule, DatePipe, Autofocus],
   templateUrl: './admin-dashboard.html',
   styleUrl: './admin-dashboard.css',
 })
@@ -22,7 +22,7 @@ export class AdminDashboard {
   private router = inject(Router);
   private auth = inject(Auth);
 
-  private groupId = '';           // for reloading after an edit
+  groupId = '';                   // for reloading after an edit, and the back link
   me = this.auth.email;           // sent as actorEmail so the server can check I'm an admin here
 
   // signals, because they're set inside subscribe callbacks and this app is zoneless
