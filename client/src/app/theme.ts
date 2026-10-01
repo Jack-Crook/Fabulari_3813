@@ -1,17 +1,10 @@
-// Colour helpers for the group theme. Plain functions with no Angular in them, so they can be
-// reasoned about and tested on their own.
-//
-// The spec makes the theme colour a group's one customisation, and says it extends into that
-// group's chat rooms. That puts an admin-chosen colour behind real text, and a text colour
-// fixed at build time cannot work for both a pale yellow and a navy. So the readable one is
-// worked out from the colour itself, using the contrast formula WCAG defines.
+// colour helpers for group themes. an admin can pick any theme and text sits on it, so the
+// readable text colour is worked out with the WCAG contrast formula.
 
 export const DARK_INK = '#1A1D23';    // the palette's text colour, for light themes
 export const LIGHT_INK = '#FFFFFF';   // for dark themes
 
-// '#5FA8D3' or the short '#5AD' form -> [r, g, b] in 0-255, or null if it isn't a hex colour.
-// The colour comes out of a <input type="color"> so it should always be the long form, but it
-// is read back from the database and nothing stops a bad value being written there directly.
+// '#5FA8D3' or '#5AD' -> [r, g, b] 0-255, or null if it isn't a hex colour
 function parseHex(hex: string): [number, number, number] | null {
   const value = (hex ?? '').trim().replace(/^#/, '');
   const full = value.length === 3 ? value.split('').map(c => c + c).join('') : value;
@@ -23,10 +16,8 @@ function parseHex(hex: string): [number, number, number] | null {
   ];
 }
 
-// WCAG relative luminance: how bright a colour actually looks, 0 for black and 1 for white.
-// Each channel is un-gamma-corrected first, because sRGB values are not linear - #808080 is
-// nowhere near half as bright as #FFFFFF, to the eye or to this formula. The three weights are
-// the green-heavy ones from the spec, because the eye is most sensitive to green.
+// WCAG relative luminance, 0 (black) to 1 (white). channels are linearised first since sRGB
+// isn't linear, and green is weighted most because the eye is most sensitive to it.
 function relativeLuminance([r, g, b]: [number, number, number]): number {
   const channel = (value: number) => {
     const c = value / 255;
@@ -35,22 +26,19 @@ function relativeLuminance([r, g, b]: [number, number, number]): number {
   return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
 }
 
-// WCAG contrast ratio between two colours: 1 when they are identical, 21 for black on white.
-// AA wants 4.5 for body text and 3 for large text. The 0.05 on both sides stops a pure black
-// background dividing by zero, and models the light a real screen reflects.
+// WCAG contrast ratio: 1 (same colour) to 21 (black on white). AA needs 4.5 for normal text.
+// the 0.05 avoids dividing by zero on pure black.
 export function contrastRatio(a: string, b: string): number {
   const first = parseHex(a);
   const second = parseHex(b);
-  if (!first || !second) return 1;      // unknown, so claim the worst rather than a false pass
+  if (!first || !second) return 1;      // unknown, so assume the worst
   const lighter = Math.max(relativeLuminance(first), relativeLuminance(second));
   const darker = Math.min(relativeLuminance(first), relativeLuminance(second));
   return (lighter + 0.05) / (darker + 0.05);
 }
 
-// The more readable of the two ink colours on the given background. Comparing the two real
-// contrast ratios rather than testing luminance against a 0.5 midpoint, because the midpoint
-// is only ever an approximation of this and gets the awkward middle greens and blues wrong.
+// dark or white text, whichever has more contrast on the theme
 export function readableInk(theme: string): string {
-  if (!parseHex(theme)) return DARK_INK;    // same assumption the rest of the app already makes
+  if (!parseHex(theme)) return DARK_INK;    // fallback for a bad value
   return contrastRatio(theme, LIGHT_INK) > contrastRatio(theme, DARK_INK) ? LIGHT_INK : DARK_INK;
 }

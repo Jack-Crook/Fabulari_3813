@@ -1,7 +1,7 @@
 import { Component, inject, signal, computed } from '@angular/core';
-import { FormsModule } from '@angular/forms';   // lets the html use [(ngModel)] on the edit form
-import { RouterLink } from '@angular/router';   // lets the html use routerLink
-import { DatePipe } from '@angular/common';     // formats the stored ISO timestamps in the template
+import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
+import { DatePipe } from '@angular/common';     // formats ISO dates in the template
 import { HttpErrorResponse } from '@angular/common/http';
 import { Navbar } from '../navbar/navbar';
 import { Auth, AppUser, ProfileChanges } from '../auth';
@@ -19,10 +19,9 @@ export class Profile {
   private groupService = inject(GroupService);
   private requestService = inject(RequestService);
 
-  email = this.auth.email;    // the one field that can't be edited, because it identifies the account
+  email = this.auth.email;    // not editable, it identifies the account
 
-  // signals throughout, because every one of these is set inside a subscribe callback and the
-  // app is zoneless, so a plain property would hold the right value but leave the screen stale
+  // signals, since they're set in subscribe and the app is zoneless
   user = signal<AppUser | undefined>(undefined);
   myGroups = signal<Group[]>([]);
   myRequests = signal<AppRequest[]>([]);
@@ -32,33 +31,27 @@ export class Profile {
   formSuccess = signal('');
   saving = signal(false);
 
-  // the profile picture. signals, because they're set inside the upload's subscribe callback
   uploadingAvatar = signal(false);
   avatarError = signal('');
 
-  // the same limits the server enforces. checked here first so a 20 MB photo is refused straight
-  // away instead of after uploading all of it. the server still checks, this can be bypassed.
+  // the server's limits, checked first to avoid a pointless upload. the server still checks.
   private readonly imageTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
   private readonly maxImageBytes = 5 * 1024 * 1024;
 
-  // the edit form's fields. plain properties, because [(ngModel)] writes to them from a DOM
-  // event and angular already schedules a redraw after those.
+  // form fields. plain, [(ngModel)] writes them from DOM events
   formUsername = '';
   formDob = '';
   formBio = '';
-  formPassword = '';       // blank means "leave the password alone", it isn't sent when empty
+  formPassword = '';       // blank = unchanged, not sent
 
-  // the spec says a user can see their own pending requests and their own past rejected ones.
-  // computed derives both from the one list rather than making two calls, and re-runs by itself
-  // whenever myRequests changes.
+  // your own pending and rejected requests, from one list
   pendingRequests = computed(() => this.myRequests().filter(r => r.status === 'pending'));
   rejectedRequests = computed(() => this.myRequests().filter(r => r.status === 'rejected'));
 
-  // the groups this user actually admins, so the profile shows the relationship that isn't
-  // stored on the user record anywhere
+  // groups you admin (stored on the groups, not the user)
   adminOf = computed(() => this.myGroups().filter(g => g.adminEmails.includes(this.email)));
 
-  // age isn't stored, it's worked out from the date of birth, the same way server.js does it
+  // worked out from the date of birth, same as server.js
   age = computed(() => {
     const dob = this.user()?.dob;
     if (!dob) {
@@ -83,8 +76,7 @@ export class Profile {
       return;
     }
 
-    // fetched from the server rather than read out of localStorage, because localStorage only
-    // holds email/role/username and goes stale the moment the profile is edited
+    // from the server, localStorage only has a few fields and goes stale
     this.auth.fetchUser(this.email).subscribe(user => this.user.set(user));
 
     this.groupService.getGroups().subscribe(groups => {
@@ -96,18 +88,17 @@ export class Profile {
     });
   }
 
-  // the full address of the stored picture, or '' when there isn't one and the initial shows instead
+  // the picture's address, or '' to show the initial
   avatarSrc = computed(() => {
     const url = this.user()?.avatarUrl;
     return url ? this.auth.avatarSrc(url) : '';
   });
 
-  // a picture is uploaded as soon as it's picked, the same as attaching one in the chat room.
-  // there's nothing else to fill in, so there's no separate save step.
+  // uploads as soon as a file is picked, no save step
   onAvatarChosen(event: Event) {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
-    input.value = '';      // reset, so choosing the same file again still fires (change)
+    input.value = '';      // so picking the same file again still fires (change)
     if (!file) {
       return;
     }
@@ -140,22 +131,20 @@ export class Profile {
     });
   }
 
-  // both upload and remove send back the updated account. the page shows it, and localStorage is
-  // refreshed too because that's where the navbar reads the picture from.
+  // show the updated account and refresh the session so the navbar updates too
   private afterAvatarChange(updated: AppUser) {
     this.user.set(updated);
     this.saveSession(updated);
     this.uploadingAvatar.set(false);
   }
 
-  // the navbar reads the username and picture out of localStorage, so the stored copy is
-  // refreshed after any change or it would keep showing the old ones until the next login
+  // the navbar reads name and picture from localStorage, so keep it current
   private saveSession(user: AppUser) {
     this.auth.saveUser({ email: user.email, role: user.role, username: user.username, avatarUrl: user.avatarUrl });
   }
 
   startEditing() {
-    // copy the stored values into the form so it opens showing what's actually saved
+    // open the form with the saved values
     const user = this.user();
     this.formUsername = user?.username ?? '';
     this.formDob = user?.dob ?? '';
@@ -179,17 +168,14 @@ export class Profile {
     this.formError.set('');
     this.formSuccess.set('');
 
-    // email and role aren't in here at all. email is the account's unique identifier so the
-    // spec says it can't change, and role is what makes someone the super admin, and letting a
-    // user PUT their own role would be a way to promote themself.
+    // no email (the identifier) and no role (or you could promote yourself)
     const changes: ProfileChanges = {
       username: this.formUsername,
       dob: this.formDob,
       bio: this.formBio,
     };
 
-    // only sent when they actually typed a new one, so saving the form without touching the
-    // password field leaves the stored password alone rather than blanking it
+    // only sent if typed, so the password isn't blanked
     if (this.formPassword) {
       changes.password = this.formPassword;
     }
@@ -209,7 +195,7 @@ export class Profile {
     });
   }
 
-  // requests are stored with a type slug, this turns it into something readable in the table
+  // readable label for a request type
   labelFor(type: string) {
     const labels: Record<string, string> = {
       'group-create': 'New group',

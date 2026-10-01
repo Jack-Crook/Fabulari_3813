@@ -36,17 +36,17 @@
   align-items: center;
 }
 
-/* account menu: the avatar button and the dropdown that hangs off it */
+/* account menu: avatar button and dropdown */
 
 .nav-account {
-  position: relative;       /* the dropdown is positioned against this, so it sits under the avatar */
+  position: relative;       /* the dropdown is positioned against this */
 }
 
 .nav-links .account-button {
   display: flex;
   align-items: center;
   gap: 4px;
-  min-height: 44px;         /* touch target, the same minimum every other button in the app keeps */
+  min-height: 44px;         /* touch target */
   padding: 0 4px;
   border-radius: 22px;
 }
@@ -59,7 +59,7 @@
   align-items: center;
   justify-content: center;
   background: #5FA8D3;
-  color: #1A1D23;           /* dark, not white: white on this blue is 2.6:1, under the 4.5:1 WCAG asks for */
+  color: #1A1D23;           /* dark text: white on this blue is only 2.6:1 (WCAG wants 4.5:1) */
   font-family: 'Fraunces Variable', Georgia, serif;
   font-size: 18px;
   font-weight: 700;
@@ -77,7 +77,7 @@ img.nav-avatar {
 .account-menu {
   position: absolute;
   top: calc(100% + 8px);
-  right: 0;                 /* lines up with the right edge of the avatar, so it never runs off the screen */
+  right: 0;                 /* aligned to the avatar's right edge so it stays on screen */
   z-index: 10;              /* above page content like the group banners */
   min-width: 220px;
   padding: 8px 0;
@@ -110,7 +110,7 @@ img.nav-avatar {
   white-space: nowrap;
 }
 
-/* the two items. a link and a button, made to look the same, each a full row tall enough to tap */
+/* a link and a button styled the same, each tall enough to tap */
 .account-menu a,
 .nav-links .account-menu button {
   display: flex;
@@ -128,7 +128,7 @@ img.nav-avatar {
 }
 
 .nav-links button {
-  width: auto;          /* the global button style is full width, which would push the navbar apart */
+  width: auto;          /* undo the global full width button style */
   min-height: 0;
   margin: 0;
   padding: 0;

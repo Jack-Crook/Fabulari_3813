@@ -35,8 +35,7 @@ describe('RequestService', () => {
 
     const req = mock.expectOne('http://localhost:3000/requests');
     expect(req.request.method).toBe('POST');
-    // the spec says the requesting user supplies the group's details up front, so they travel
-    // in the payload rather than being filled in by the super admin after approval
+    // the requester supplies the group's details in the payload
     expect(req.request.body).toEqual({
       type: 'group-create', requestedBy: 'me@test.com', groupId: '', payload: { name: 'Chess Club' },
     });
@@ -47,7 +46,7 @@ describe('RequestService', () => {
     service.reject('r1', 'boss@test.com', 'Too similar to an existing group').subscribe();
 
     const req = mock.expectOne('http://localhost:3000/requests/r1/reject');
-    // the spec requires a reason on every rejection, and the server answers 400 without one
+    // a rejection needs a reason
     expect(req.request.body.reason).toBe('Too similar to an existing group');
     req.flush(makeRequest({ status: 'rejected' }));
   });

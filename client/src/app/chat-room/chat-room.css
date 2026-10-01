@@ -1,6 +1,6 @@
 .chat-body {
   display: flex;
-  height: calc(100vh - 74px);   /* a fixed height, not a minimum, so the message area can scroll on its own */
+  height: calc(100vh - 74px);   /* fixed height so the message area scrolls on its own */
   background: #FAFAFA;
 }
 
@@ -46,10 +46,7 @@
 }
 
 .room-link.selected {
-  /* the background is set inline from the group's theme colour, because the spec says the
-     theme extends into the group's chat rooms, and the text colour is derived from it. these
-     are only the fallbacks and the weight - and the fallback background is a pale blue, so
-     the fallback text has to be the dark ink, not the white this used to hardcode. */
+  /* the background and text colour are set inline from the group's theme. these are fallbacks: the fallback background is pale, so dark text. */
   background: #E8EDFB;
   color: #1A1D23;
   font-weight: 600;
@@ -76,8 +73,7 @@
 
 /* middle column */
 
-/* the room header, in the group's colour. it also answers "which room am I in" now that the
-   sidebar is hidden on a phone. */
+/* the room header in the group's colour */
 .chat-banner {
   display: flex;
   align-items: baseline;
@@ -124,8 +120,7 @@
   padding: 24px;
 }
 
-/* the avatar and the bubble side by side. the avatar sits at the bottom, level with the end of
-   the message, the way most chat apps do it */
+/* avatar and bubble side by side, avatar at the bottom */
 .message-row {
   display: flex;
   align-items: flex-end;
@@ -213,14 +208,13 @@
   opacity: 0.7;
 }
 
-/* the input's own colour is bound inline, but a placeholder is a pseudo element and can't be,
-   so the dark theme case is carried by a class the component sets from the same calculation */
+/* the placeholder can't be coloured inline, so a class handles dark themes */
 .composer input.on-dark::placeholder {
   color: #FFFFFF;
   opacity: 0.75;
 }
 
-/* the Image button is secondary, so it's outlined rather than a second solid blue button */
+/* Image is secondary, so outlined */
 .composer .attach {
   background: #FFFFFF;
   color: #1A1D23;
@@ -267,8 +261,7 @@
   background: #FEF2F2;
 }
 
-/* the global button in styles.css is a full width block made for the login form, so this one
-   is reset to sit beside the input instead of underneath it */
+/* sits beside the input, unlike the global full width button */
 .composer button {
   width: auto;
   margin: 0;
@@ -276,8 +269,7 @@
   border-radius: 999px;
 }
 
-/* a fixed height whether or not there's a notice, so a join or leave doesn't shove the
-   message list down and back up again four seconds later */
+/* fixed height, so a notice doesn't push the messages around */
 .notice {
   min-height: 20px;
   margin: 0;
@@ -304,7 +296,7 @@
 
 
 
-/* the phone version of the presence sidebar. only shown under 768px, see below */
+/* phone version of the presence sidebar (under 768px) */
 .presence-strip {
   display: none;
   flex-wrap: wrap;
@@ -321,9 +313,7 @@
 }
 
 @media (max-width: 768px) {
-  /* three columns don't fit on a phone, so the messages get the whole width.
-     the room list is still reachable through the group view, and who's in the room moves into
-     the strip under the banner, because the spec asks for that list to be visible. */
+  /* on phones the messages get the full width. the presence list moves to the strip under the banner. */
   .rooms-sidebar, .presence-sidebar {
     display: none;
   }

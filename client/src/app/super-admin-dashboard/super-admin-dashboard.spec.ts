@@ -18,7 +18,7 @@ describe('SuperAdminDashboard', () => {
   }
 
   function load(requests = [makeRequest({ type: 'group-create' })]) {
-    // /audit/types has to be answered before /audit, because the shorter url matches both
+    // answer /audit/types first, the shorter /audit matches both
     flushByUrl(mock, {
       '/requests': requests,
       '/users': [makeUser({ email: 'admin@test.com' }), makeUser()],
@@ -48,8 +48,7 @@ describe('SuperAdminDashboard', () => {
   it('asks only for the requests the super admin actions', async () => {
     await build();
 
-    // scope: 'super' is the three system level types. room proposals go to the group's own
-    // admin, so they're deliberately not in this queue.
+    // only the super admin's types, room proposals go to group admins
     const req = mock.expectOne(r => r.url === 'http://localhost:3000/requests');
     expect(req.request.params.get('scope')).toBe('super');
     expect(req.request.params.get('status')).toBe('pending');
@@ -64,8 +63,7 @@ describe('SuperAdminDashboard', () => {
     await build();
     load();
 
-    // group admin is held on the group rather than the account, so it can only be counted by
-    // looking through the groups
+    // group admin is stored on groups, so it's counted from them
     expect(component.groupCountFor('admin@test.com')).toBe(1);
     expect(component.adminCountFor('admin@test.com')).toBe(1);
     expect(component.adminCountFor('member@test.com')).toBe(0);
@@ -77,8 +75,7 @@ describe('SuperAdminDashboard', () => {
 
     component.onFilterAudit('User Banned');
 
-    // the spec asks for a log filterable by type in date order, and both happen on the server,
-    // so changing the filter refetches rather than hiding rows already on the page
+    // filtering is on the server, so changing it refetches
     const req = mock.expectOne(r => r.url === 'http://localhost:3000/audit');
     expect(req.request.params.get('type')).toBe('User Banned');
     req.flush([]);
@@ -91,14 +88,13 @@ describe('SuperAdminDashboard', () => {
 
     component.onApprove(request);
 
-    // approving is what actually carries the request out, and the group is created on the
-    // server, with the requester as its first admin
+    // approving carries the request out on the server
     const req = mock.expectOne('http://localhost:3000/requests/r1/approve');
     expect(req.request.body.actorEmail).toBe('boss@test.com');
     req.flush(makeRequest({ status: 'approved' }));
     expect(component.actionSuccess()).toContain('Chess Club');
 
-    load([]);   // the page reloads all five panels after an action
+    load([]);   // everything reloads after an action
   });
 
   it('surfaces the 400 when a rejection has no reason', async () => {

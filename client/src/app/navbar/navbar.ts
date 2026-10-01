@@ -9,9 +9,7 @@ import { GroupService, Group } from '../group';
   imports: [RouterLink, RouterLinkActive],
   templateUrl: './navbar.html',
   styleUrl: './navbar.css',
-  // listeners on the whole document, not just the navbar, because the account menu should close
-  // when you click anywhere else on the page or press Escape, which is how people expect a
-  // dropdown to behave
+  // document listeners, so the account menu closes on a click elsewhere or Escape
   host: {
     '(document:click)': 'onDocumentClick($event)',
     '(document:keydown.escape)': 'closeMenu(true)',
@@ -23,45 +21,37 @@ export class Navbar {
   private auth = inject(Auth);
   private router = inject(Router);
   private groupService = inject(GroupService);
-  private host = inject(ElementRef<HTMLElement>);    // this navbar's own element, to tell a click inside it from one outside
+  private host = inject(ElementRef<HTMLElement>);    // to tell clicks inside the navbar from outside
 
 
-  me = this.auth.email;       // not private, the account menu shows it under the name
+  me = this.auth.email;       // shown in the account menu
 
-  // the account menu on the right says which account you're acting as, which matters a lot on
-  // this app because the same page looks different per role. computed from auth.session, so
-  // changing the name or the picture on the profile page shows up here straight away.
+  // from auth.session, so a name or picture change shows straight away
   displayName = computed(() => this.auth.session()?.username || this.me);
 
-  // the letter in the avatar circle when there's no picture, the same as the profile page
+  // the avatar letter when there's no picture
   initial = computed(() => (this.displayName().charAt(0) || '?').toUpperCase());
 
-  // their uploaded profile picture, or '' when they haven't set one and the initial shows instead
+  // the profile picture, or '' to show the initial
   avatarSrc = computed(() => {
     const url = this.auth.session()?.avatarUrl;
     return url ? this.auth.avatarSrc(url) : '';
   });
 
-  // a signal because it's also closed from the document listeners and from a navigation event,
-  // not only from a click on the button itself
+  // a signal, since the document listeners and navigation also close it
   menuOpen = signal(false);
 
-  // the avatar button, so focus can go back to it when Escape closes the menu. otherwise a
-  // keyboard user is left focused on something that just disappeared
+  // focus returns here when Escape closes the menu
   private accountButton = viewChild<ElementRef<HTMLButtonElement>>('accountButton');
 
-  // not a computed like isGroupAdmin below, because it doesn't depend on which page you're on.
-  // super admin authority is system wide rather than tied to one group, so the link is always
-  // there for them, the same as Dashboard and Profile are for everyone.
+  // plain value: super admin doesn't depend on the current page
   isSuperAdmin = this.auth.isSuper;
 
-  private groups = signal<Group[]>([]);      // every group, fetched once
-  // not private, the template reads it to build the group admin link
-  currentGroupId = signal('');               // the group in the url, empty when we aren't on a group page
+  private groups = signal<Group[]>([]);      // fetched once
+  currentGroupId = signal('');               // the group in the url, '' when not on a group page
 
 
-  // computed works out its own value from other signals, and re-runs whenever any of them
-  // change. so the link appears and disappears as you move around without any extra wiring.
+  // re-runs when groups or the current group change, so the link shows on the right pages
   isGroupAdmin = computed(() => {
     const current = this.groups().find(g => g._id === this.currentGroupId());
     return current?.adminEmails.includes(this.me) ?? false;
@@ -73,22 +63,19 @@ export class Navbar {
       this.groupService.getGroups().subscribe(groups => this.groups.set(groups));
     }
 
-    this.readGroupFromUrl();      // the url is already correct when this component is built
+    this.readGroupFromUrl();
 
-    // switching between two groups reuses the same components, so the navbar isn't rebuilt
-    // and the url has to be re-read on every navigation
+    // the navbar isn't rebuilt between group pages, so re-read the url on every navigation
     this.router.events.subscribe(event => {
       if (event instanceof NavigationEnd) {
         this.readGroupFromUrl();
-        this.menuOpen.set(false);     // picking Profile from the menu shouldn't leave it open on the next page
+        this.menuOpen.set(false);     // don't leave the menu open on the next page
       }
     });
   }
 
 
-  // urls are /groups/g1, /groups/g1/channels/c2 or /admin-dashboard/g1, so in all of them
-  // the group id is the third segment. admin-dashboard is included so the link stays visible
-  // and highlighted once you're actually on the admin page.
+  // /groups/:id, /groups/:id/channels/:c and /admin-dashboard/:id all have the group id third
   private readGroupFromUrl() {
     const segments = this.router.url.split('/');
     const onAGroupPage = segments[1] === 'groups' || segments[1] === 'admin-dashboard';
@@ -101,8 +88,7 @@ export class Navbar {
     this.menuOpen.update(open => !open);
   }
 
-  // Escape closes the menu and puts focus back on the avatar button. only when it was actually
-  // open, so pressing Escape somewhere else on the page doesn't steal focus into the navbar.
+  // Escape returns focus to the button, only if the menu was open
   closeMenu(returnFocus = false) {
     if (!this.menuOpen()) {
       return;
@@ -113,16 +99,15 @@ export class Navbar {
     }
   }
 
-  // a click anywhere outside the navbar closes the menu. clicks inside it are left alone, the
-  // button toggles it itself and the links close it by navigating.
+  // close on a click outside the navbar
   onDocumentClick(event: MouseEvent) {
     if (!this.host.nativeElement.contains(event.target as Node)) {
       this.closeMenu();
     }
   }
 
-  onLogout() {                          // runs when the logout button is clicked
-    this.auth.logout();                 // clear the stored user first
-    this.router.navigateByUrl('/login');// then send them back to the login page
+  onLogout() {
+    this.auth.logout();
+    this.router.navigateByUrl('/login');
   }
 }

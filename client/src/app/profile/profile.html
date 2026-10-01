@@ -6,9 +6,7 @@
     <div class="card">
       <h2>Profile</h2>
 
-      <!-- avatar circle + name, same as the little user box on the dashboard wireframe. the
-           uploaded picture when there is one, otherwise the first letter of the display name so
-           the circle isn't just a blank blob. -->
+      <!-- the picture if there is one, otherwise the first letter of the name -->
       <div class="profile-top">
         @if (avatarSrc()) {
           <img class="avatar" [src]="avatarSrc()" alt="Your profile picture" />
@@ -17,13 +15,10 @@
         }
         <div>
           <p class="username">{{ user()?.username }}</p>
-          <!-- role is 'user' or 'super'. group admin isn't a role on the user record, it's
-               whether their email is in a group's adminEmails, which is why it's listed
-               separately below rather than shown here. -->
+          <!-- 'user' or 'super'. group admin is stored on groups, so it's listed below -->
           <p class="role-tag">{{ user()?.role === 'super' ? 'Super Admin' : 'User' }}</p>
 
-          <!-- the real file input is hidden because it can't be styled, and the button clicks it.
-               the same pattern as attaching an image in the chat room. -->
+          <!-- hidden file input (can't be styled), the button clicks it. same as the chat room. -->
           <div class="avatar-actions">
             <input #avatarPicker type="file" hidden accept="image/png,image/jpeg,image/gif,image/webp"
                    (change)="onAvatarChosen($event)" />
@@ -48,13 +43,11 @@
         <p class="error" role="alert">{{ formError() }}</p>
       }
 
-      <!-- read only view. the edit form replaces it rather than sitting under it, so there's
-           only ever one copy of each value on screen. -->
+      <!-- read only view, replaced by the form when editing -->
       @if (!editing()) {
         <div class="info-row">
           <span class="info-label">Email</span>
-          <!-- the one field with no input in the form below, because the spec makes email the
-               account's unique identifier -->
+          <!-- email has no input, it's the account's identifier -->
           <span class="info-value">{{ email }} <span class="locked">can't be changed</span></span>
         </div>
 
@@ -69,8 +62,7 @@
             @if (user()?.dob) {
               {{ user()?.dob }} <span class="locked">age {{ age() }}</span>
             } @else {
-              <!-- worth calling out, because joining a group with an age limit is refused
-                   until there's a date of birth to check against -->
+              <!-- joining an age limited group needs a date of birth -->
               <span class="locked">Not set, needed to join age restricted groups</span>
             }
           </span>
@@ -100,7 +92,7 @@
         <button type="button" (click)="startEditing()">Edit Profile</button>
       }
 
-      <!-- edit form. every field the spec allows a user to change is here, and email isn't -->
+      <!-- edit form: every field except email -->
       @if (editing()) {
         <form (ngSubmit)="onSave()">
           <div class="field">
@@ -121,8 +113,7 @@
 
           <div class="field">
             <label for="edit-password">New password <span class="optional">optional</span></label>
-            <!-- left blank the password isn't sent at all, so saving the rest of the form
-                 doesn't wipe it -->
+            <!-- left blank, the password isn't sent -->
             <input id="edit-password" name="edit-password" type="password" [(ngModel)]="formPassword" />
             <span class="hint">Leave blank to keep your current password.</span>
           </div>
@@ -135,8 +126,7 @@
       <p class="switch"><a routerLink="/user-dashboard">Back to Dashboard</a></p>
     </div>
 
-    <!-- the spec says a user can see their own pending requests, and their own past rejected
-         ones with the reason. it doesn't give them any other view of the request queue. -->
+    <!-- your pending requests, and rejected ones with the reason -->
     <div class="card">
       <h2>My Requests</h2>
 
@@ -145,8 +135,7 @@
         <div class="request-card">
           <p class="request-summary">{{ request.summary }}</p>
           <p class="request-meta">{{ labelFor(request.type) }} · raised {{ request.createdAt | date:'d MMM yyyy' }}</p>
-          <!-- no cancel button on purpose: the spec says a pending request can't be withdrawn
-               once submitted, so there's no endpoint for it either -->
+          <!-- no cancel button, pending requests can't be withdrawn -->
           <p class="request-meta">Waiting on an admin. A request can't be cancelled once sent.</p>
         </div>
       }
@@ -158,7 +147,7 @@
       @for (request of rejectedRequests(); track request._id) {
         <div class="request-card rejected">
           <p class="request-summary">{{ request.summary }}</p>
-          <!-- a rejection always has a reason, the server refuses to record one without it -->
+          <!-- a rejection always has a reason -->
           <p class="request-reason">Reason: {{ request.reason }}</p>
           <p class="request-meta">{{ labelFor(request.type) }} · {{ request.resolvedAt | date:'d MMM yyyy' }}</p>
         </div>

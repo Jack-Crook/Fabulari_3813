@@ -1,5 +1,5 @@
 import { Component, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';                // lets the html use [(ngModel)] on the add room input
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -21,47 +21,43 @@ export class AdminDashboard {
   private route = inject(ActivatedRoute);
   private auth = inject(Auth);
 
-  private groupId = '';           // kept so the panels can reload after an edit without re-reading the url
-  me = this.auth.email;           // every write endpoint takes this as actorEmail so the server can check the caller is really an admin here
+  private groupId = '';           // for reloading after an edit
+  me = this.auth.email;           // sent as actorEmail so the server can check I'm an admin here
 
   // signals, because they're set inside subscribe callbacks and this app is zoneless
-  group = signal<Group | undefined>(undefined);   // the group whose id is in the url
-  channels = signal<Channel[]>([]);               // its rooms, so a newly added one shows up straight away
-  proposals = signal<AppRequest[]>([]);           // room proposals from members, waiting on this admin
+  group = signal<Group | undefined>(undefined);   // the group in the url
+  channels = signal<Channel[]>([]);
+  proposals = signal<AppRequest[]>([]);           // pending room proposals
 
-  newRoomName = '';               // plain property, [(ngModel)] writes it from a DOM event
+  newRoomName = '';               // plain, [(ngModel)] writes it
 
-  // shared feedback for every action on the page
+  // one message bar for the page
   actionError = signal('');
   actionSuccess = signal('');
 
-  // the group settings form. it opens pre-filled with what's stored, so saving without changing
-  // anything writes back the same values rather than blanking them.
+  // settings form, opened pre-filled with the saved values
   editingSettings = signal(false);
   formName = '';
   formDescription = '';
   formAgeLimit = 0;
   formTheme = '#5FA8D3';
 
-  // only one row is ever renaming, banning or being rejected at a time, so each of these holds
-  // the id of that row rather than every row carrying its own open/closed flag
+  // only one row is open at a time, so each holds that row's id
   renamingChannelId = signal('');
   renameValue = '';
 
-  banningEmail = signal('');       // which member the ban/report box is open for
+  banningEmail = signal('');       // the member with the ban/report box open
   banReason = '';
 
-  // the "are you sure?" step, for the two actions here that can't be undone in one click:
-  // deleting a room takes every message in it, and removing a member takes them out of the group.
-  // the same one-open-row-at-a-time idea as the reject box below.
-  confirmingDeleteId = signal('');     // which room's delete is waiting to be confirmed
-  confirmingRemoveEmail = signal('');  // which member's removal is waiting to be confirmed
+  // "are you sure?" for deleting a room (takes its messages) and removing a member
+  confirmingDeleteId = signal('');
+  confirmingRemoveEmail = signal('');
 
-  rejectingId = signal('');        // which proposal the reject box is open for
-  rejectReason = '';               // the spec says a rejection must carry a reason, so this can't be skipped
+  rejectingId = signal('');        // the proposal with the reject box open
+  rejectReason = '';               // required for a rejection
 
   constructor() {
-    // subscribed rather than read once, so switching between two groups you admin reloads
+    // subscribed, so switching between groups you admin reloads
     this.route.paramMap.subscribe(params => {
       this.groupId = params.get('groupId') ?? '';
       this.load();
@@ -77,13 +73,12 @@ export class AdminDashboard {
       this.channels.set(channels);
     });
 
-    // scope: 'group' asks the server for the request types a group admin actions rather than
-    // the ones that go to the super admin, so this page doesn't have to know which is which
+    // only the group admin's request types
     this.requestService.getRequests({ groupId: this.groupId, status: 'pending', scope: 'group' })
       .subscribe(requests => this.proposals.set(requests));
   }
 
-  // admins are just the members whose email is in adminEmails, there's no role stored per member
+  // admin = email in adminEmails, there's no per-member role
   roleOf(email: string) {
     return this.group()?.adminEmails.includes(email) ? 'Admin' : 'Member';
   }
@@ -92,9 +87,7 @@ export class AdminDashboard {
     return this.group()?.adminEmails.includes(email) ?? false;
   }
 
-  // the spec says a group must always keep at least one admin, so the last one can't be
-  // demoted, removed or banned. the server enforces it with a 409 either way, and this just
-  // greys the buttons out so it isn't a surprise.
+  // a group always keeps an admin. the server answers 409, this just greys out the buttons.
   isLastAdmin(email: string) {
     const group = this.group();
     return !!group && group.adminEmails.includes(email) && group.adminEmails.length === 1;
@@ -105,7 +98,7 @@ export class AdminDashboard {
     this.actionSuccess.set('');
   }
 
-  // express sends its errors as { error: '...' }, and that body arrives on err.error
+  // the server's { error } body
   private showError(err: HttpErrorResponse) {
     this.actionError.set(err.error?.error ?? 'Something went wrong, please try again.');
   }
@@ -122,9 +115,7 @@ export class AdminDashboard {
     this.editingSettings.set(true);
   }
 
-  // no request needed for this. the spec is explicit that a group admin can change the name,
-  // description, theme and age limit whenever they like. only creating and deleting a group
-  // go to the super admin.
+  // no request needed to edit settings
   onSaveSettings() {
     this.clearMessages();
 
@@ -137,8 +128,7 @@ export class AdminDashboard {
 
     this.groupService.updateGroup(this.groupId, changes, this.me).subscribe({
       next: result => {
-        // raising the age limit automatically removes members who no longer meet it, so the
-        // server sends back who went and the admin is told rather than finding out later
+        // raising the age limit removes under-age members, and the server says who
         this.actionSuccess.set(result.booted.length
           ? `Group updated. ${result.booted.length} member(s) removed under the new age limit: ${result.booted.join(', ')}`
           : 'Group updated.');
@@ -149,8 +139,7 @@ export class AdminDashboard {
     });
   }
 
-  // deleting a group is the one thing a group admin can't do themself. this raises the request
-  // and the super admin actions it. it's also how a group with no working admin gets disbanded.
+  // a group admin can't delete their group, so this asks the super admin
   onRequestDeletion() {
     this.clearMessages();
 
@@ -162,7 +151,7 @@ export class AdminDashboard {
 
   // rooms
 
-  onAddRoom() {                     // POST /channels, the room appears in the group view too
+  onAddRoom() {                     // POST /channels
     this.clearMessages();
 
     this.groupService.createChannel(this.groupId, this.newRoomName, this.me).subscribe({
@@ -181,7 +170,7 @@ export class AdminDashboard {
     this.clearMessages();
   }
 
-  onRenameRoom(channel: Channel) {  // PATCH /channels/:id, the spec allows an admin to fix a room's name
+  onRenameRoom(channel: Channel) {  // PATCH /channels/:id
     this.clearMessages();
 
     this.groupService.renameChannel(channel._id, this.renameValue, this.me).subscribe({
@@ -199,7 +188,7 @@ export class AdminDashboard {
     this.clearMessages();
   }
 
-  onDeleteRoom(channel: Channel) {  // DELETE /channels/:id, only reached from the confirm box
+  onDeleteRoom(channel: Channel) {  // DELETE /channels/:id, from the confirm box
     this.clearMessages();
 
     this.groupService.deleteChannel(channel._id, this.me).subscribe({
@@ -214,11 +203,10 @@ export class AdminDashboard {
 
   // members
 
-  // group level removal, not a system wide ban. the server refuses with a 409 if this would
-  // leave the group without an admin, and that message is what ends up in actionError.
+  // removes from this group only. 409 if it would leave no admin.
   startRemoving(email: string) {
     this.confirmingRemoveEmail.set(email);
-    this.banningEmail.set('');       // only one box open under a member at a time
+    this.banningEmail.set('');       // one box open at a time
     this.clearMessages();
   }
 
@@ -247,8 +235,7 @@ export class AdminDashboard {
     });
   }
 
-  // the same call whether an admin is demoting someone else or stepping down themself, because the
-  // spec treats both the same way, and both are refused if they'd leave the group adminless
+  // demote or step down, same call. refused for the last admin.
   onDemote(email: string) {
     this.clearMessages();
 
@@ -274,8 +261,7 @@ export class AdminDashboard {
     this.banningEmail.set('');
   }
 
-  // group level ban. stronger than Remove because it also stops them rejoining, but the
-  // account still exists and they keep every other group. this one can be lifted again.
+  // group ban: removes them and stops them rejoining. can be lifted.
   onBanFromGroup(email: string) {
     this.clearMessages();
 
@@ -301,10 +287,8 @@ export class AdminDashboard {
     });
   }
 
-  // a system wide ban is permanent and only the super admin can do it, and only from a group
-  // admin's report, since the spec says an admin can't ban directly without a prior report. this is
-  // that report. the server refuses one without a reason, and refuses one against a user who is
-  // some other group's only admin until a replacement is assigned there.
+  // reports a user to the super admin for a permanent ban. needs a reason, and is refused if
+  // the user is a group's only admin.
   onReportUser(email: string) {
     this.clearMessages();
 
@@ -318,7 +302,7 @@ export class AdminDashboard {
     });
   }
 
-  // room proposals raised by members of this group
+  // room proposals from members
 
   onApproveProposal(request: AppRequest) {
     this.clearMessages();
@@ -342,8 +326,7 @@ export class AdminDashboard {
     this.rejectingId.set('');
   }
 
-  // the reason isn't optional. the server answers 400 without one, so the box has to be filled
-  // in before this does anything, which is the spec's rule, enforced rather than suggested.
+  // a reason is required (400 without)
   onRejectProposal(request: AppRequest) {
     this.clearMessages();
 

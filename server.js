@@ -3,47 +3,40 @@ const { Server } = require('socket.io');
 
 
 const express = require('express');
-const cors = require('cors');// Angular (localhost:4200) and Express (localhost:3000) are different origins,
-                            // so without this the browser blocks Angular's requests to this API by default.
-                    // cors() adds the Access-Control-Allow-Origin header to responses so the browser allows it.
-const { MongoClient, ObjectId } = require('mongodb');   // MongoClient opens the connection, ObjectId turns an id from a url back into the type mongo stores
-const bcrypt = require('bcrypt');       // hashes passwords so the stored value can't be read back as the password
-const multer = require('multer');       // reads multipart/form-data, which is how a browser uploads a file. express.json() can't
+const cors = require('cors');// angular (:4200) and express (:3000) are different origins, so the browser
+                            // blocks angular's requests unless cors() adds the allow header
+const { MongoClient, ObjectId } = require('mongodb');   // ObjectId turns an id from a url back into mongo's type
+const bcrypt = require('bcrypt');       // one way password hashing
+const multer = require('multer');       // reads multipart/form-data (file uploads), which express.json() can't
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');       // randomUUID() names each uploaded file
 
 const app = express();
 
-app.use(cors());            // allow requests from other origins (Angular on :4200)
-app.use(express.json());    // parse JSON request bodies into req.body
+app.use(cors());            // allow requests from angular on :4200
+app.use(express.json());    // parse JSON bodies into req.body
 
-// uploaded chat images live on disk in uploads/, not in mongo. a message stores only the path to
-// its image, which keeps documents small and lets express send the file itself. the folder is
-// gitignored, it's user content rather than source.
+// uploaded images live on disk in uploads/, mongo only stores the path. gitignored.
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
-fs.mkdirSync(UPLOAD_DIR, { recursive: true });     // recursive means no error if it's already there
+fs.mkdirSync(UPLOAD_DIR, { recursive: true });     // no error if it already exists
 
-// GET /uploads/<file> serves the image. nosniff tells the browser to trust the content type from
-// the extension rather than guessing from the bytes, so a file that isn't really an image can't be
-// run as something else.
+// serves the images. nosniff stops the browser guessing the type from the bytes.
 app.use('/uploads', express.static(UPLOAD_DIR, {
     setHeaders: res => res.set('X-Content-Type-Options', 'nosniff'),
 }));
 
-app.get('/', (req, res) => {            // test route to confirm the server is alive
+app.get('/', (req, res) => {            // health check
   res.send('Fabulari API running');
 });
 
 
-// phase 1 stored everything in json files under data/, one file per type. phase 2 replaces
-// that with mongo, one collection per type, which is the shape the file split was already
-// built around. data/*.json is still in the repo, but only as the seed for `npm run seed`.
+// one mongo collection per type. data/*.json is now only the seed for `npm run seed`.
 const MONGO_URL = process.env.MONGO_URL ?? 'mongodb://localhost:27017';
 const DB_NAME = process.env.DB_NAME ?? 'fabulari';
 
-let users;      // assigned by start() below, before the server begins listening, so no route
-let groups;     // can ever run against an undefined collection
+let users;      // set by start() before the server listens, so no route sees them undefined
+let groups;
 let channels;
 let requests;
 let audit;
@@ -51,47 +44,30 @@ let banned;
 let messages;
 
 
-// ids for groups, channels, requests and audit entries now come from mongo's own _id rather
-// than the old makeId() timestamp. an id arriving from a url is a 24 character hex string that
-// has to be turned back into an ObjectId before it can match anything. a malformed one makes
-// the ObjectId constructor throw, so this returns null instead and the caller answers 404.
+// a url id is a hex string and needs converting to an ObjectId. a malformed one makes the
+// constructor throw, so this returns null and the caller answers 404.
 function toObjectId(value) {
     return ObjectId.isValid(value) ? new ObjectId(value) : null;
 }
 
-// phase 1 stored passwords as plain text, so anyone who could read the database could read
-// every password, and people reuse them across sites. bcrypt hashes are one way: the stored
-// value can be compared against a typed password but can't be turned back into one.
-//
-// 10 is bcrypt's own default cost. the cost is the exponent on how much work a hash takes
-// (2^10 rounds), which is what keeps a stolen database expensive to crack, and it's stored
-// inside the hash itself so raising it later doesn't invalidate existing hashes.
-//
-// bcrypt also generates a random salt per password and keeps it in the hash string, so two
-// people with the same password get different hashes and one cracked hash isn't every account.
+// bcrypt cost: 2^10 rounds, its default. stored inside the hash with a random salt, so equal
+// passwords hash differently and the cost can be raised later.
 const SALT_ROUNDS = 10;
 
-// the spec says email is the unique identifier for a user, so it gets trimmed and lowercased everywhere.
-// without this Test@Test.com and test@test.com would be stored as two different people.
+// email is the unique identifier, so it's always trimmed and lowercased
 function normaliseEmail(email) {
     return String(email ?? '').trim().toLowerCase();
 }
 
-// good enough for a prototype: something, an @, something, a dot, something. real address
-// validation is a rabbit hole, and the only thing this has to stop is obvious nonsense.
+// basic shape check only: something@something.something
 function looksLikeEmail(email) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-// group names are unique case insensitively, and so are channel names inside one group.
-// phase 1 lowercased both sides in JS. mongo does the same comparison itself with a collation:
-// strength 2 means it ignores case (and accents) when matching, and the unique index created
-// in seed.js uses the same collation so the database enforces it too.
+// case-insensitive matching for group and room names. same collation as the unique index in seed.js.
 const CASE_INSENSITIVE = { collation: { locale: 'en', strength: 2 } };
 
-// the password never leaves the server. every route that sends a user back sends this instead
-// of the raw record, so the stored password can't be read out of an API response. _id is
-// dropped as well, because email is what identifies a user everywhere in this app.
+// what a user looks like in every response: no password, no _id
 function publicUser(user) {
     return {
         email: user.email,
@@ -99,13 +75,12 @@ function publicUser(user) {
         username: user.username ?? '',
         dob: user.dob ?? '',
         bio: user.bio ?? '',
-        avatarUrl: user.avatarUrl ?? '',    // '' when they haven't uploaded a profile picture
+        avatarUrl: user.avatarUrl ?? '',    // '' = no profile picture
         createdAt: user.createdAt ?? '',
     };
 }
 
-// records written before bannedEmails existed come back without it, and .includes() on
-// undefined throws. every group read goes through here so the gap is filled in one place.
+// older group records have no bannedEmails, and .includes() on undefined throws
 function normaliseGroup(group) {
     if (group) {
         group.bannedEmails = group.bannedEmails ?? [];
@@ -113,41 +88,37 @@ function normaliseGroup(group) {
     return group;
 }
 
-// age in whole years from a yyyy-mm-dd date of birth, or null when there isn't one stored.
-// null matters: it means "unknown", which is treated differently from "too young" below.
+// age in whole years from yyyy-mm-dd. null means unknown, which is not the same as too young.
 function ageFrom(dob) {
     if (!dob) {
         return null;
     }
     const born = new Date(dob);
-    if (isNaN(born.getTime())) {      // a typed date that isn't a real date parses to NaN
+    if (isNaN(born.getTime())) {      // not a real date
         return null;
     }
     const now = new Date();
     let age = now.getFullYear() - born.getFullYear();
     const monthsIn = now.getMonth() - born.getMonth();
     if (monthsIn < 0 || (monthsIn === 0 && now.getDate() < born.getDate())) {
-        age = age - 1;                  // their birthday hasn't happened yet this year
+        age = age - 1;                  // birthday not reached yet this year
     }
     return age;
 }
 
-// the spec asks for an audit log the super admin can filter by type and read in date order,
-// so every route that changes something calls this. it's one line at each call site, which is
-// the only way a log like this stays complete. async now, because it writes to mongo.
+// every change is logged for the super admin's audit page
 async function logAudit(type, actor, detail) {
     await audit.insertOne({
-        at: new Date().toISOString(),   // stored as ISO so string sorting and date sorting agree
+        at: new Date().toISOString(),   // ISO, so string order = date order
         type,
         actor,
         detail,
     });
 }
 
-// used by the join route and by the age limit check when an admin raises it. returns a
-// reason string when the user can't be in the group, or null when they're fine.
+// returns why a user can't be in a group, or null if they can
 function ageProblem(user, group) {
-    if (!group.ageLimit) {            // 0 (or missing) means the group has no age restriction
+    if (!group.ageLimit) {            // 0 = no age limit
         return null;
     }
     const age = ageFrom(user.dob);
@@ -160,42 +131,34 @@ function ageProblem(user, group) {
     return null;
 }
 
-// builds and inserts a new group when the super admin approves a group-create request. there is
-// deliberately no POST /groups route: the spec says a group only exists once a request for it
-// has been approved, so a direct create route would be a way around the super admin.
-// insertOne sets _id on the object it was given, so the caller can read it straight back.
+// only called when a group-create request is approved. there is no POST /groups on purpose,
+// so the super admin can't be bypassed. insertOne sets _id on newGroup.
 async function createGroupRecord({ name, description, ageLimit, theme }, creatorEmail) {
     const newGroup = {
         name: String(name).trim(),
         description: description ?? '',
-        ageLimit: Number(ageLimit) || 0,  // 0 means no age limit. the spec puts the limit on the group, and it covers every channel inside it
-        theme: theme ?? '#5FA8D3',        // the group's colour, which carries through to its chat rooms
-        adminEmails: [creatorEmail],      // the spec says a group must always have at least one admin, so whoever asked for it becomes the first one
-        memberEmails: [creatorEmail],     // that admin is a member of the group as well
-        bannedEmails: [],                 // group level bans. the account still exists, they just can't be in this group
+        ageLimit: Number(ageLimit) || 0,  // 0 = no limit. covers every room in the group
+        theme: theme ?? '#5FA8D3',        // carries into the group's chat rooms
+        adminEmails: [creatorEmail],      // the requester is the first admin
+        memberEmails: [creatorEmail],
+        bannedEmails: [],                 // group level bans
     };
     await groups.insertOne(newGroup);
     return newGroup;
 }
 
-// deletes messages and the image files that belong to them. a room or group going takes its
-// messages with it, and without removing the files too, every image ever sent there would stay in
-// uploads/ with nothing pointing at it. the image paths are read before the documents are deleted,
-// because afterwards there is nothing left to read them from.
+// deletes messages and their image files. the paths are read first, because after the
+// delete there's nothing left to read them from.
 async function deleteMessages(filter) {
     const withImages = await messages.find({ ...filter, imageUrl: { $ne: '' } }, { projection: { imageUrl: 1 } }).toArray();
     await messages.deleteMany(filter);
-    // force: true means a file that's already gone isn't an error. basename() keeps the delete
-    // inside uploads/ whatever the stored path says.
+    // basename() keeps the delete inside uploads/. force: a missing file isn't an error.
     await Promise.all(withImages.map(m =>
         fs.promises.rm(path.join(UPLOAD_DIR, path.basename(m.imageUrl)), { force: true })));
 }
 
-// closes every pending request matching the filter as rejected, with the reason recorded. used
-// when the thing a request depends on stops existing: a group that's deleted, or a requester who is
-// permanently banned. without it those requests sat in a queue forever, and approving one could
-// act on something that was gone, e.g. create a group whose only admin is a deleted account.
-// rejected rather than deleted, so the requester still sees what happened on their profile page.
+// rejects pending requests whose group or requester no longer exists. rejected rather than
+// deleted, so the requester still sees the reason on their profile.
 async function closePendingRequests(filter, reason, actor) {
     const result = await requests.updateMany(
         { ...filter, status: 'pending' },
@@ -205,17 +168,14 @@ async function closePendingRequests(filter, reason, actor) {
     }
 }
 
-// deletes one file that POST /uploads or the avatar route wrote, given the path stored for it.
-// '' or undefined means there's nothing to delete. basename() keeps it inside uploads/, and
-// force: true means a file that's already gone isn't an error.
+// deletes one uploaded file by its stored path. '' means nothing to delete.
 async function removeUploadedFile(url) {
     if (url) {
         await fs.promises.rm(path.join(UPLOAD_DIR, path.basename(url)), { force: true });
     }
 }
 
-// a group name has to be unique across every group, optionally ignoring one group so that
-// saving an edit form without touching the name doesn't collide with the group's own record.
+// group names are unique. exceptId skips the group being edited so it doesn't clash with itself.
 async function nameTaken(name, exceptId) {
     const query = { name: String(name).trim() };
     if (exceptId) {
@@ -226,50 +186,45 @@ async function nameTaken(name, exceptId) {
 
 
 //register route
-app.post('/register', async (req, res) => {       // handles new user signups
-    const { email, password, username, dob } = req.body;     // pull fields out of the request body
+app.post('/register', async (req, res) => {
+    const { email, password, username, dob } = req.body;
 
-        if (!email || !password) {    // reject the request early if either field is missing/empty
-            return res.status(400).json({ error: 'Email and password are required' });      // 400 = Bad Request, it tells the client (Angular) it sent invalid input,
+        if (!email || !password) {
+            return res.status(400).json({ error: 'Email and password are required' });      // 400 = bad input
     }
 
-    const cleanEmail = normaliseEmail(email);       // compare and store the same tidied up version every time
+    const cleanEmail = normaliseEmail(email);
 
         if (!looksLikeEmail(cleanEmail)) {
             return res.status(400).json({ error: 'That is not a valid email address' });
     }
 
-        if (String(password).length < 6) {      // a minimum length is the one password rule worth having in a prototype
+        if (String(password).length < 6) {
             return res.status(400).json({ error: 'Password must be at least 6 characters' });
     }
 
-    const existingUser = await users.findOne({ email: cleanEmail });        // check if email is already registered
+    const existingUser = await users.findOne({ email: cleanEmail });
         if (existingUser) {
             return res.status(409).json({ error: 'Email is already registered' });
     }
 
-    // a system wide ban is permanent: the spec says the email can never be reused, so the
-    // banned list is checked here rather than only at login. deleting the account isn't enough
-    // on its own, because nothing would stop them signing up again with the same address.
+    // a system wide ban is permanent, so a banned email can never sign up again
     const isBanned = await banned.findOne({ email: cleanEmail });
         if (isBanned) {
             return res.status(403).json({ error: 'This email is permanently banned and cannot be reused' });
     }
 
-    // bootstrap: the spec says exactly one super admin always exists, and nobody can create
-    // that account through the UI. rather than editing the database by hand, the very first
-    // account to register on an empty system becomes it. every account after that is a normal
-    // user, so this can only ever happen once.
+    // the first account on an empty system becomes the one super admin. can only happen once.
     const role = (await users.countDocuments()) === 0 ? 'super' : 'user';
 
     const newUser = {
         email: cleanEmail,
-        password: await bcrypt.hash(password, SALT_ROUNDS),   // the typed password is never stored, only this hash of it
+        password: await bcrypt.hash(password, SALT_ROUNDS),   // only the hash is stored
         role,
-        username: (username ?? '').trim() || cleanEmail.split('@')[0],   // fall back to the part before the @ so nobody is nameless
-        dob: dob ?? '',        // optional at signup, but needed before joining an age restricted group
+        username: (username ?? '').trim() || cleanEmail.split('@')[0],   // default: the part before the @
+        dob: dob ?? '',        // optional, but needed to join an age limited group
         bio: '',
-        avatarUrl: '',         // no profile picture until they upload one from the profile page
+        avatarUrl: '',
         createdAt: new Date().toISOString(),
     };
 
@@ -278,7 +233,7 @@ app.post('/register', async (req, res) => {       // handles new user signups
         ? 'First account on the system, promoted to super admin'
         : 'Self registered');
 
-    // the client shows a different message for the bootstrap case, so the role goes back too
+    // role goes back so the client can show the super admin message
     res.status(201).json({ message: 'User registered successfully', email: cleanEmail, role });
 });
 
@@ -287,33 +242,29 @@ app.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
         if (!email || !password) {
-            return res.status(400).json({ error: 'Email and password are required' });      // 400 = Bad Request, it tells the client (Angular) it sent invalid input,
+            return res.status(400).json({ error: 'Email and password are required' });
     }
-    const cleanEmail = normaliseEmail(email);       // tidied the same way as register so a stored email always matches a typed one
+    const cleanEmail = normaliseEmail(email);
 
-    const user = await users.findOne({ email: cleanEmail }); // look for a user whose email matches the one submitted; null if none found
+    const user = await users.findOne({ email: cleanEmail });
 
-    // bcrypt.compare hashes what was typed with the salt stored inside the saved hash and
-    // compares the two, which is the only way to check a password that was never kept.
-    // the two cases are still answered identically, so this doesn't reveal whether an email
-    // is registered. && short circuits, so no hash is attempted when there's no user.
+    // compare() hashes the typed password with the stored salt. unknown email and wrong
+    // password get the same answer, so this doesn't reveal who has an account.
         if (!user || !(await bcrypt.compare(String(password), user.password))) {
             return res.status(401).json({ error: 'Invalid email or password' });
     }
-    // role goes back too so Angular knows which pages to offer, and the profile fields go with
-    // it so the profile page has something to show before it fetches anything
     res.status(200).json({ message: 'Login successful', ...publicUser(user) });
 });
 
 
 //users routes
 
-app.get('/users', async (req, res) => {       // every registered account, for the super admin's members panel
+app.get('/users', async (req, res) => {       // every account, for the super admin's members panel
     const all = await users.find().toArray();
-    res.status(200).json(all.map(publicUser));      // map(publicUser) strips the password off every record
+    res.status(200).json(all.map(publicUser));
 });
 
-app.get('/users/:email', async (req, res) => {        // one account, used by the profile page to load fresh values rather than trusting localStorage
+app.get('/users/:email', async (req, res) => {        // one account, for the profile page
     const email = normaliseEmail(req.params.email);
     const user = await users.findOne({ email });
 
@@ -323,16 +274,12 @@ app.get('/users/:email', async (req, res) => {        // one account, used by th
     res.status(200).json(publicUser(user));
 });
 
-// the spec says a user can edit every profile field except their email, because email is the
-// unique identifier for the account. role isn't editable either, so nobody can promote themself
-// to super admin by PUTing their own profile.
+// edit your own profile. email (the identifier) and role can't be changed.
 app.put('/users/:email', async (req, res) => {
     const email = normaliseEmail(req.params.email);
     const { username, dob, bio, password, actorEmail } = req.body;
 
-    // only the account holder can edit their own profile. there is deliberately no admin
-    // override: the spec says the super admin cannot create, edit or deactivate an account,
-    // only permanently ban one. without this check anyone could PUT anyone's password.
+    // own profile only. the spec gives the super admin no edit power over accounts.
         if (normaliseEmail(actorEmail) !== email) {
             return res.status(403).json({ error: 'You can only edit your own profile' });
     }
@@ -342,8 +289,7 @@ app.put('/users/:email', async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
     }
 
-    // built up as a $set rather than mutating and writing the whole record back, so an edit
-    // only ever touches the fields that were actually sent
+    // only the fields that were sent go into the $set
     const changes = {};
 
         if (username !== undefined) {
@@ -354,8 +300,7 @@ app.put('/users/:email', async (req, res) => {
     }
 
         if (dob !== undefined) {
-            // an empty string is allowed, it means "clearing the date of birth", but a value
-            // that's there has to actually be a date or the age check can't use it
+            // '' clears it, anything else has to be a real date
             if (dob && ageFrom(dob) === null) {
                 return res.status(400).json({ error: 'That is not a valid date of birth' });
         }
@@ -366,15 +311,14 @@ app.put('/users/:email', async (req, res) => {
             changes.bio = String(bio);
     }
 
-        if (password !== undefined) {       // changing the password is part of editing the profile
+        if (password !== undefined) {
             if (String(password).length < 6) {
                 return res.status(400).json({ error: 'Password must be at least 6 characters' });
         }
-            changes.password = await bcrypt.hash(password, SALT_ROUNDS);    // hashed here too, or changing it would undo the hashing done at register
+            changes.password = await bcrypt.hash(password, SALT_ROUNDS);    // hashed here too
     }
 
-    // returnDocument: 'after' hands back the record as it now is, so the client renders what
-    // is actually stored rather than what it hoped it sent
+    // returnDocument: 'after' returns the saved record
     const updated = Object.keys(changes).length
         ? await users.findOneAndUpdate({ email }, { $set: changes }, { returnDocument: 'after' })
         : user;
@@ -386,14 +330,12 @@ app.put('/users/:email', async (req, res) => {
 
 //groups routes
 
-app.get('/groups', async (req, res) => {      // send back every group, the dashboard uses this for both My Groups and Discover
+app.get('/groups', async (req, res) => {      // every group, for My Groups and Discover
     const all = await groups.find().toArray();
     res.status(200).json(all.map(normaliseGroup));
 });
 
-// a group admin can change the name, description, theme colour and age limit at any time with
-// no request needed, because the spec is explicit that only creating and deleting a group need the
-// super admin. actorEmail is in the body so the server can check they really are an admin here.
+// a group admin edits name, description, theme or age limit. no request needed.
 app.patch('/groups/:id', async (req, res) => {
     const { name, description, ageLimit, theme, actorEmail } = req.body;
     const actor = normaliseEmail(actorEmail);
@@ -404,7 +346,7 @@ app.patch('/groups/:id', async (req, res) => {
             return res.status(404).json({ error: 'Group not found' });
     }
         if (!group.adminEmails.includes(actor)) {
-            return res.status(403).json({ error: 'Only an admin of this group can edit it' });   // 403 = you're logged in, you just aren't allowed to do this
+            return res.status(403).json({ error: 'Only an admin of this group can edit it' });   // 403 = not allowed
     }
 
     const changes = {};
@@ -414,8 +356,6 @@ app.patch('/groups/:id', async (req, res) => {
                 if (!cleanName) {
                     return res.status(400).json({ error: 'Group name cannot be empty' });
             }
-            // the same uniqueness rule as creation, minus this group itself, otherwise saving
-            // the form without touching the name would collide with its own record
                 if (await nameTaken(cleanName, group._id)) {
                     return res.status(409).json({ error: 'A group with that name already exists' });
             }
@@ -435,14 +375,13 @@ app.patch('/groups/:id', async (req, res) => {
             const raising = newLimit > (group.ageLimit ?? 0);
             changes.ageLimit = newLimit;
 
-            // the spec says raising the age limit automatically removes members who no longer
-            // meet it. only on a raise, because lowering it can't make anyone ineligible.
+            // raising the limit removes members who no longer meet it
                 if (raising) {
                     const members = await users.find({ email: { $in: group.memberEmails } }).toArray();
                     const byEmail = new Map(members.map(u => [u.email, u]));
                     booted = group.memberEmails.filter(email => {
                         if (group.adminEmails.includes(email)) {
-                            return false;       // an admin isn't booted, that could empty adminEmails and break the group
+                            return false;       // never an admin, the group could end up with none
                         }
                         const member = byEmail.get(email);
                         return !member || ageProblem(member, { ...group, ageLimit: newLimit }) !== null;
@@ -450,8 +389,7 @@ app.patch('/groups/:id', async (req, res) => {
             }
     }
 
-    // one write: the changed fields, plus anyone the new age limit pushed out. $pullAll takes
-    // a list, so the boot and the edit can't end up as two writes that half apply.
+    // the edit and the removals in one write
     const update = { $set: changes };
         if (booted.length) {
             update.$pullAll = { memberEmails: booted };
@@ -462,11 +400,10 @@ app.patch('/groups/:id', async (req, res) => {
 
     await logAudit('Group Edited', actor, `Edited group "${updated.name}"`
         + (booted.length ? `, removed ${booted.length} member(s) under the new age limit` : ''));
-    res.status(200).json({ group: updated, booted });   // booted goes back so the UI can say who was removed
+    res.status(200).json({ group: updated, booted });   // booted so the UI can say who was removed
 });
 
-// deleting a group is only reachable through an approved group-delete request, so this route
-// takes the super admin's email and checks it rather than trusting the caller.
+// super admin only. the UI reaches deletion through an approved group-delete request.
 app.delete('/groups/:id', async (req, res) => {
     const actor = normaliseEmail(req.body?.actorEmail ?? req.query.actorEmail);
 
@@ -481,25 +418,18 @@ app.delete('/groups/:id', async (req, res) => {
             return res.status(404).json({ error: 'Group not found' });
     }
 
-    // the rooms are read BEFORE they're deleted, because once they're gone there's nothing left
-    // to match their messages on. messages reference a channel, not a group, so deleting the
-    // group alone would strand every message in it.
+    // rooms read first, so their messages can be matched before the rooms are gone
     const doomed = await channels.find({ groupId: group._id }).toArray();
     await deleteMessages({ channelId: { $in: doomed.map(c => c._id) } });
 
     await groups.deleteOne({ _id: group._id });
-    // a channel can't exist without its group, so its rooms go with it rather than being left
-    // behind pointing at a groupId that no longer resolves
-    await channels.deleteMany({ groupId: group._id });
-    // room proposals and ban reports for this group can never be actioned now
+    await channels.deleteMany({ groupId: group._id });     // rooms go with their group
     await closePendingRequests({ groupId: group._id }, 'The group was deleted', actor);
     await logAudit('Group Deleted', actor, `Deleted group "${group.name}" and its rooms`);
     res.status(200).json({ message: 'Group deleted' });
 });
 
-// the members of one group as the chat room shows them: email, display name and profile picture.
-// deliberately only those three. the spec says profiles are private, so a member's date of birth
-// and bio aren't handed to everyone else in the room, which GET /users would do.
+// email, name and picture of each member, for the chat room. nothing else, profiles are private.
 app.get('/groups/:id/members', async (req, res) => {
     const groupId = toObjectId(req.params.id);
     const group = groupId && await groups.findOne({ _id: groupId });
@@ -507,8 +437,7 @@ app.get('/groups/:id/members', async (req, res) => {
             return res.status(404).json({ error: 'Group not found' });
     }
 
-    // one query for every member rather than one per person, the same $in as the age limit boot
-    const members = await users.find({ email: { $in: group.memberEmails } }).toArray();
+    const members = await users.find({ email: { $in: group.memberEmails } }).toArray();   // one query for all
     res.status(200).json(members.map(u => ({
         email: u.email,
         username: u.username ?? '',
@@ -516,25 +445,24 @@ app.get('/groups/:id/members', async (req, res) => {
     })));
 });
 
-app.post('/groups/:id/members', async (req, res) => {     // a user joins a group
+app.post('/groups/:id/members', async (req, res) => {     // join a group
     const email = normaliseEmail(req.body.email);
 
         if (!email) {
             return res.status(400).json({ error: 'Email is required' });
     }
 
-    // joining is something you do for yourself. without this anyone could add any registered
-    // user to any group, including one they'd never want to be in. same check as editing a profile.
+    // you can only join for yourself
         if (normaliseEmail(req.body.actorEmail) !== email) {
             return res.status(403).json({ error: 'You can only join a group yourself' });
     }
 
     const user = await users.findOne({ email });
-        if (!user) {                        // don't let a group hold an email that was never registered
+        if (!user) {
             return res.status(404).json({ error: 'User not found' });
     }
 
-    const groupId = toObjectId(req.params.id);      // :id in the route path comes through as req.params.id
+    const groupId = toObjectId(req.params.id);
     const group = normaliseGroup(groupId && await groups.findOne({ _id: groupId }));
         if (!group) {
             return res.status(404).json({ error: 'Group not found' });
@@ -546,19 +474,17 @@ app.post('/groups/:id/members', async (req, res) => {     // a user joins a grou
         if (group.memberEmails.includes(email)) {
             return res.status(409).json({ error: 'User is already in this group' });
     }
-        if (group.bannedEmails.includes(email)) {   // a group level ban is what stops them coming straight back in
+        if (group.bannedEmails.includes(email)) {
             return res.status(403).json({ error: 'You are banned from this group' });
     }
 
-    // the spec says users can see every group whatever their age, but are auto rejected when
-    // they try to join one they're too young for. this is that rejection.
+    // every group is visible, but joining one you're too young for is refused
     const tooYoung = ageProblem(user, group);
         if (tooYoung) {
             return res.status(403).json({ error: tooYoung });
     }
 
-    // $push appends inside the stored document, so the record never has to be read out and
-    // written back, which is what used to lose a write when two people joined at once
+    // $push appends in place, so two joins at once can't overwrite each other
     const updated = normaliseGroup(await groups.findOneAndUpdate(
         { _id: group._id }, { $push: { memberEmails: email } }, { returnDocument: 'after' }));
 
@@ -566,7 +492,7 @@ app.post('/groups/:id/members', async (req, res) => {     // a user joins a grou
     res.status(200).json(updated);
 });
 
-app.delete('/groups/:id/members/:email', async (req, res) => {    // removes a user from a group, this is the group level ban/leave, not a system wide delete
+app.delete('/groups/:id/members/:email', async (req, res) => {    // leave, or an admin removes a member
     const email = normaliseEmail(req.params.email);
 
     const groupId = toObjectId(req.params.id);
@@ -575,20 +501,17 @@ app.delete('/groups/:id/members/:email', async (req, res) => {    // removes a u
             return res.status(404).json({ error: 'Group not found' });
     }
 
-    // a group admin can remove a member, and a member can remove themself, which is what the
-    // Leave button does. anyone else has no business doing either, so this is the same check
-    // the ban and promote routes already make.
+    // yourself, or an admin of this group
     const actor = normaliseEmail(req.query.actorEmail);
         if (actor !== email && !group.adminEmails.includes(actor)) {
             return res.status(403).json({ error: 'Only an admin of this group can remove a member' });
     }
 
-        if (group.adminEmails.includes(email) && group.adminEmails.length === 1) {   // a group always needs at least one admin left behind
+        if (group.adminEmails.includes(email) && group.adminEmails.length === 1) {   // a group always keeps an admin
             return res.status(409).json({ error: 'Cannot remove the only admin of this group' });
     }
 
-    // both lists in one $pull, so someone who was an admin as well as a member is dropped from
-    // both in a single write rather than two that could half apply
+    // removed from both lists in one write
     const updated = normaliseGroup(await groups.findOneAndUpdate(
         { _id: group._id },
         { $pull: { memberEmails: email, adminEmails: email } },
@@ -598,8 +521,7 @@ app.delete('/groups/:id/members/:email', async (req, res) => {    // removes a u
     res.status(200).json(updated);
 });
 
-// group level ban. the account still exists and they keep every other group, so this only stops
-// them being in this one, and unlike a system wide ban it can be lifted.
+// group level ban: they lose this group only, and it can be lifted
 app.post('/groups/:id/bans', async (req, res) => {
     const email = normaliseEmail(req.body.email);
     const actor = normaliseEmail(req.body.actorEmail);
@@ -621,7 +543,7 @@ app.post('/groups/:id/bans', async (req, res) => {
             return res.status(409).json({ error: 'That user is already banned from this group' });
     }
 
-    // removed from both lists and added to the banned one in a single write
+    // out of both lists and onto the banned list, in one write
     const updated = normaliseGroup(await groups.findOneAndUpdate(
         { _id: group._id },
         { $pull: { memberEmails: email, adminEmails: email }, $push: { bannedEmails: email } },
@@ -631,7 +553,7 @@ app.post('/groups/:id/bans', async (req, res) => {
     res.status(200).json(updated);
 });
 
-app.delete('/groups/:id/bans/:email', async (req, res) => {   // lifts a group level ban, which the spec allows because only system wide bans are permanent
+app.delete('/groups/:id/bans/:email', async (req, res) => {   // lift a group level ban
     const email = normaliseEmail(req.params.email);
     const actor = normaliseEmail(req.query.actorEmail);
 
@@ -652,8 +574,7 @@ app.delete('/groups/:id/bans/:email', async (req, res) => {   // lifts a group l
     res.status(200).json(updated);
 });
 
-// promotion. the spec says an existing group admin can promote any member of that group, and
-// there's no limit on how many admins a group has or how many groups you can admin.
+// promote a member. no limit on admins per group.
 app.post('/groups/:id/admins', async (req, res) => {
     const email = normaliseEmail(req.body.email);
     const actor = normaliseEmail(req.body.actorEmail);
@@ -666,7 +587,7 @@ app.post('/groups/:id/admins', async (req, res) => {
         if (!group.adminEmails.includes(actor)) {
             return res.status(403).json({ error: 'Only an admin of this group can promote a member' });
     }
-        if (!group.memberEmails.includes(email)) {      // you can only promote someone who is already in the group
+        if (!group.memberEmails.includes(email)) {      // members only
             return res.status(404).json({ error: 'That user is not a member of this group' });
     }
         if (group.adminEmails.includes(email)) {
@@ -680,8 +601,7 @@ app.post('/groups/:id/admins', async (req, res) => {
     res.status(200).json(updated);
 });
 
-// demotion, including an admin stepping down themself. either way the rule is the same: the
-// group can never be left with no admin, so the last one can't be demoted.
+// demote an admin, or step down yourself. never the last admin.
 app.delete('/groups/:id/admins/:email', async (req, res) => {
     const email = normaliseEmail(req.params.email);
     const actor = normaliseEmail(req.query.actorEmail);
@@ -701,7 +621,7 @@ app.delete('/groups/:id/admins/:email', async (req, res) => {
             return res.status(409).json({ error: 'A group must always have at least one admin' });
     }
 
-    const updated = normaliseGroup(await groups.findOneAndUpdate(       // they stay a member, they just stop being an admin
+    const updated = normaliseGroup(await groups.findOneAndUpdate(       // still a member, just not an admin
         { _id: group._id }, { $pull: { adminEmails: email } }, { returnDocument: 'after' }));
 
     await logAudit('Admin Demoted', actor,
@@ -712,12 +632,12 @@ app.delete('/groups/:id/admins/:email', async (req, res) => {
 
 //channels routes
 
-app.get('/channels', async (req, res) => {        // /channels lists them all, /channels?groupId=... lists just one group's channels
-    const { groupId } = req.query;          // anything after the ? in the url ends up in req.query
+app.get('/channels', async (req, res) => {        // all rooms, or one group's with ?groupId=
+    const { groupId } = req.query;
 
         if (groupId) {
             const id = toObjectId(groupId);
-                if (!id) {      // an id that isn't a real ObjectId can't match anything, so the answer is an empty list rather than an error
+                if (!id) {      // a malformed id can't match anything, so an empty list
                     return res.status(200).json([]);
             }
             return res.status(200).json(await channels.find({ groupId: id }).toArray());
@@ -725,7 +645,7 @@ app.get('/channels', async (req, res) => {        // /channels lists them all, /
     res.status(200).json(await channels.find().toArray());
 });
 
-app.post('/channels', async (req, res) => {       // creates a channel inside a group
+app.post('/channels', async (req, res) => {       // an admin creates a room directly
     const { groupId, name } = req.body;
     const actor = normaliseEmail(req.body.actorEmail);
 
@@ -735,33 +655,28 @@ app.post('/channels', async (req, res) => {       // creates a channel inside a 
 
     const id = toObjectId(groupId);
     const group = normaliseGroup(id && await groups.findOne({ _id: id }));
-        if (!group) {      // a channel can't exist on its own, it has to belong to a real group
+        if (!group) {
             return res.status(404).json({ error: 'Group not found' });
     }
 
-    // only an admin creates a room outright. the spec says a regular member proposes one and
-    // an admin approves it, so without this check the whole propose/approve flow is optional:
-    // a member could just POST the room they were supposed to ask for.
+    // members propose rooms instead, otherwise the approval step could be skipped
         if (!group.adminEmails.includes(actor)) {
             return res.status(403).json({ error: 'Only an admin of this group can create a room. Propose it instead.' });
     }
 
-    // two channels can share a name across different groups, just not inside the same one,
-    // so the groupId is part of the query rather than the name being unique on its own
+    // names are unique within a group, not across groups
     const existingChannel = await channels.findOne({ groupId: id, name: String(name).trim() }, CASE_INSENSITIVE);
         if (existingChannel) {
             return res.status(409).json({ error: 'That group already has a channel with this name' });
     }
 
-    // groupId is stored as an ObjectId, not the string it arrived as, so it matches the _id of
-    // the group it points at. express turns it back into a hex string in the json response.
-    const newChannel = { groupId: id, name: String(name).trim() };
+    const newChannel = { groupId: id, name: String(name).trim() };     // groupId stored as an ObjectId
     await channels.insertOne(newChannel);
     await logAudit('Room Created', actor, `Created room "${newChannel.name}" in "${group.name}"`);
     res.status(201).json(newChannel);
 });
 
-// the spec says a group admin can rename a room they created, to fix a typo for instance
+// an admin renames a room
 app.patch('/channels/:id', async (req, res) => {
     const { name, actorEmail } = req.body;
     const actor = normaliseEmail(actorEmail);
@@ -795,25 +710,21 @@ app.patch('/channels/:id', async (req, res) => {
     res.status(200).json(updated);
 });
 
-app.delete('/channels/:id', async (req, res) => {     // group admins can delete a room they made, so this removes one by id
+app.delete('/channels/:id', async (req, res) => {     // an admin deletes a room
     const channelId = toObjectId(req.params.id);
     const channel = channelId && await channels.findOne({ _id: channelId });
 
-        if (!channel) {     // nothing matched that id
+        if (!channel) {
             return res.status(404).json({ error: 'Channel not found' });
     }
 
-    // the same check PATCH /channels/:id makes. renaming a room was guarded and deleting it
-    // was not, which meant anyone could delete any room in any group.
     const actor = normaliseEmail(req.query.actorEmail);
     const group = normaliseGroup(await groups.findOne({ _id: channel.groupId }));
         if (!group || !group.adminEmails.includes(actor)) {
             return res.status(403).json({ error: 'Only an admin of this group can delete a room' });
     }
 
-    // a message belongs to a room, so it can't outlive one. without this the messages stay in
-    // the collection forever, invisible but still counted, pointing at a channelId that no
-    // longer resolves.
+    // messages can't outlive their room
     await deleteMessages({ channelId: channel._id });
     await channels.deleteOne({ _id: channel._id });
     await logAudit('Room Deleted', actor, `Deleted room "${channel.name}"`);
@@ -823,15 +734,14 @@ app.delete('/channels/:id', async (req, res) => {     // group admins can delete
 
 //requests routes
 //
-// four things in the spec can't be done directly and have to be asked for:
-//   group-create   a user asks the super admin for a new group, supplying the details up front
-//   group-delete   a group admin asks the super admin to delete their group (or disband it)
-//   channel-create a member proposes a room, the group admin approves or rejects it
-//   user-ban       a group admin reports a user, the super admin actions the permanent ban
-// they all live in one requests collection with a type field, because the approve/reject/reason
-// mechanics are identical and only the action taken on approval differs.
+// four actions have to be asked for:
+//   group-create   user -> super admin, with the group's details up front
+//   group-delete   group admin -> super admin
+//   channel-create member -> group admin
+//   user-ban       group admin reports a user -> super admin bans permanently
+// one collection with a type field, since approve/reject work the same for all four.
 
-const SUPER_TYPES = ['group-create', 'group-delete', 'user-ban'];   // these go to the super admin, the rest go to the group's admins
+const SUPER_TYPES = ['group-create', 'group-delete', 'user-ban'];   // the super admin's types, the rest go to group admins
 
 app.get('/requests', async (req, res) => {
     const { status, type, groupId, requestedBy, scope } = req.query;
@@ -845,16 +755,15 @@ app.get('/requests', async (req, res) => {
     }
         if (groupId) {
             const id = toObjectId(groupId);
-                if (!id) {      // same reasoning as /channels, an unmatchable id means an empty list
+                if (!id) {      // same as /channels
                     return res.status(200).json([]);
             }
             query.groupId = id;
     }
-        if (requestedBy) {      // the profile page uses this so a user sees their own pending and rejected requests
+        if (requestedBy) {      // the profile page's own requests
             query.requestedBy = normaliseEmail(requestedBy);
     }
-        // scope splits the super admin's queue from a group admin's queue without the client
-        // having to know which types belong where
+        // splits the super admin's queue from a group admin's
         if (scope === 'super') {
             query.type = { $in: SUPER_TYPES };
     }
@@ -862,9 +771,7 @@ app.get('/requests', async (req, res) => {
             query.type = { $nin: SUPER_TYPES };
     }
 
-    // newest first, which is what both queues want. mongo does the sort rather than the route
-    // pulling everything into memory to sort it.
-    res.status(200).json(await requests.find(query).sort({ createdAt: -1 }).toArray());
+    res.status(200).json(await requests.find(query).sort({ createdAt: -1 }).toArray());   // newest first
 });
 
 app.post('/requests', async (req, res) => {
@@ -879,19 +786,16 @@ app.post('/requests', async (req, res) => {
         if (!requesterUser) {
             return res.status(404).json({ error: 'User not found' });
     }
-        // the spec says the super admin only actions requests and can never raise one, which
-        // is also what stops them approving their own
+        // the super admin only actions requests, so can never approve their own
         if (requesterUser.role === 'super') {
             return res.status(403).json({ error: 'The super admin cannot raise requests, only action them' });
     }
 
-    // group-create has no group yet, so its groupId is null rather than an ObjectId
-    const targetGroupId = groupId ? toObjectId(groupId) : null;
+    const targetGroupId = groupId ? toObjectId(groupId) : null;     // null for group-create
     const details = payload ?? {};
     let summary = '';
 
-    // each type has its own validation, because what makes a request valid is different for
-    // each one. the switch keeps them next to each other instead of scattered through the file.
+    // validation per type
     switch (type) {
         case 'group-create': {
             const name = String(details.name ?? '').trim();
@@ -901,7 +805,7 @@ app.post('/requests', async (req, res) => {
                 if (await nameTaken(name)) {
                     return res.status(409).json({ error: 'A group with that name already exists' });
             }
-                // names are unique, so two people can't have the same name pending either
+                // or already requested by someone else
                 if (await requests.findOne({ status: 'pending', type: 'group-create', 'payload.name': name }, CASE_INSENSITIVE)) {
                     return res.status(409).json({ error: 'A group with that name has already been requested' });
             }
@@ -929,7 +833,7 @@ app.post('/requests', async (req, res) => {
                 if (!group) {
                     return res.status(404).json({ error: 'Group not found' });
             }
-                if (!group.memberEmails.includes(requester)) {      // you propose a room in a group you're actually in
+                if (!group.memberEmails.includes(requester)) {      // members only
                     return res.status(403).json({ error: 'You must be a member of this group to propose a room' });
             }
             const roomName = String(details.name ?? '').trim();
@@ -952,8 +856,7 @@ app.post('/requests', async (req, res) => {
                 if (!group) {
                     return res.status(404).json({ error: 'Group not found' });
             }
-                // "admins cannot ban directly without a prior report". the report is this
-                // request, and only a group admin can raise it
+                // this request is the "prior report" the spec requires, and only a group admin raises it
                 if (!group.adminEmails.includes(requester)) {
                     return res.status(403).json({ error: 'Only a group admin can report a user for a system wide ban' });
             }
@@ -967,11 +870,10 @@ app.post('/requests', async (req, res) => {
                 if (target === requester) {
                     return res.status(400).json({ error: 'You cannot report yourself' });
             }
-                if (!String(details.reason ?? '').trim()) {   // a ban report without a reason is not actionable
+                if (!String(details.reason ?? '').trim()) {
                     return res.status(400).json({ error: 'A reason is required to report a user' });
             }
-                // the spec says a replacement admin must be assigned before removing someone
-                // who is a group admin, so the ban is refused until that's done
+                // a group's only admin needs a replacement first ('adminEmails.1' missing = one admin)
                 const stillAdminSomewhere = await groups.findOne({ adminEmails: target, 'adminEmails.1': { $exists: false } });
                 if (stillAdminSomewhere) {
                     return res.status(409).json({ error: `${target} is the only admin of "${stillAdminSomewhere.name}". Assign a replacement admin there first.` });
@@ -989,15 +891,15 @@ app.post('/requests', async (req, res) => {
 
     const newRequest = {
         type,
-        status: 'pending',      // pending -> approved or rejected. the spec says there's no cancelling, so there's no route that sets it back
-        summary,                // written once here so every queue can render a row without re-deriving the wording
+        status: 'pending',      // -> approved or rejected. no cancelling
+        summary,                // the wording every queue shows
         requestedBy: requester,
         groupId: targetGroupId,
         payload: details,
         createdAt: new Date().toISOString(),
         resolvedAt: '',
         resolvedBy: '',
-        reason: '',             // only filled in on a rejection, which the spec requires a reason for
+        reason: '',             // set on rejection
     };
 
     await requests.insertOne(newRequest);
@@ -1016,8 +918,7 @@ app.post('/requests/:id/approve', async (req, res) => {
         if (request.status !== 'pending') {
             return res.status(409).json({ error: 'That request has already been actioned' });
     }
-        // spelled out even though POST /requests already blocks the super admin from raising
-        // one, because the same rule applies to a group admin approving their own proposal
+        // a group admin can't approve their own room proposal
         if (request.requestedBy === actor) {
             return res.status(403).json({ error: 'You cannot approve your own request' });
     }
@@ -1027,14 +928,12 @@ app.post('/requests/:id/approve', async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
     }
 
-    // a ban closes the banned user's requests, but this is checked here as well so nothing is ever
-    // carried out on behalf of an account that no longer exists. it can still be rejected.
+    // nothing is carried out for an account that no longer exists. it can still be rejected.
         if (!(await users.findOne({ email: request.requestedBy }))) {
             return res.status(409).json({ error: 'The user who raised this request no longer has an account. Reject it instead.' });
     }
 
-    // who is allowed to action this depends on the type: the super admin for the three system
-    // level ones, an admin of the group in question for a room proposal
+    // super admin for the system types, a group admin for room proposals
         if (SUPER_TYPES.includes(request.type)) {
             if (actorUser.role !== 'super') {
                 return res.status(403).json({ error: 'Only the super admin can action this request' });
@@ -1046,13 +945,10 @@ app.post('/requests/:id/approve', async (req, res) => {
         }
     }
 
-    // carrying out the request is the whole point of approving it, so each type does its work here
+    // carry the request out
     switch (request.type) {
         case 'group-create': {
-            // re-checked at approval time, not just when the request was raised, because a
-            // group with this name could have been created while the request sat in the queue.
-            // the two cases below re-check their own rules for exactly the same reason, and
-            // without this the "group names are unique" rule breaks on an approval.
+            // re-checked, the name may have been taken while the request waited
             const wantedName = String(request.payload.name ?? '').trim();
                 if (await nameTaken(wantedName)) {
                     return res.status(409).json({ error: 'A group with that name already exists' });
@@ -1067,15 +963,13 @@ app.post('/requests/:id/approve', async (req, res) => {
                 if (!group) {
                     return res.status(404).json({ error: 'Group not found' });
             }
-            // same order as DELETE /groups/:id: read the rooms first, then their messages, then
-            // the group. this is the path the UI actually uses, since a group admin can't delete
-            // their own group directly and has to have the super admin approve it.
+            // same order as DELETE /groups/:id
             const doomed = await channels.find({ groupId: group._id }).toArray();
             await deleteMessages({ channelId: { $in: doomed.map(c => c._id) } });
 
             await groups.deleteOne({ _id: group._id });
             await channels.deleteMany({ groupId: group._id });
-            // every other pending request for this group, not this one, which is marked approved below
+            // every other pending request for this group. this one is marked approved below.
             await closePendingRequests({ groupId: group._id, _id: { $ne: request._id } }, 'The group was deleted', actor);
             await logAudit('Group Deleted', actor, `Approved deletion of "${group.name}" and its rooms`);
             break;
@@ -1083,8 +977,7 @@ app.post('/requests/:id/approve', async (req, res) => {
 
         case 'channel-create': {
             const roomName = String(request.payload.name).trim();
-                // re-checked at approval time, not just when the request was raised, because an admin
-                // could have created a room with the same name while this sat in the queue
+                // re-checked, an admin may have made the same room meanwhile
                 if (await channels.findOne({ groupId: request.groupId, name: roomName }, CASE_INSENSITIVE)) {
                     return res.status(409).json({ error: 'That group already has a channel with this name' });
             }
@@ -1095,23 +988,18 @@ app.post('/requests/:id/approve', async (req, res) => {
 
         case 'user-ban': {
             const target = normaliseEmail(request.payload.email);
-                // re-checked here too: someone could have been left as a group's only admin
-                // since the report was raised, and the spec says a replacement comes first
+                // re-checked, they may have become a group's only admin since the report
                 const onlyAdminOf = await groups.findOne({ adminEmails: target, 'adminEmails.1': { $exists: false } });
                 if (onlyAdminOf) {
                     return res.status(409).json({ error: `${target} is the only admin of "${onlyAdminOf.name}". A replacement admin must be assigned before the ban.` });
             }
 
-            // a system wide ban is permanent, so it happens in three parts: the account is
-            // deleted, they're pulled out of every group, and the email goes on the banned
-            // list so /register can never hand it out again
-            // their profile picture goes with the account, or it would sit in uploads/ forever
+            // permanent ban: delete the account (and picture), remove from every group,
+            // and add the email to the banned list so /register refuses it
             const bannedUser = await users.findOne({ email: target });
             await removeUploadedFile(bannedUser?.avatarUrl);
             await users.deleteOne({ email: target });
 
-            // one updateMany instead of rewriting every group, so groups the user was never in
-            // are not touched at all
             await groups.updateMany(
                 { $or: [{ memberEmails: target }, { adminEmails: target }] },
                 { $pull: { memberEmails: target, adminEmails: target } });
@@ -1123,8 +1011,7 @@ app.post('/requests/:id/approve', async (req, res) => {
                 bannedAt: new Date().toISOString(),
                 bannedBy: actor,
             });
-            // anything they had waiting is closed too. approving their group-create afterwards
-            // would make a deleted account the only admin of a brand new group.
+            // close their pending requests, e.g. a group-create that would get a deleted admin
             await closePendingRequests({ requestedBy: target }, 'The requester was permanently banned', actor);
             await logAudit('User Banned', actor, `Permanently banned ${target}. Reason: ${request.payload.reason ?? 'no reason given'}`);
             break;
@@ -1143,8 +1030,7 @@ app.post('/requests/:id/reject', async (req, res) => {
     const actor = normaliseEmail(req.body.actorEmail);
     const reason = String(req.body.reason ?? '').trim();
 
-        // the spec is explicit that a rejected request must include a reason, so this is a
-        // 400 rather than something the client is trusted to enforce
+        // the spec requires a reason
         if (!reason) {
             return res.status(400).json({ error: 'A reason is required when rejecting a request' });
     }
@@ -1166,7 +1052,7 @@ app.post('/requests/:id/reject', async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
     }
 
-    // the same authority check as approve, because rejecting is just as much an admin action
+    // same authority check as approve
         if (SUPER_TYPES.includes(request.type)) {
             if (actorUser.role !== 'super') {
                 return res.status(403).json({ error: 'Only the super admin can action this request' });
@@ -1182,7 +1068,7 @@ app.post('/requests/:id/reject', async (req, res) => {
         { _id: request._id },
         { $set: {
             status: 'rejected',
-            reason,                 // the user sees this on their profile page under past rejected requests
+            reason,                 // shown on the requester's profile
             resolvedAt: new Date().toISOString(),
             resolvedBy: actor,
         } },
@@ -1195,22 +1081,19 @@ app.post('/requests/:id/reject', async (req, res) => {
 
 //bans and audit routes
 
-app.get('/bans', async (req, res) => {        // every permanently banned account, the super admin sees these system wide
+app.get('/bans', async (req, res) => {        // every permanently banned account
     res.status(200).json(await banned.find().toArray());
 });
 
-// the spec asks for an audit log page that's filterable by type and in date order, so the
-// filtering and the sorting both happen here rather than in the component
+// the audit log, newest first, optionally filtered by type
 app.get('/audit', async (req, res) => {
     const { type } = req.query;
     const query = type ? { type } : {};
 
-    res.status(200).json(await audit.find(query).sort({ at: -1 }).toArray());   // newest first
+    res.status(200).json(await audit.find(query).sort({ at: -1 }).toArray());
 });
 
-// the distinct types actually present in the log, so the filter dropdown lists real values
-// instead of a hardcoded list that drifts out of date. distinct() is a mongo command, so the
-// whole log never has to be read into memory just to find the unique values.
+// the types actually in the log, for the filter dropdown
 app.get('/audit/types', async (req, res) => {
     const types = await audit.distinct('type');
     res.status(200).json(types.sort());
@@ -1219,13 +1102,10 @@ app.get('/audit/types', async (req, res) => {
 
 //image upload route
 //
-// sending an image is two steps. the browser uploads the file here over normal http and gets back
-// a path, then sends a chat message over the socket carrying that path. files don't go over the
-// socket itself because a multipart http upload streams to disk, gets a size limit and a type check
-// from multer, and doesn't hold a whole image in memory inside one socket event.
+// an image message is two steps: upload the file here over http and get a path back, then send
+// that path in a socket message. multer handles the size limit, type check and streaming to disk.
 
-// only these four. the extension comes from this map, never from the uploaded filename, so a file
-// can't choose its own extension. svg is deliberately missing: it can carry script.
+// allowed types. the extension comes from this map, never the filename. no svg, it can carry script.
 const IMAGE_TYPES = {
     'image/png': '.png',
     'image/jpeg': '.jpg',
@@ -1237,29 +1117,24 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024;     // 5 MB
 const upload = multer({
     storage: multer.diskStorage({
         destination: UPLOAD_DIR,
-        // a random name, not the user's filename: two people uploading photo.jpg can't overwrite
-        // each other, and a name like ../../server.js can't escape the folder
+        // random name: no overwrites, and no ../ escaping the folder
         filename: (req, file, cb) => cb(null, crypto.randomUUID() + IMAGE_TYPES[file.mimetype]),
     }),
     limits: { fileSize: MAX_IMAGE_BYTES, files: 1 },
-    // returning false skips the file rather than erroring, which leaves req.file undefined and the
-    // route below answers with a readable message
+    // false skips the file, so req.file is undefined and the route answers 400
     fileFilter: (req, file, cb) => cb(null, Boolean(IMAGE_TYPES[file.mimetype])),
 });
 
-// the path a message is allowed to carry: exactly what the route below hands out, a uuid and one of
-// the four extensions. anything else, like an outside url, is refused by sendMessage.
+// the only image path a message may carry: one this server handed out
 const IMAGE_PATH = /^\/uploads\/[0-9a-f-]{36}\.(png|jpg|gif|webp)$/;
 
 app.post('/uploads', (req, res, next) => {
-    // upload.single is called by hand rather than listed as middleware, so its errors (too big,
-    // wrong field name) arrive in this callback and can be answered as json rather than reaching
-    // the generic 500 handler
+    // called by hand so multer's errors come back here as json instead of a 500
     upload.single('image')(req, res, async err => {
         try {
             if (err) {
                 if (err.code === 'LIMIT_FILE_SIZE') {
-                    return res.status(413).json({ error: 'Images must be 5 MB or smaller' });   // 413 = payload too large
+                    return res.status(413).json({ error: 'Images must be 5 MB or smaller' });   // 413 = too large
                 }
                 return res.status(400).json({ error: 'Could not read that upload' });
             }
@@ -1267,9 +1142,7 @@ app.post('/uploads', (req, res, next) => {
                 return res.status(400).json({ error: 'Choose a PNG, JPEG, GIF or WebP image' });
             }
 
-            // the same rule as joining a room: only a member of the group can post into it, so only
-            // a member can upload for it. multer has already written the file by now, so a refused
-            // upload deletes it again rather than leaving it on disk.
+            // members only. the file is already written, so a refusal deletes it.
             const email = normaliseEmail(req.body.email);
             const channelId = toObjectId(req.body.channelId);
             const channel = channelId && await channels.findOne({ _id: channelId });
@@ -1279,8 +1152,7 @@ app.post('/uploads', (req, res, next) => {
                 return res.status(403).json({ error: 'You are not a member of this group' });
             }
 
-            // a relative path, not a full url, so the stored message doesn't break if the server's
-            // address changes. the client puts its api url in front when it displays it.
+            // relative path, the client adds the api address
             res.status(201).json({ imageUrl: `/uploads/${req.file.filename}` });
         } catch (e) {
             next(e);
@@ -1289,15 +1161,9 @@ app.post('/uploads', (req, res, next) => {
 });
 
 
-// profile pictures
-//
-// the same multer setup as chat images: the same four types, the same 5 MB limit, a random file
-// name and the extension from IMAGE_TYPES. the file lives in uploads/ and the user document only
-// stores its path in avatarUrl, the same reason as messages: documents stay small and express
-// serves the file itself.
+// profile pictures: same multer setup as chat images, path stored in the user's avatarUrl
 
-// runs multer and hands back its error (or null) as a promise, so the route below can be a normal
-// async handler instead of nesting everything inside multer's callback like POST /uploads does
+// multer as a promise, so the route can be a normal async handler
 function readImage(req, res) {
     return new Promise(resolve => upload.single('image')(req, res, err => resolve(err ?? null)));
 }
@@ -1316,9 +1182,7 @@ app.post('/users/:email/avatar', async (req, res) => {
             return res.status(400).json({ error: 'Choose a PNG, JPEG, GIF or WebP image' });
     }
 
-    // only the account holder changes their own picture, same rule as PUT /users/:email. multer
-    // has already written the file by the time this runs, so a refused upload deletes it again.
-    // actorEmail has to come before the file in the form, or it won't be in req.body yet.
+    // own picture only. actorEmail must come before the file in the form to be in req.body.
         if (normaliseEmail(req.body.actorEmail) !== email) {
             await fs.promises.rm(req.file.path, { force: true });
             return res.status(403).json({ error: 'You can only change your own profile picture' });
@@ -1333,15 +1197,14 @@ app.post('/users/:email/avatar', async (req, res) => {
     const updated = await users.findOneAndUpdate(
         { email }, { $set: { avatarUrl: `/uploads/${req.file.filename}` } }, { returnDocument: 'after' });
 
-    // the old picture is deleted after the new one is saved, so a failed save never leaves the
-    // account pointing at a file that's already gone
+    // old file deleted after the save, so a failed save never points at a missing file
     await removeUploadedFile(user.avatarUrl);
 
     await logAudit('Profile Picture Changed', email, 'Uploaded a new profile picture');
     res.status(200).json(publicUser(updated));
 });
 
-// back to the initial letter. the file is deleted too, nothing else points at it.
+// back to the initial letter, and the file is deleted
 app.delete('/users/:email/avatar', async (req, res) => {
     const email = normaliseEmail(req.params.email);
 
@@ -1363,23 +1226,19 @@ app.delete('/users/:email/avatar', async (req, res) => {
 });
 
 
-// express 5 catches a rejected promise from an async route handler and passes it here, so a
-// failed mongo call answers with a 500 instead of leaving the request hanging forever.
-// express 4 did not do this, which is why most tutorials wrap every route in try/catch.
-// four arguments is what marks this as express's error handler rather than another route.
+// express 5 passes a rejected promise from an async route here, so a failed mongo call gets a
+// 500 instead of hanging. four arguments marks it as the error handler.
 app.use((err, req, res, next) => {
     console.error(err);
     res.status(500).json({ error: 'Something went wrong on the server' });
 });
 
-// how many past messages a joiner is sent. enough to give a room context without shipping a
-// year of history down the wire every time someone clicks in.
+// how many past messages a joiner gets
 const HISTORY_LIMIT = 50;
 
 function registerSocketHandlers() {
   io.on('connection', socket => {
-    // what this socket is currently in. kept on the socket itself so disconnect can clean up
-    // without searching every room in the presence map.
+    // the room this socket is in, so disconnect can clean up directly
     let joined = null;      // { channelId, groupId, email }
 
     socket.on('joinRoom', async ({ channelId, email }, ack) => {
@@ -1395,15 +1254,13 @@ function registerSocketHandlers() {
           return ack?.({ error: 'Room not found' });
         }
 
-        // you can only be in a room of a group you belong to. this is the same rule the rest
-        // routes enforce, and without it any signed in user could join any room by id.
+        // members of the group only
         const group = normaliseGroup(await groups.findOne({ _id: channel.groupId }));
         if (!group || !group.memberEmails.includes(cleanEmail)) {
           return ack?.({ error: 'You are not a member of this group' });
         }
 
-        // leaving the previous room first means clicking between rooms can't leave you listed
-        // as present in one you already left
+        // leave the previous room first, so you're never listed in two
         if (joined) {
           await leaveCurrentRoom();
         }
@@ -1417,16 +1274,14 @@ function registerSocketHandlers() {
         }
         presence.get(roomKey).set(socket.id, cleanEmail);
 
-        // oldest first, because that's reading order in the transcript. the limit is applied
-        // from the newest end and then reversed, so you get the most recent 50, not the first 50.
+        // the newest 50, reversed into reading order (oldest first)
         const history = (await messages.find({ channelId: id })
           .sort({ at: -1 }).limit(HISTORY_LIMIT).toArray()).reverse();
 
-        // ack goes only to the joiner: their history and who is already here
+        // history and presence go only to the joiner
         ack?.({ history, present: peopleIn(roomKey) });
 
-        // everyone else gets told someone arrived, plus the refreshed list.
-        // socket.to(room) excludes the sender, which is what makes "you joined" not appear to you.
+        // socket.to excludes the joiner, io.to includes everyone
         socket.to(roomKey).emit('userJoined', { email: cleanEmail });
         io.to(roomKey).emit('presence', peopleIn(roomKey));
       } catch (err) {
@@ -1437,15 +1292,12 @@ function registerSocketHandlers() {
 
     socket.on('sendMessage', async ({ body, imageUrl }, ack) => {
       try {
-        // the sender is taken from the socket's own join, never from the payload. a client that
-        // sends someone else's email can't spoof a message, because this never reads one.
+        // the sender comes from the join, never the payload, so it can't be spoofed
         if (!joined) {
           return ack?.({ error: 'Join a room first' });
         }
 
-        // membership was checked at join time, but someone can be removed, banned or leave while
-        // they're still sitting in the room. checked again on every send, otherwise they could
-        // keep posting into a group they're no longer in until they happened to navigate away.
+        // re-checked every send, in case they were removed or banned while in the room
         const group = await groups.findOne({ _id: joined.groupId });
         if (!group || !group.memberEmails.includes(joined.email)) {
           await leaveCurrentRoom();
@@ -1454,9 +1306,7 @@ function registerSocketHandlers() {
         const text = String(body ?? '').trim();
         const image = String(imageUrl ?? '');
 
-        // an image has to be one POST /uploads actually handed out and that is still on disk.
-        // without this a client could send any url at all, e.g. an image on another site that
-        // logs who loaded it.
+        // an image must be one /uploads handed out and still on disk, not any outside url
         if (image) {
           const onDisk = await fs.promises.access(path.join(UPLOAD_DIR, path.basename(image)))
             .then(() => true, () => false);
@@ -1465,7 +1315,7 @@ function registerSocketHandlers() {
           }
         }
 
-        // a message needs text, an image, or both
+        // text, an image, or both
         if (!text && !image) {
           return ack?.({ error: 'Message cannot be empty' });
         }
@@ -1474,12 +1324,12 @@ function registerSocketHandlers() {
           channelId: new ObjectId(joined.channelId),
           sender: joined.email,
           body: text,
-          imageUrl: image,                     // '' for a text only message, so every document has the same shape
-          at: new Date().toISOString(),        // ISO so sorting strings and dates agree, same as audit
+          imageUrl: image,                     // '' for text only
+          at: new Date().toISOString(),
         };
-        await messages.insertOne(message);     // insertOne sets _id on the object we then broadcast
+        await messages.insertOne(message);     // sets _id before the broadcast
 
-        io.to(joined.channelId).emit('newMessage', message);   // io.to, not socket.to: the sender sees it too
+        io.to(joined.channelId).emit('newMessage', message);   // io.to: the sender gets it too
         ack?.({ ok: true });
       } catch (err) {
         console.error(err);
@@ -1488,7 +1338,7 @@ function registerSocketHandlers() {
     });
 
     socket.on('leaveRoom', () => leaveCurrentRoom());
-    socket.on('disconnect', () => leaveCurrentRoom());   // closing the tab is a leave as well
+    socket.on('disconnect', () => leaveCurrentRoom());   // closing the tab counts as leaving
 
     async function leaveCurrentRoom() {
       if (!joined) {
@@ -1501,7 +1351,7 @@ function registerSocketHandlers() {
       if (room) {
         room.delete(socket.id);
         if (room.size === 0) {
-          presence.delete(channelId);   // don't leave empty rooms in the map forever
+          presence.delete(channelId);   // drop empty rooms
         }
       }
 
@@ -1516,32 +1366,24 @@ function registerSocketHandlers() {
 
 const PORT = 3000;
 
-// express and socket.io share one http server. app.listen() would create its own and give us
-// nowhere to attach io, so the server is built explicitly and express is handed to it as the
-// request handler.
+// express and socket.io share one http server, so it's created here instead of app.listen()
 const server = http.createServer(app);
 
-// the websocket handshake starts as a normal http request, so it needs its own cors config.
-// app.use(cors()) only covers the rest routes.
+// the websocket handshake needs its own cors config, app.use(cors()) only covers rest routes
 const io = new Server(server, {
   cors: { origin: 'http://localhost:4200', methods: ['GET', 'POST'] },
 });
 
-// who is currently in which room. deliberately in memory rather than in mongo: presence is
-// ephemeral, and if the server restarts nobody is in a room any more, which is exactly what an
-// empty map says. persisting it would leave ghosts behind after a crash.
-// shape: channelId -> Map(socket.id -> email). keyed by socket, not email, so two tabs from the
-// same person are two entries and closing one doesn't mark them as gone.
+// who is in which room: channelId -> Map(socket.id -> email). in memory because presence is
+// temporary, a restart should empty it. keyed by socket so two tabs are two entries.
 const presence = new Map();
 
 function peopleIn(channelId) {
   const room = presence.get(channelId);
-  return room ? [...new Set(room.values())] : [];   // Set dedupes the two-tabs case for display
+  return room ? [...new Set(room.values())] : [];   // Set removes the two-tab duplicate
 }
 
-// port is a parameter so the tests can pass 0, which asks the OS for any free port. that way a
-// test run never collides with a real server already running on 3000. the mongo client is
-// returned so whoever started the server can close the connection again.
+// port 0 (any free port) is used by the tests. returns the mongo client so the caller can close it.
 async function start(port = PORT) {
   const client = new MongoClient(MONGO_URL);
   await client.connect();
@@ -1555,26 +1397,23 @@ async function start(port = PORT) {
   banned = db.collection('banned');
   messages = db.collection('messages');
 
-  // one message belongs to one room, and the room view always wants them oldest first
+  // room history, oldest first
   await messages.createIndex({ channelId: 1, at: 1 });
 
-  registerSocketHandlers();      // registered after the collections exist, same rule as app.listen
+  registerSocketHandlers();      // after the collections exist
 
   console.log(`Connected to MongoDB at ${MONGO_URL}/${DB_NAME}`);
 
-  // wrapped in a promise so start() only resolves once the server is actually accepting
-  // connections, otherwise a test could fire its first request before anything is listening
-  await new Promise(resolve => server.listen(port, resolve));    // server.listen, not app.listen — io is attached to this one
+  // resolves once the server is actually listening
+  await new Promise(resolve => server.listen(port, resolve));    // server.listen, since io is attached to it
   console.log(`Server listening on port ${server.address().port}`);
   return client;
 }
 
 
-// require.main === module is only true when this file was run directly (`npm start`). the tests
-// require() it instead, to get at the server and start it themselves against a test database,
-// and without this check just requiring the file would boot a second server on port 3000.
+// only start when run directly (`npm start`). the tests require() this file and start it themselves.
 if (require.main === module) {
-  start().catch(err => {      // if mongo isn't running there's nothing useful the app can do, so fail loudly instead of serving broken routes
+  start().catch(err => {      // no mongo, nothing works, so exit
       console.error('Failed to start server:', err);
       process.exit(1);
   });

@@ -4,18 +4,13 @@ import { map } from 'rxjs';
 import { Auth } from './auth';
 import { GroupService } from './group';
 
-// Route guards. A guard is a function the router runs before it builds the component for a
-// route: return true and the navigation happens, return a UrlTree and the router goes there
-// instead. They're plain functions rather than classes because Angular's class based guards
-// are deprecated, and inject() works the same way inside them as it does in a component.
+// route guards run before a route's component is built: true lets it through, a UrlTree
+// redirects. functions, since class guards are deprecated.
 //
-// Worth saying out loud in the interview: this is not security. Everything these read comes
-// out of localStorage, which the user owns and can edit, and the API doesn't check any of it.
-// What guards actually buy is that typing /super-admin-dashboard as an ordinary user bounces
-// you instead of rendering a page full of controls that will all fail. The real enforcement is
-// the role and admin checks in server.js, which run whatever the client believes.
+// not security: they read localStorage, which the user can edit. they only stop the wrong page
+// rendering. the server enforces the real rules.
 
-// signed in at all. everything except login and register sits behind this.
+// signed in at all. on everything except login and register.
 export const authGuard: CanActivateFn = () => {
   const auth = inject(Auth);
   const router = inject(Router);
@@ -23,8 +18,7 @@ export const authGuard: CanActivateFn = () => {
   return auth.email ? true : router.createUrlTree(['/login']);
 };
 
-// there is exactly one super admin, and their role is the one thing stored on the user record,
-// so this is a straight read rather than a lookup.
+// super admin is the role stored on the user, so a straight read
 export const superAdminGuard: CanActivateFn = () => {
   const auth = inject(Auth);
   const router = inject(Router);
@@ -32,9 +26,8 @@ export const superAdminGuard: CanActivateFn = () => {
   return auth.isSuper ? true : router.createUrlTree(['/user-dashboard']);
 };
 
-// group admin isn't a role on the user, it's whether their email is in that group's
-// adminEmails, so this one has to fetch the group before it can answer. Returning the
-// observable is fine: the router waits for it to emit before deciding.
+// group admin is stored on the group (adminEmails), so the group is fetched first. the router
+// waits for the observable.
 export const groupAdminGuard: CanActivateFn = (route) => {
   const auth = inject(Auth);
   const router = inject(Router);

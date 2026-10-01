@@ -1,8 +1,8 @@
 import { Component, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';       // lets the html use [(ngModel)] on the inputs
-import { RouterLink, Router } from '@angular/router';        // lets the html use routerLink
-import { HttpErrorResponse } from '@angular/common/http'; // the type of error http requests give back
-import { Auth, LoginResponse } from '../auth';                      // the service that actually talks to the backend
+import { FormsModule } from '@angular/forms';       // [(ngModel)]
+import { RouterLink, Router } from '@angular/router';
+import { HttpErrorResponse } from '@angular/common/http';
+import { Auth, LoginResponse } from '../auth';
 
 
 @Component({
@@ -12,52 +12,45 @@ import { Auth, LoginResponse } from '../auth';                      // the servi
   styleUrl: './login.css',
 })
 export class Login {
-  private auth = inject(Auth); // grabs the Auth service so this component can use it //stores email or password typed in
+  private auth = inject(Auth);
   private router = inject(Router);
   email = '';           
   password = '';        
 
-  // signals, not plain strings. the app is zoneless so angular only redraws when a signal changes,
-  // and these get set inside the subscribe below, which is after the submit event has finished.
-  errormessage = signal('');    // text shown on screen if login fails
-  successmessage = signal('');  // text shown on screen if login works
+  // signals, because they're set inside subscribe and the app is zoneless
+  errormessage = signal('');
+  successmessage = signal('');
 
 
-  // disables the button while a login is in flight. without it a double click fires two
-  // requests and two setTimeout redirects.
+  // disables the button during a login, so a double click can't send two
   submitting = signal(false);
 
 
-  onSubmit() {                // runs when the login form is submitted
+  onSubmit() {
     if (this.submitting()) {
       return;
     }
     this.submitting.set(true);
-    this.errormessage.set('');   // clear old messages first
+    this.errormessage.set('');
     this.successmessage.set('');
 
-    this.auth.login(this.email, this.password).subscribe({ // send email+password to the backend
+    this.auth.login(this.email, this.password).subscribe({
             next: (res: LoginResponse) => {
 
-        // this runs if the backend says login worked
-        // only the fields the navbar and the guards need are kept. everything else about
-        // the account is fetched fresh by the profile page, because localStorage goes stale the
-        // moment the profile is edited.
+        // keep only what the navbar and guards need, the rest is fetched fresh
         this.auth.saveUser({ email: res.email, role: res.role, username: res.username, avatarUrl: res.avatarUrl });
         this.successmessage.set('Logged in successfully.');
 
 
-        // everyone lands on the same dashboard whatever their role, the navbar is what offers
-        // the super admin / group admin pages. the 1s delay lets the success message be read
-        // before the page changes.
+        // everyone lands on the same dashboard, the navbar offers the admin pages.
+        // the 1s delay lets the message be read.
         setTimeout(() => this.router.navigateByUrl('/user-dashboard'), 1000);
       },
 
       error: (err: HttpErrorResponse) => {
 
-        // this runs if the backend says login failed (wrong password etc)
         this.errormessage.set(err.error?.error ?? 'Something went wrong, please try again.');
-        this.submitting.set(false);      // let them try again, the button is disabled until this clears
+        this.submitting.set(false);      // allow another try
       },
 
     });

@@ -1,30 +1,26 @@
 <header class="navbar">
-  <!-- the logo doubles as a way back to the dashboard, same as most sites -->
+  <!-- the logo links back to the dashboard -->
   <a class="nav-logo-link" routerLink="/user-dashboard">
     <img src="/fabulari-logo.png" alt="Fabulari logo" class="nav-logo">
   </a>
     <ul class="nav-links">
     <li><a routerLink="/user-dashboard" routerLinkActive="active">Dashboard</a></li>
-    <!-- only shown when the group being viewed is one this user admins -->
+    <!-- only on a group this user admins -->
     @if (isGroupAdmin()) {
       <li><a [routerLink]="['/admin-dashboard', currentGroupId()]" routerLinkActive="active">Group Admin</a></li>
     }
-    <!-- a plain boolean, not a signal, so it isn't called like isGroupAdmin() above -->
+    <!-- a plain boolean, not a signal, so no () -->
     @if (isSuperAdmin) {
       <li><a routerLink="/super-admin-dashboard" routerLinkActive="active">Super Admin</a></li>
     }
-    <!-- the account menu. every page in this app looks different depending on who you are, so
-         the avatar is always there to say which account is signed in, and Profile and Logout
-         live inside it rather than as two more links on the bar.
-         it's a disclosure button (aria-expanded), not an ARIA menu: role="menu" promises arrow
-         key navigation, and plain links and buttons that Tab moves through are what this is. -->
+    <!-- account menu: shows who is signed in, with Profile and Logout. a disclosure button (aria-expanded), not role="menu", which would promise arrow key navigation. -->
     <li class="nav-account">
       <button #accountButton type="button" class="account-button"
               (click)="toggleMenu()"
               aria-controls="account-menu"
               [attr.aria-expanded]="menuOpen()"
               [attr.aria-label]="'Account: ' + displayName()">
-        <!-- alt="" because the button's aria-label already names the account -->
+        <!-- alt="" because the button's aria-label names the account -->
         @if (avatarSrc()) {
           <img class="nav-avatar" [src]="avatarSrc()" alt="" />
         } @else {

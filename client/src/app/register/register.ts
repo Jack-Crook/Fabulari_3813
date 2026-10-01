@@ -17,41 +17,38 @@ export class Register {
 
   email = '';
   password = '';
-  username = '';    // optional, the server falls back to the part before the @ when it's blank
-  dob = '';         // optional here, but needed before joining a group with an age limit
+  username = '';    // optional, defaults to the part before the @
+  dob = '';         // optional, but needed to join an age limited group
 
-  // signals, not plain strings. the app is zoneless so angular only redraws when a signal changes,
-  // and these get set inside the subscribe below, which is after the submit event has finished.
-  errormessage = signal('');    // text shown on screen if login fails
-  successmessage = signal('');  // text shown on screen if login works
+  // signals, because they're set inside subscribe and the app is zoneless
+  errormessage = signal('');
+  successmessage = signal('');
 
-  // stops a double click sending two registrations, same reason as the login page
+  // stops a double click registering twice
   submitting = signal(false);
 
 
-  onSubmit() {              // called when the register form is submitted
+  onSubmit() {
     if (this.submitting()) {
       return;
     }
     this.submitting.set(true);
-    this.errormessage.set(''); // clear any message from a previous attempt
+    this.errormessage.set('');
     this.successmessage.set('');
 
-    this.auth.register(this.email, this.password, this.username, this.dob).subscribe({ // send the form to the backend
-      next: res => {                    // runs if the backend responds with success
-        // the spec says exactly one super admin exists and nobody can create that account.
-        // rather than editing users.json by hand, the very first account to register on an
-        // empty system becomes it, and the server sends the role back so this page can say so.
+    this.auth.register(this.email, this.password, this.username, this.dob).subscribe({
+      next: res => {
+        // the first account on an empty system becomes the super admin
         this.successmessage.set(res.role === 'super'
           ? 'Registered as the super admin. This was the first account on the system. You can now log in.'
           : 'Registered successfully. You can now log in.');
-        this.email = '';    // clear the form
+        this.email = '';
         this.password = '';
         this.username = '';
         this.dob = '';
         this.submitting.set(false);
       },
-      error: (err: HttpErrorResponse) => {         // err.error is the JSON body the Express route sent, e.g. { error: 'Email is already registered' }
+      error: (err: HttpErrorResponse) => {         // err.error is the server's { error } body
         this.errormessage.set(err.error?.error ?? 'Something went wrong, please try again.');
         this.submitting.set(false);
       },

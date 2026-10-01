@@ -14,8 +14,7 @@ describe('UserDashboard', () => {
     makeGroup({ _id: 'g2', name: 'Robotics', ageLimit: 16, memberEmails: ['admin@test.com'] }),
   ];
 
-  // the component reads the signed in user in a field initialiser and fetches in its
-  // constructor, so signing in has to happen before it's built
+  // sign in before the component is built, it reads the user straight away
   async function build(email: string, role = 'user') {
     signIn(email, role);
     fixture = TestBed.createComponent(UserDashboard);
@@ -44,8 +43,7 @@ describe('UserDashboard', () => {
     await build('member@test.com');
     flushByUrl(mock, { '/groups': groups, '/requests': [] });
 
-    // one call fills both panels, and the difference is only whether this email is in the
-    // group's member list
+    // one call fills both panels, split on membership
     expect(component.myGroups().map(g => g._id)).toEqual(['g1']);
     expect(component.discover().map(g => g._id)).toEqual(['g2']);
   });
@@ -54,8 +52,7 @@ describe('UserDashboard', () => {
     await build('boss@test.com', 'super');
     flushByUrl(mock, { '/groups': groups });
 
-    // the super admin can't be a member of any group, so the member split doesn't apply,
-    // they oversee all of them instead
+    // the super admin is in no groups and sees them all
     expect(component.myGroups().length).toBe(2);
     expect(component.discover().length).toBe(0);
   });
@@ -79,8 +76,7 @@ describe('UserDashboard', () => {
     component.newAgeLimit = 0;
     component.onRequestGroup();
 
-    // the spec says group creation goes to the super admin, and that the requester supplies
-    // the details up front, so this posts a request, not a group
+    // groups are requested from the super admin, not created
     const req = mock.expectOne('http://localhost:3000/requests');
     expect(req.request.body.type).toBe('group-create');
     expect(req.request.body.payload.name).toBe('Chess Club');
@@ -95,8 +91,7 @@ describe('UserDashboard', () => {
 
     component.onJoin(groups[1]);
 
-    // every group is visible whatever your age; the check happens when you try to join, and
-    // the server answers 403 with the reason
+    // every group is visible, the age check happens on join (403 with the reason)
     mock.expectOne('http://localhost:3000/groups/g2/members')
       .flush({ error: 'You must be at least 16 to join this group.' },
              { status: 403, statusText: 'Forbidden' });
@@ -110,8 +105,7 @@ describe('UserDashboard', () => {
 
     component.onLeave(groups[0]);
 
-    // a group must always keep at least one admin, so leaving is refused. disbanding goes
-    // through a deletion request to the super admin instead.
+    // the last admin can't leave
     mock.expectOne(r => r.url.includes('/groups/g1/members/'))
       .flush({ error: 'Cannot remove the only admin of this group' },
              { status: 409, statusText: 'Conflict' });

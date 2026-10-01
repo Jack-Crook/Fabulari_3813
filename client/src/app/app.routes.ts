@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { Register } from './register/register'; // the component to show on /register
+import { Register } from './register/register';
 import { Login } from './login/login';
 import { UserDashboard } from './user-dashboard/user-dashboard';
 import { Profile } from './profile/profile';
@@ -10,23 +10,20 @@ import { ChatRoom } from './chat-room/chat-room';
 import { authGuard, superAdminGuard, groupAdminGuard } from './guards';
 
 export const routes: Routes = [
-  { path: 'register', component: Register },      // localhost:4200/register -> Register component
+  { path: 'register', component: Register },      // /register -> Register
   { path: 'login', component: Login},
-  { path: '', redirectTo: 'login', pathMatch: 'full' }, // nothing at the root, so send people to the login page
+  { path: '', redirectTo: 'login', pathMatch: 'full' }, // the root goes to login
 
-  // canActivate runs before the component is built. login and register are the only two routes
-  // without a guard, because they're the pages you use when you aren't signed in yet.
+  // canActivate runs before the component is built. only login and register are unguarded.
   {path: 'user-dashboard', component: UserDashboard, canActivate: [authGuard]},
   {path: 'profile', component: Profile, canActivate: [authGuard]},
 
-  // two guards, run in order: signed in at all, then an admin of this particular group.
-  // groupAdminGuard has to read :groupId out of the route, which is why the page is
-  // parameterised, because a user can admin any number of groups.
+  // signed in, then an admin of this group. :groupId because a user can admin many groups.
   {path: 'admin-dashboard/:groupId', component: AdminDashboard, canActivate: [authGuard, groupAdminGuard]},
 
   {path: 'super-admin-dashboard', component: SuperAdminDashboard, canActivate: [authGuard, superAdminGuard]},
-  {path: 'groups/:id', component: GroupView, canActivate: [authGuard]},                                  // :id is the group being opened
-  {path: 'groups/:groupId/channels/:channelId', component: ChatRoom, canActivate: [authGuard]},          // one room inside that group
+  {path: 'groups/:id', component: GroupView, canActivate: [authGuard]},
+  {path: 'groups/:groupId/channels/:channelId', component: ChatRoom, canActivate: [authGuard]},          // one room in a group
 
-  { path: '**', redirectTo: 'login' }          // any unmatched url, e.g. a typo, otherwise renders a blank page, because router-outlet has nothing to put there. must stay last, first match wins.
+  { path: '**', redirectTo: 'login' }          // anything unknown goes to login. must be last, the first match wins.
 ];

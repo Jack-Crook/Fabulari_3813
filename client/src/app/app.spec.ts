@@ -20,13 +20,12 @@ describe('App', () => {
     const fixture = TestBed.createComponent(App);
     await fixture.whenStable();
     const compiled = fixture.nativeElement as HTMLElement;
-    // the root shell is nothing but the outlet, and every page component brings its own navbar,
-    // which is why login and register have none
+    // the root is just the outlet, each page brings its own navbar
     expect(compiled.querySelector('router-outlet')).toBeTruthy();
   });
 });
 
 
-//need atleast 1 test for each route
-//endpoints can use either
-//have components with lots of tests
+// need at least 1 test for each route
+// endpoints can use either
+// have components with lots of tests

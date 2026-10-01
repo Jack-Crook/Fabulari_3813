@@ -1,19 +1,15 @@
-// one off script: loads the phase 1 json files into mongo so there's data to work with.
-// run it with `npm run seed`. it clears the six collections first, so it's safe to re-run and
-// always produces the same starting state rather than duplicating everything.
+// loads the phase 1 json files into mongo (`npm run seed`). clears the collections first, so
+// re-running always gives the same starting state.
 //
-// the json files use hand written string ids (g1, c1, r17885...) and channels and requests
-// point at their group with that same string. mongo generates its own _id, so this loads the
-// groups first, remembers which new _id each old string id became, and rewrites every
-// reference through that map. without it the rooms and requests would all point at ids that
-// no longer exist.
+// the json uses string ids (g1, c1...) and mongo makes its own _id, so groups are loaded first
+// and a map from old id to new _id is used to rewrite the rooms' and requests' groupId.
 
 const fs = require('fs');
 const path = require('path');
 const { MongoClient } = require('mongodb');
-const bcrypt = require('bcrypt');       // the json files hold plain passwords, they get hashed on the way in
+const bcrypt = require('bcrypt');       // the json has plain passwords, hashed on the way in
 
-const SALT_ROUNDS = 10;     // the same cost server.js registers with, so a seeded account is no different to a registered one
+const SALT_ROUNDS = 10;     // same cost as server.js
 
 const MONGO_URL = process.env.MONGO_URL ?? 'mongodb://localhost:27017';
 const DB_NAME = process.env.DB_NAME ?? 'fabulari';
@@ -36,38 +32,34 @@ async function seed() {
     await db.collection(name).deleteMany({});
   }
 
-  // clearing messages orphans every uploaded chat image, so the upload folder is emptied too.
-  // it only ever holds files POST /uploads wrote, and server.js recreates it on startup.
+  // messages are cleared, so their uploaded images are too
   const uploads = path.join(__dirname, 'uploads');
   fs.rmSync(uploads, { recursive: true, force: true });
   fs.mkdirSync(uploads, { recursive: true });
 
-  // users carry no id of their own, email is the identifier, so nothing has to be rewritten.
-  // the password does though: data/users.json is a fixture written by hand, so the passwords in
-  // it are readable, and the database only ever holds the hash. hashing here rather than
-  // rewriting the file keeps the fixture usable, since the point of it is knowing the logins.
+  // users need no id rewriting (email is the identifier), only their passwords hashed. the json
+  // keeps plain passwords so the test logins are known.
   const users = readJson('users.json');
   if (users.length) {
     const hashed = await Promise.all(users.map(async user => ({
       ...user,
       password: await bcrypt.hash(user.password, SALT_ROUNDS),
-      avatarUrl: user.avatarUrl ?? '',   // no profile pictures in the fixture, and uploads/ is emptied below anyway
+      avatarUrl: user.avatarUrl ?? '',   // no pictures in the fixture
     })));
     await db.collection('users').insertMany(hashed);
   }
 
-  // strip the old string id off each group and keep a map from it to the _id mongo assigns
+  // old string id -> new mongo _id
   const oldToNew = new Map();
   const groups = readJson('groups.json');
   for (const group of groups) {
     const { id, ...rest } = group;
-    rest.bannedEmails = rest.bannedEmails ?? [];   // older records predate this field
+    rest.bannedEmails = rest.bannedEmails ?? [];   // older records don't have it
     const result = await db.collection('groups').insertOne(rest);
     oldToNew.set(id, result.insertedId);
   }
 
-  // channels are rewritten to point at the new group _id. one whose group is missing would be
-  // an orphan room, so it's skipped rather than inserted broken.
+  // point each room at its group's new _id. rooms with no group are skipped.
   const channels = readJson('channels.json');
   let skippedChannels = 0;
   for (const channel of channels) {
@@ -79,20 +71,19 @@ async function seed() {
     await db.collection('channels').insertOne({ groupId, name: channel.name });
   }
 
-  // requests point at a group the same way, except group-create ones, which have no group yet
-  // and stored that as an empty string. those become null, which is what server.js writes now.
+  // same for requests. group-create has no group yet, '' becomes null like server.js writes.
   const requests = readJson('requests.json');
   let skippedRequests = 0;
   for (const request of requests) {
     const { id, groupId, ...rest } = request;
     if (groupId && !oldToNew.has(groupId)) {
-      skippedRequests++;      // the group it referred to isn't in groups.json any more
+      skippedRequests++;      // its group no longer exists
       continue;
     }
     await db.collection('requests').insertOne({ ...rest, groupId: groupId ? oldToNew.get(groupId) : null });
   }
 
-  // audit entries and bans reference people by email, not by group id, so they need no rewriting
+  // audit and bans use emails, nothing to rewrite
   const auditEntries = readJson('audit.json').map(({ id, ...rest }) => rest);
   if (auditEntries.length) {
     await db.collection('audit').insertMany(auditEntries);
@@ -103,19 +94,16 @@ async function seed() {
     await db.collection('banned').insertMany(bans);
   }
 
-  // email is the unique identifier for an account, and a banned email can never be reused, so
-  // both are worth mongo enforcing rather than trusting a route to always check first. group
-  // names are unique per the spec, compared case insensitively, so that index carries the same
-  // collation the queries in server.js use.
+  // unique emails and group names enforced by mongo itself. group names ignore case, with the
+  // same collation server.js queries with.
   await db.collection('users').createIndex({ email: 1 }, { unique: true });
   await db.collection('banned').createIndex({ email: 1 }, { unique: true });
   await db.collection('groups').createIndex({ name: 1 }, { unique: true, collation: { locale: 'en', strength: 2 } });
-  // the queues and the audit page both read newest first, and both filter before sorting
+  // the request queues and audit page filter, then sort newest first
   await db.collection('requests').createIndex({ status: 1, createdAt: -1 });
   await db.collection('audit').createIndex({ type: 1, at: -1 });
 
-  // a group can only hold emails that belong to real accounts, which the endpoints enforce but
-  // the json files predate. anything listed here would be an admin who can't log in.
+  // warn about group members in the json with no account
   const emails = new Set(users.map(u => u.email));
   const orphans = new Set();
   for (const group of groups) {

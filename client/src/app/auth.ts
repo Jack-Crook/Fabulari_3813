@@ -1,35 +1,31 @@
 import { Service, inject, signal, computed } from '@angular/core';    // Service = injectable decorator; inject() = grabs a dependency
-import { HttpClient } from '@angular/common/http';  // lets this service make HTTP requests
+import { HttpClient } from '@angular/common/http';
 
-// one account as the server sends it back. the password is never in here, because server.js strips it
-// off every user it returns, so there's nothing to leak into the client.
+// one account as the server sends it. never has a password, the server strips it.
 export interface AppUser {
   email: string;
   role: string;
   username: string;
-  dob: string;        // yyyy-mm-dd, empty when they haven't set one. the age limit check needs it
+  dob: string;        // yyyy-mm-dd, '' if not set. used for age limits
   bio: string;
-  avatarUrl: string;  // /uploads/<uuid>.png on the api server, or '' when they haven't set a picture
+  avatarUrl: string;  // /uploads/<uuid>.png, or '' for no picture
   createdAt: string;
 }
 
-// the shape the express /login route sends back: a message plus the same fields as AppUser
+// what /login sends back
 export interface LoginResponse extends AppUser {
   message: string;
 }
 
-// what gets kept in localStorage once someone is logged in. deliberately smaller than AppUser,
-// only what the navbar and the group pages need to decide what to show. everything else is
-// fetched fresh, because localStorage goes stale the moment the profile is edited elsewhere.
+// what's kept in localStorage. only what the navbar and guards need, the rest is fetched fresh.
 export interface StoredUser {
   email: string;
   role: string;
   username: string;
-  avatarUrl?: string;   // optional, so a session saved before profile pictures existed still reads fine
+  avatarUrl?: string;   // optional, older sessions don't have it
 }
 
-// the fields a user is allowed to change about themself. email isn't here, because the spec
-// makes it the unique identifier for the account, and neither is role.
+// the editable profile fields. no email (the identifier) and no role.
 export interface ProfileChanges {
   username?: string;
   dob?: string;
@@ -38,58 +34,49 @@ export interface ProfileChanges {
 }
 
 
-@Service()           // marks this class as injectable app-wide, without needing to register it manually anywhere
+@Service()           // injectable app-wide
 export class Auth {
   private http = inject(HttpClient);
   private apiUrl = 'http://localhost:3000';
 
-  // localStorage can't tell angular when it changes, so saveUser and logout bump this counter and
-  // `session` below re-reads storage whenever it moves. that's what lets the navbar redraw the
-  // moment the profile page changes the picture or the name, instead of on the next page load.
+  // localStorage can't notify angular, so saveUser and logout bump this counter
   private sessionVersion = signal(0);
 
-  // the signed in user as a signal. localStorage is still where it lives, this only makes a
-  // change to it something the template can react to.
+  // the signed in user as a signal, re-read whenever the counter changes. lets the navbar
+  // update straight away when the name or picture changes.
   session = computed(() => {
     this.sessionVersion();
     return this.getUser();
   });
 
-  // username and dob are optional at signup. the server falls back to the part before the @
-  // when no username is given, so nobody ends up nameless.
+  // username and dob are optional, the server defaults the username to the part before the @
   register(email: string, password: string, username?: string, dob?: string) {
     return this.http.post<{ message: string; email: string; role: string }>(
       `${this.apiUrl}/register`, { email, password, username, dob });
   }
 
-  login(email: string, password: string) {          // send a POST request to the Express /login route with email + password as the JSON body
+  login(email: string, password: string) {          // POST /login
     return this.http.post<LoginResponse>(`${this.apiUrl}/login`, { email, password });
 }
 
-  getUsers() {                                // GET /users, every registered account. the super admin's members panel
+  getUsers() {                                // GET /users, for the super admin's members panel
     return this.http.get<AppUser[]>(`${this.apiUrl}/users`);
   }
 
-  // GET /users/:email. the profile page uses this instead of reading localStorage, so it shows
-  // what's actually stored rather than whatever was true at login.
+  // GET /users/:email. the profile page loads from here, not stale localStorage.
   fetchUser(email: string) {
     return this.http.get<AppUser>(`${this.apiUrl}/users/${encodeURIComponent(email)}`);
   }
 
-  // PUT /users/:email. only the fields in `changes` are sent, so leaving password out of the
-  // object means "don't touch the password" rather than "set it to empty".
+  // PUT /users/:email. only the fields in `changes` are sent, so no password = unchanged.
   updateProfile(email: string, changes: ProfileChanges) {
-    // actorEmail says who is asking. the server refuses the edit unless it matches the account
-    // in the url, so one signed in user can't PUT another user's password. same "the caller
-    // tells the server who they are" pattern GroupService uses on its write methods.
+    // actorEmail says who is asking. the server refuses unless it matches the url.
     return this.http.put<AppUser>(`${this.apiUrl}/users/${encodeURIComponent(email)}`,
       { ...changes, actorEmail: this.email });
   }
 
-  // POST /users/:email/avatar, a new profile picture. FormData because it's a file upload, the
-  // same as a chat image. actorEmail goes BEFORE the file: multer reads the form top to bottom,
-  // and the server's "only your own picture" check needs it in req.body by the time the file
-  // has been written.
+  // POST /users/:email/avatar. actorEmail goes BEFORE the file: multer reads the form in order
+  // and the server's check needs it in req.body by then.
   uploadAvatar(file: File) {
     const form = new FormData();
     form.append('actorEmail', this.email);
@@ -103,25 +90,22 @@ export class Auth {
       { params: { actorEmail: this.email } });
   }
 
-  // the server stores a relative path, so it keeps working if the api's address changes. this
-  // turns it into something an <img> can load, the same as ChatService.imageSrc.
+  // the server stores a relative path, this makes it loadable by an <img>
   avatarSrc(avatarUrl: string) {
     return `${this.apiUrl}${avatarUrl}`;
   }
 
-  saveUser(user: StoredUser) {     // called after a successful login so the rest of the app knows who is signed in
-    localStorage.setItem('user', JSON.stringify(user));   // localStorage only holds strings, so the object gets stringified first
+  saveUser(user: StoredUser) {     // after login
+    localStorage.setItem('user', JSON.stringify(user));   // localStorage only holds strings
     this.sessionVersion.update(v => v + 1);
   }
 
-  getUser(): StoredUser | null {              // reads the logged in user back out, or null if nobody is logged in
+  getUser(): StoredUser | null {              // the signed in user, or null
     const raw = localStorage.getItem('user');
-    return raw ? JSON.parse(raw) : null;      // getItem gives back null when the key isn't there, so only parse when there's something to parse
+    return raw ? JSON.parse(raw) : null;
   }
 
-  // used by the route guards and by every component that needs "who am I" as a plain string.
-  // this is state, not security. the server doesn't verify it, it just stops the wrong pages
-  // being rendered by someone typing a url.
+  // "who am I", for the guards and components. state, not security: the server doesn't verify it.
   get email(): string {
     return this.getUser()?.email ?? '';
   }
@@ -131,7 +115,7 @@ export class Auth {
   }
 
   logout() {
-    localStorage.removeItem('user');          // clearing the key is all "logging out" means for now, there's no server side session
+    localStorage.removeItem('user');          // no server side session, so this is all logout is
     this.sessionVersion.update(v => v + 1);
   }
 

@@ -6,9 +6,6 @@
 **Workshop Time:** Thursday 9am
 **Repository:** https://github.com/Jack-Crook/Fabulari_3813
 
-
-
-
 ## 1. Specifications and Requirements
 
  The requirements for this assignment came from the assignment brief, the Week 2 client briefing, and the Spec Update documents that answered questions from the students. The client is the course convenor, and the brief was deliberately incomplete, so some requirements only exist in those Q&A answers.
@@ -16,7 +13,6 @@
   Phase 1 covered the UI and user management, stored in JSON files. Phase 2 is the full app: data in MongoDB, real-time chat over socket.io with text and image messages, a live presence list, the request and approval flow, hashed passwords and profile pictures.
 
 ### Requirements implemented in Phase 2
-
 
 | # | Requirement | Where it's enforced |
 |---|---|---|
@@ -59,24 +55,16 @@
 
 ### Assumptions and known limitations
 
-<!-- Write these up honestly. A stated limitation scores better than a hidden one,
-     and you will be asked about them in the interview. The four that matter:
+- **Identity is self-asserted.** Every REST write route takes an `actorEmail` from the client and checks the rules against it (admin of this group, your own profile, super admin only). The rules are enforced on the server, but the server trusts the email it is given. There are no sessions or tokens, so a modified client could claim to be someone else. The fix would be a JWT issued at login and checked in Express middleware and in the socket handshake.
+- **The socket join trusts the email too.** `joinRoom` checks that the email is a member of the group, but takes the email from the client. Once joined, `sendMessage` takes the sender from the socket's own join, never from the payload, so a message can't be posted under a different name than the one that joined.
+- **Read routes are open.** `GET /users`, `/groups`, `/requests`, `/audit` and `/bans` don't check who is asking. The route guards stop the wrong pages showing, not the data being fetched.
+- **Route guards are not security.** They read the session from localStorage, which the user can edit. They only control navigation. The real checks are on the server.
+- **No HTTPS.** Passwords are hashed with bcrypt before they are stored, but they still cross the network in plain text on localhost.
+- **Login timing.** When the email doesn't exist, login answers before running bcrypt, which is faster than a wrong password. The message is identical, but the timing could show whether an account exists.
+- **Single server.** Presence is kept in memory, and uploaded images are stored on the server's disk in `uploads/`. Both would need changing (a Redis adapter, object storage) to run more than one server.
+- **Profile pictures in chat** are loaded when you enter a room, so a picture someone changes while you're in the room shows after a refresh.
 
-       - actorEmail is self-asserted on every REST write route. The rules are
-         enforced, the identity is not. Contrast this with the socket layer, which
-         does not have the hole - see §2.
-       - GET /users, /groups, /requests, /audit, /bans are unauthenticated.
-         Route guards stop the wrong pages rendering, not the data.
-       - Passwords are hashed now, but there is no HTTPS, so the password still
-         crosses the network in the clear. And login short-circuits before hashing
-         when the email is unknown, which is measurably faster than a wrong
-         password and leaks whether an account exists.
-       - Route guards read localStorage, which the user owns. Navigation control,
-         not security.
-
-     Also note what you fixed since Phase 1 rather than only what is broken:
-     plain-text passwords and the missing image messages are both closed. -->
-
+Fixed since Phase 1: passwords are no longer stored in plain text, data is in MongoDB instead of JSON files (no more lost writes when two requests overlap), image messages exist, and several write routes that had no permission check now have one.
 
 ## 2. API Documentation
 
@@ -89,11 +77,6 @@ Conventions
 - Users never have a password in a response. Every route that returns a user goes through publicUser().
 
 ### REST endpoints
-
-<!-- 28 handlers. Verify with:
-       grep -nE "^app\.(get|post|put|patch|delete)\(" server.js
-     GET /uploads/:file is express.static, not a route of its own - list it at the
-     bottom for completeness and say so. -->
 
 Identity comes from `actorEmail`: in the body for POST/PUT/PATCH, and in the query string for DELETE. See the limitations in §1.
 
@@ -130,18 +113,13 @@ Identity comes from `actorEmail`: in the body for POST/PUT/PATCH, and in the que
 | GET | `/audit/types` | The distinct types in the log, sorted, for the filter dropdown. | 200 |
 | POST | `/uploads` | Upload a chat image (multipart: `email`, `channelId`, then `image`). Members only. | 201 `{ imageUrl }` · 400 wrong type or unreadable upload · 403 not a member (the file is deleted) · 413 over 5 MB |
 | GET | `/uploads/:file` | **Not a route handler**: `express.static` serving uploaded images with `X-Content-Type-Options: nosniff`. | 200 · 404 |
-| — | *any route* | The Express 5 error handler, for a failure no route handled (e.g. Mongo down). | 500 `{ error }` |
+| ANY | *any route* | The Express 5 error handler, for a failure no route handled (e.g. Mongo down). | 500 `{ error }` |
 
 ### Socket.io events
 
-<!-- 7 events, in server.js registerSocketHandlers(). Cover the direction, the
-     payload and the ack shape.
+The socket server runs on the same HTTP server as Express. The client opens one connection for the whole app (`ChatService`) and reuses it for every room.
 
-     The paragraph underneath is the important one: sendMessage carries no identity.
-     The sender is read from the socket's validated join, not the payload, so a
-     client cannot spoof another user. That is the direct answer to the actorEmail
-     weakness in §1. Also explain socket.to() excluding the sender vs io.to()
-     including it, and why each is used where it is. -->
+`sendMessage` carries no sender. The server remembers who joined on each socket and uses that, so the payload can't be used to post as someone else. `newMessage` uses `io.to(room)`, which includes the sender, so the sender's own message comes from the server like everyone else's. `userJoined` uses `socket.to(room)`, which excludes the sender, because you don't need to be told that you joined.
 
 | Direction | Event | Payload / ack |
 |---|---|---|
@@ -156,13 +134,7 @@ Identity comes from `actorEmail`: in the body for POST/PUT/PATCH, and in the que
 
 ### Data structures
 
-<!-- 7 collections: users, groups, channels, messages, requests, audit, banned.
-     Key fields only, not every field.
-
-     Then the paragraph worth the most marks in this whole document: why group
-     admin status lives on the group as adminEmails[] and not as a role on the
-     user - because one person can admin several groups while being an ordinary
-     member of others. Have this one ready to say out loud. -->
+Group admin is not a role on the user. It is stored on the group as `adminEmails[]`, because one person can be an admin of one group and an ordinary member of another. The only role on the user is `user` or `super`, since there is exactly one super admin. Members and bans are stored the same way, as email arrays on the group, and updated with `$push` / `$pull` so two changes at once don't overwrite each other.
 
 | Collection | Key fields |
 |---|---|
@@ -176,11 +148,6 @@ Identity comes from `actorEmail`: in the body for POST/PUT/PATCH, and in the que
 
 ### Indexes
 
-<!-- 6, created in seed.js. For each one say which query it serves - an index with
-     no named query is just a claim. The groups.name one needs the collation
-     explained (locale en, strength 2 = case-insensitive uniqueness enforced by the
-     database, not just by a route check). -->
-
 | Collection | Index | Purpose |
 |---|---|---|
 | `users` | `{ email: 1 }` unique | The lookup in `/login`, `/register` and every route that checks an actor. Also guarantees one account per email even if two registrations race. |
@@ -192,23 +159,13 @@ Identity comes from `actorEmail`: in the body for POST/PUT/PATCH, and in the que
 
 ### Error handling
 
-<!-- Short. One Express 5 error middleware at the bottom of server.js instead of 28
-     try/catch blocks, because Express 5 forwards a rejected promise from an async
-     handler and Express 4 did not. Four arguments is what marks it as an error
-     handler. Good answer to "where is your error handling?" -->
-
+Each route checks its own inputs and answers with a 4xx status and `{ error }`. For anything unexpected (for example MongoDB being down), there is one Express 5 error handler at the bottom of `server.js`. Express 5 passes a rejected promise from an async route to that handler, so the routes don't need a try/catch each, and the client gets a 500 instead of a request that hangs. The socket handlers can't use it, so each one has its own try/catch and answers through the ack.
 
 ## 3. Angular Components, Services and Models
 
-<!-- Open with the two architectural facts: standalone components, no NgModules;
-     and zoneless change detection, which is why anything set inside an async
-     callback is a signal() while [(ngModel)] values stay plain properties (a DOM
-     event already schedules a redraw). This caused you real pain - worth a sentence
-     saying so. -->
+The client is Angular 22 in `client/`. Every component is standalone (no NgModules) and imports what it uses directly. The app is zoneless, so Angular only redraws when a signal changes or a template event fires. Anything set inside an HTTP `subscribe` or a socket callback is therefore a `signal()`. Form fields bound with `[(ngModel)]` stay plain properties, because typing is a DOM event and already triggers a redraw. Missing this caused a bug in Phase 1 where data loaded but never appeared on screen.
 
 ### Components
-
-<!-- 9. client/src/app/ - one directory each, plus App at the root. -->
 
 | Component | Purpose |
 |---|---|
@@ -226,11 +183,6 @@ Identity comes from `actorEmail`: in the body for POST/PUT/PATCH, and in the que
 
 ### Services
 
-<!-- 4: Auth, GroupService, RequestService, ChatService. For ChatService say that it
-     owns the one socket connection for the whole app, and that ChatRoom holds no
-     chat state of its own - it binds the service's signals straight into the
-     template rather than copying them. -->
-
 | Service | Owns |
 |---|---|
 | `Auth` (`auth.ts`) | Who is signed in: the localStorage session, exposed as the `session` signal so the navbar redraws when it changes. Also register, login, and the users endpoints: fetch, update profile, upload or remove a profile picture. |
@@ -240,8 +192,6 @@ Identity comes from `actorEmail`: in the body for POST/PUT/PATCH, and in the que
 | `theme.ts` *(functions, not a service)* | `contrastRatio()` and `readableInk()`: the WCAG contrast maths that picks dark or light text for any group theme. |
 
 ### Models
-
-<!-- Grouped by the file they live in: auth.ts, group.ts, request.ts, chat.ts. -->
 
 | Model | File | Note |
 |---|---|---|
@@ -263,8 +213,7 @@ Identity comes from `actorEmail`: in the body for POST/PUT/PATCH, and in the que
 
 ### Route guards
 
-<!-- 3, all in guards.ts. Note that groupAdminGuard is async and returns an
-     Observable because it has to fetch the group first. -->
+The guards only control which pages render. They read localStorage, so they are not security. Every action is checked again on the server.
 
 | Guard | Rule |
 |---|---|
@@ -274,11 +223,9 @@ Identity comes from `actorEmail`: in the body for POST/PUT/PATCH, and in the que
 
 ### Routes
 
-<!-- From app.routes.ts. Say which are behind authGuard and what the wildcard does. -->
-
 | Path | Component | Guard |
 |---|---|---|
-| `''` | — | Redirects to `/login` |
+| `''` | none | Redirects to `/login` |
 | `login` | `Login` | none |
 | `register` | `Register` | none |
 | `user-dashboard` | `UserDashboard` | `authGuard` |
@@ -287,87 +234,67 @@ Identity comes from `actorEmail`: in the body for POST/PUT/PATCH, and in the que
 | `groups/:groupId/channels/:channelId` | `ChatRoom` | `authGuard` (the server checks membership when joining) |
 | `admin-dashboard/:groupId` | `AdminDashboard` | `authGuard`, then `groupAdminGuard` |
 | `super-admin-dashboard` | `SuperAdminDashboard` | `authGuard`, then `superAdminGuard` |
-| `**` | — | Any unknown URL redirects to `/login`. It's last because the first matching route wins. |
-
+| `**` | none | Any unknown URL redirects to `/login`. It's last because the first matching route wins. |
 
 ## 4. Design Documents
 
-<!-- Reuse Phase 1 §7 and update it. The wireframes are already in design/ -
-     8 files, 6 desktop screens + 2 mobile. Cover:
-       - desktop-first with mobile reductions
-       - the same components reused at both sizes rather than separate mobile screens
-       - 44px minimum touch targets
-       - the colour and type tokens
-
-     Then a subsection on what changed in Phase 2: the chat composer, the presence
-     list, the request queues, the audit log page.
-
-     ACCESSIBILITY IS EXPLICITLY GRADED IN PHASE 2 AND IS NOT DONE YET.
-     Do the work before you write this section, then describe what you actually did:
-       - the theme contrast fix (deriving banner text colour from the theme's
-         luminance instead of hardcoding it) - this is the strongest thing you can
-         put in this section, because it is a consequence of the client's own
-         "theme extends into chat rooms" requirement
-       - labels on the 7 unlabelled form controls
-       - the global :focus-visible outline in styles.css
-       - role="status" / role="alert" on messages outside the chat room -->
+The wireframes from Phase 1 are in [`design/`](design/): six desktop screens and two mobile ones. The built app follows them, with the changes listed in the table below. Most changes come from the spec updates (for example the super admin can't ban directly, so there is no Ban button) or from features added in Phase 2 (chat, presence, images, profile pictures).
 
 ### Wireframes
 
-All in [`design/`](design/). The last column is honest on purpose: update it if you redraw any of them before submitting.
+All in [`design/`](design/). The last column lists what changed in the built app.
 
 | Screen | Desktop | Mobile | Changed since the wireframe |
 |---|---|---|---|
 | Login | [`Login_wireframe.png`](design/Login_wireframe.png) | [`Mobile_login.PNG`](design/Mobile_login.PNG) | Register link; error and success messages |
 | User dashboard | [`User_Dashboard_Wireframe.png`](design/User_Dashboard_Wireframe.png) | [`Mobile_dashboard.PNG`](design/Mobile_dashboard.PNG) | "Request Group" form instead of direct create; Leave buttons; pending requests; account menu replaces the bottom-left user card |
-| Group / channel view | [`Group_Channel_view_wireframe.png`](design/Group_Channel_view_wireframe.png) | — | Propose-a-room form, proposed rooms list, Join bar and locked rooms for non-members |
-| Chat room | [`In_chatroom_wireframe.png`](design/In_chatroom_wireframe.png) | — | Live presence list (a strip on mobile), join/leave notice, avatars, image attach and preview, dates on older messages, mobile Back link |
-| Group admin | [`admin_view_wireframe.png`](design/admin_view_wireframe.png) | — | Editable settings, room management, promote/demote/remove/ban/report, banned list, room proposals instead of join requests, confirm boxes |
-| Super admin | [`super_admin_wireframes.png`](design/super_admin_wireframes.png) | — | No Un-ban button and no direct Ban (the spec forbids both); approve/reject with reasons; audit type filter; confirm boxes |
-| Profile | — | — | Not wireframed: edit form, profile picture, groups administered, pending and rejected requests |
+| Group / channel view | [`Group_Channel_view_wireframe.png`](design/Group_Channel_view_wireframe.png) | None | Propose-a-room form, proposed rooms list, Join bar and locked rooms for non-members |
+| Chat room | [`In_chatroom_wireframe.png`](design/In_chatroom_wireframe.png) | None | Live presence list (a strip on mobile), join/leave notice, avatars, image attach and preview, dates on older messages, mobile Back link |
+| Group admin | [`admin_view_wireframe.png`](design/admin_view_wireframe.png) | None | Editable settings, room management, promote/demote/remove/ban/report, banned list, room proposals instead of join requests, confirm boxes |
+| Super admin | [`super_admin_wireframes.png`](design/super_admin_wireframes.png) | None | No Un-ban button and no direct Ban (the spec forbids both); approve/reject with reasons; audit type filter; confirm boxes |
+| Profile | None | None | Not wireframed: edit form, profile picture, groups administered, pending and rejected requests |
 
 ### Responsive methodology
 
+- Designed for desktop first, then reduced for phones with one breakpoint, `@media (max-width: 768px)`, in each page's CSS.
+- The same components are used at both sizes; there are no separate mobile pages. Under 768px, side panels are hidden or stacked, for example the chat room hides the room list and the "Currently In" sidebar.
+- Anything hidden on mobile has a replacement so nothing is lost: a presence strip under the chat banner and a Back link in the banner.
+- Every button is at least 44px tall (set once in `styles.css`), and so are the navbar links and the mobile Back link, so they are easy to tap.
+
 ### Accessibility
 
+- **Theme contrast.** The group's theme colour is used behind text in its banner and chat rooms, and an admin can pick any colour. The text colour (dark or white) is worked out from the theme using the WCAG contrast formula in `theme.ts`, so text stays readable on any theme. A unit test checks every seeded theme passes WCAG AA (4.5:1).
+- **Labels.** Every form input has a `<label>` or an `aria-label`, so screen readers can name it.
+- **Messages are announced.** Errors use `role="alert"` and success messages use `role="status"`, including the chat join and leave notices.
+- **Keyboard.** All controls are real buttons and links. There is a visible `:focus-visible` outline. The account menu closes on Escape and returns focus to its button. Confirm boxes put focus on Cancel, so Enter backs out, and use `aria-describedby` so the question is read out.
+- **Images.** The logo and chat images have alt text. Avatars use `alt=""` because the name is written next to them.
 
 ## 5. Testing
 
-<!-- Tools: Vitest 4 via @angular/build:unit-test, jsdom, Angular TestBed with
-     provideHttpClientTesting.
+Three levels of automated testing:
 
-     Methodology paragraph: the HTTP backend is swapped for a test backend that
-     queues requests, so each test asserts what the component *asked for* and hands
-     back a fixed reply. Shared setup lives in testing.ts - testProviders(),
-     httpMock(), signIn/signOut and the makeGroup/makeChannel/makeRequest/makeUser
-     builders - rather than being repeated in 14 files. flushByUrl answers a
-     component's several startup requests by matching on URL, because their order is
-     not something a test should depend on.
-
-     Worth one line: no application code was changed to suit the tests. -->
+- **Server integration tests** use Node's built-in test runner (`node --test`). Each test file starts the real server on a free port against a separate test database, then calls the routes over HTTP and the socket events with `socket.io-client`, checking status codes, responses and what was written to the database.
+- **Client unit tests** use Vitest through Angular's `ng test`, with jsdom and TestBed. The HTTP backend is replaced with Angular's testing backend, so each test checks what a component or service requested and gives it a fixed reply. Shared setup (providers, sign in, data builders) is in `testing.ts`. No application code was changed to suit the tests.
+- **End to end tests** use Cypress, against the real app, server and database (see below).
 
 ### Automated test suite
 
-<!-- 14 spec files. RUN `npm test` IN client/ AND USE THE REAL NUMBER - a static
-     count says 99 but nobody has confirmed they all pass since sockets and images
-     landed. Put the pass/fail line and the duration under the table. -->
-
-**Server — integration tests** (`test/`, run with `npm test` from the repo root, needs `mongod`)
+**Server: integration tests** (`test/`, run with `npm test` from the repo root, needs `mongod`)
 
 | Spec file | Tests | Covers |
 |---|---|---|
-| `api.test.js` — auth and users | 16 | health check; first account becomes super admin; bcrypt hash stored, never the password; email normalised; 400 on missing fields, bad email, short password; 403 on a banned email; identical 401 for wrong password and unknown email; password never returned; profile edit own-only (403), role not editable, changed password re-hashed |
-| `api.test.js` — profile pictures | 5 | your own picture stored with a random file name, returned on the account and served; replacing it deletes the old file; someone else's picture 403 with no file left on disk; SVG refused (400); remove clears it and deletes the file, own account only |
-| `api.test.js` — groups | 26 | list; edit admin-only (403); malformed id is 404, not 500; a name another group has (409); raising the age limit boots under-age members but never an admin; delete super-admin-only and cascades rooms and messages; member list returns only email, name and picture; join, already-in and super admin (409), joining for someone else (403), too young or no date of birth (403); leave and remove; last admin can't be removed, banned or demoted (409); group ban blocks rejoin, lifting it allows it; promote and demote |
-| `api.test.js` — channels | 9 | list all / by group, malformed group id gives `[]`; admin creates, member gets 403 (must propose); duplicate name in a group (409); rename rules (403, 400, 409); delete admin-only and removes its messages |
-| `api.test.js` — requests | 21 | `scope` splits the super admin and group admin queues; `requestedBy` filter; super admin can't raise requests (403); duplicate pending name (409); member-only proposals, admin-only deletion requests; ban report needs a reason (400) and won't target a group's only admin (409); approve carries out all four types; nobody approves their own (403); can't action twice (409); name re-checked at approval time (409); approved ban deletes the account and blocks re-registering; a ban closes the banned user's pending requests; a request from a deleted account can't be approved (409); deleting a group closes its other pending requests; reject needs a reason (400) and has the same authority check |
-| `api.test.js` — bans and audit | 3 | banned list; audit newest first and filterable by type; distinct sorted types, refused actions not logged |
-| `api.test.js` — uploads | 5 | member upload gets a random file name and is served with `nosniff`; non-member 403 and the file is removed from disk; SVG refused (400); over 5 MB refused (413); unknown file 404 |
+| `api.test.js`: auth and users | 16 | health check; first account becomes super admin; bcrypt hash stored, never the password; email normalised; 400 on missing fields, bad email, short password; 403 on a banned email; identical 401 for wrong password and unknown email; password never returned; profile edit own-only (403), role not editable, changed password re-hashed |
+| `api.test.js`: profile pictures | 5 | your own picture stored with a random file name, returned on the account and served; replacing it deletes the old file; someone else's picture 403 with no file left on disk; SVG refused (400); remove clears it and deletes the file, own account only |
+| `api.test.js`: groups | 26 | list; edit admin-only (403); malformed id is 404, not 500; a name another group has (409); raising the age limit boots under-age members but never an admin; delete super-admin-only and cascades rooms and messages; member list returns only email, name and picture; join, already-in and super admin (409), joining for someone else (403), too young or no date of birth (403); leave and remove; last admin can't be removed, banned or demoted (409); group ban blocks rejoin, lifting it allows it; promote and demote |
+| `api.test.js`: channels | 9 | list all / by group, malformed group id gives `[]`; admin creates, member gets 403 (must propose); duplicate name in a group (409); rename rules (403, 400, 409); delete admin-only and removes its messages |
+| `api.test.js`: requests | 21 | `scope` splits the super admin and group admin queues; `requestedBy` filter; super admin can't raise requests (403); duplicate pending name (409); member-only proposals, admin-only deletion requests; ban report needs a reason (400) and won't target a group's only admin (409); approve carries out all four types; nobody approves their own (403); can't action twice (409); name re-checked at approval time (409); approved ban deletes the account and blocks re-registering; a ban closes the banned user's pending requests; a request from a deleted account can't be approved (409); deleting a group closes its other pending requests; reject needs a reason (400) and has the same authority check |
+| `api.test.js`: bans and audit | 3 | banned list; audit newest first and filterable by type; distinct sorted types, refused actions not logged |
+| `api.test.js`: uploads | 5 | member upload gets a random file name and is served with `nosniff`; non-member 403 and the file is removed from disk; SVG refused (400); over 5 MB refused (413); unknown file 404 |
 | `sockets.test.js` | 15 | members only can join; bad or unknown room refused; history and presence in the join ack; `userJoined` to others but not the joiner; history replayed oldest first; must join before sending; empty message refused; `newMessage` reaches the sender too and is stored; sender taken from the join, not the payload; a sender removed from the group after joining is refused; uploaded image sends, an image url the server never issued is refused; leave and disconnect both send `userLeft` and update presence, no ghost entries |
 
 **Result: 2 files, 100 tests, 100 passed, about 2s.**
 
-**Client — unit tests** (`client/`, Vitest via `ng test`)
+**Client: unit tests** (`client/`, Vitest via `ng test`)
 
 | Spec file | Tests | Covers |
 |---|---|---|
@@ -389,52 +316,44 @@ All in [`design/`](design/). The last column is honest on purpose: update it if 
 
 **Result: 15 files, 128 tests, 128 passed.**
 
-**Total: 228 automated tests, all passing** (re-run 2026-09-30).
+**End to end: Cypress** (`client/cypress/e2e/`, run with `npx cypress run` from `client/`)
+
+The two suites above test the halves separately. The client tests replace the server with a test backend, and the server tests call the API without a browser. The Cypress tests use neither shortcut. Cypress 16 drives a real browser against the running Angular app (`ng serve`, :4200). That talks to the real Express server (`npm start`, :3000), which reads and writes the real MongoDB. Nothing is mocked, so a passing test means the whole chain works: the form, the HTTP call or socket event, the route, the database write and what the page shows afterwards.
+
+- **Setup goes through the API, the test goes through the UI.** `cypress/support/helpers.ts` creates the accounts, groups and rooms a test needs with `cy.request`, for example a group request approved by the super admin. A test then only clicks through the feature it is checking. The login form is tested in `auth.cy.ts`, and the other specs sign in with `visitAs()`. That logs in through the API and writes the same `localStorage` entry `login.ts` saves, before Angular starts.
+- **Independent of the database.** Every account and group a run creates gets a timestamp in its name, so the suite gives the same result twice in a row without reseeding. The only fixture it relies on is the seeded super admin (`test@test.com`), because the spec allows exactly one and it can't be registered.
+- **Two users in one chat.** Cypress drives a single browser, so the second person in a room is played from Node. The tasks in `cypress.config.ts` (`socketJoin`, `socketSend`, `socketReceived`, `socketLeave`) open a real connection with `socket.io-client`, the same library the Angular `ChatService` uses. A message sent in the browser has to reach that connection, and the reverse, so it is tested passing through the server, not just being drawn on the sender's screen.
+- **Selectors are what the user sees.** Tests find elements by visible text, labels and `role="alert"` / `role="status"`, so they also check that errors and confirmations are announced to screen readers.
+
+| Spec file | Tests | Covers |
+|---|---|---|
+| `auth.cy.ts` | 5 | register through the form; the same email twice (409); log in, land on the dashboard, password not in `localStorage`, navbar names the account; wrong password (401) stays on login with no session; logout from the account menu clears the session and the guard then bounces `/user-dashboard` |
+| `guards.cy.ts` | 8 | signed out: `/user-dashboard`, `/profile`, `/super-admin-dashboard`, `/groups/:id` and an unknown URL all go to `/login`; an ordinary user is sent from the super admin dashboard and from another group's admin page back to their dashboard, with no Super Admin link; the super admin gets in |
+| `groups.cy.ts` | 8 | request a group from the dashboard and see it awaiting approval; a second request for the same name refused; super admin approves; requester is its first admin with the age badge; an adult finds it in Discover and joins; a user under the 18+ limit is automatically refused with the reason; leaving; rejecting needs a reason (400 shown), and the requester sees that reason on their profile |
+| `admin.cy.ts` | 8 | Manage link from the group page; edit settings, where raising the age limit removes the under-age member and says who; add, rename and delete a room, the delete confirm focusing Cancel and Cancel keeping the room; a member proposes a room and the admin approves it; promote and demote; group ban and lifting it; report for a permanent ban, super admin approves through the confirm step, account in the banned list and the email refused at registration; request group deletion, super admin approves, group gone and its page says "Group not found." |
+| `chat.cy.ts` | 6 | send a message with Enter, shown as your own with the admin indicator; history still there after a reload; a second user joins (presence list and "joined" notice), their message appears under their display name, the browser's message reaches them, and their disconnect shows "left" and removes them from the list; send an image (upload, preview, sent, loaded from the server); a non-member and the super admin are refused the room with no message box |
+
+**Result: 5 files, 35 tests, 35 passed, about 15s** (run twice in a row 2026-10-01 to check it doesn't depend on the database).
+
+**Total: 263 automated tests, all passing**: 100 server, 128 client, 35 end to end.
 
 ### Manual and integration testing
 
-<!-- This is real work that otherwise goes uncredited, so write it up:
-       - the throwaway Node harness that drove 90 checks against a live server and
-         live database, covering every route and every status code (last-admin 409,
-         approve-your-own-request 403, reject-without-reason 400, banned-member-
-         cannot-rejoin 403, age-raise boots members but not admins, DELETE /groups
-         cascading its rooms). Say plainly that it was not committed.
-       - two-browser verification of the socket layer: two members of Book Club in
-         the same room, checking the presence list, the join/leave notices and live
-         messages in both windows.
-       - browser verification of all 7 routes against live Mongo data. -->
+- Before the server test suite existed, a temporary Node script ran about 90 checks against the live server and database, covering every route and status code. It was not committed; the server test suite replaced it.
+- The socket layer was checked by hand with two browser windows (one private, since two tabs share localStorage) logged in as two members of the same group: presence list, join and leave notices, and live messages in both windows.
+- Every page was clicked through in the browser against the seeded MongoDB data after the migration, at desktop width and at phone width in the browser's device mode.
 
 ### Gaps
 
-<!-- Name them rather than letting the marker find them. There are no server-side
-     automated tests at all, which means the socket handlers, POST /uploads and the
-     password hashing have no automated coverage - all 99 tests are client-side.
-     Say what you would do about it. -->
-
+- The end to end tests only run in Cypress's built-in Electron browser, not in Firefox or Safari.
+- The tests are run by hand. There is no CI running them on every push.
+- The end to end tests rely on the seeded super admin account (`test@test.com`).
+- Accessibility was checked by hand (keyboard only, contrast maths). There is no automated accessibility test.
+- No load testing, for example many users in one room.
 
 ## 6. Git Strategy
 
-<!-- Not in the required list for Phase 2, but git is graded directly and this is
-     cheap to write. Facts:
-       - branch per feature, feature/* throughout. `git branch -a` is worth showing
-         at the demo.
-       - Phase 1 submitted at 592a880, tagged phase-1-submission. Everything after
-         phase-2-start (092dd60) is Phase 2.
-       - the lesson worth admitting: the Mongo migration was written against a stale
-         server.js because origin/main had not been pulled first. The merge was
-         aborted rather than resolved, the work parked on a branch, and the migration
-         redone against the current file. Pull before starting, not after finishing.
-
-     Admitting that one costs nothing and shows you understand the tooling. -->
-
-
-<!-- ============================================================
-     BEFORE SUBMITTING - 5pm Fri 02 Oct 2026
-       [ ] delete every comment block in this file
-       [ ] run `npm test` in client/ and put the real number in §5
-       [ ] do the accessibility work, then write §4
-       [ ] make the repo PRIVATE and add the teaching staff as a collaborator
-           (currently public, Jack-Crook is the only collaborator)
-       [ ] export to a single PDF: name + snumber + repo link + this file
-       [ ] submit to Canvas
-     ============================================================ -->
+- Every feature was built on its own `feature/*` branch and merged into `main` when it worked, for example `feature/socket`, `feature/image-messages`, `feature/pfp`, `feature/pre-submission-fixes` and `feature/cypress-e2e`.
+- Phase 1 was submitted at `592a880`, tagged `phase-1-submission`. Phase 2 starts at `092dd60`, tagged `phase-2-start`.
+- Commits are small and describe the change, so the history shows how the app was built.
+- Mistake and lesson: the MongoDB migration was first written against an old copy of `server.js`, because I hadn't pulled `origin/main` first. I aborted the merge instead of forcing it, kept that work on a branch, and redid the migration on the current file. Now I pull before starting a branch.

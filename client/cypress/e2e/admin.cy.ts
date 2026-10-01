@@ -1,22 +1,17 @@
-// end to end tests for running a group: the group admin's dashboard, plus the two things a
-// group admin has to ask the super admin for, a permanent ban and deleting the group.
-//
-// one group is made for the whole file and the tests run in order against it, ending with it
-// being deleted. the people in it are made fresh each run, so nothing depends on the seed data
-// except the super admin account.
+// e2e: the group admin dashboard, plus a permanent ban and group deletion via the super admin.
+// one group for the file, the tests run in order and end by deleting it.
 
 import { API, SUPER, newUser, register, visitAs, createGroup, joinGroup, unique, TestGroup } from '../support/helpers';
 
 describe('Group admin', () => {
   const admin = newUser('admin');
   const member = newUser('member');
-  const minor = newUser('minor', '2012-02-03');    // fine with no age limit, too young once it's 16
+  const minor = newUser('minor', '2012-02-03');    // too young once the limit is 16
   const groupName = `E2E Admin ${unique()}`;
   let group: TestGroup;
   let adminPage: string;
 
-  // the member's row in the members table. the first <tr> with their email is their own row,
-  // the remove and ban boxes drop in as extra rows underneath it.
+  // the member's own row (confirm and ban boxes are extra rows under it)
   const memberRow = () => cy.contains('.members-table tbody tr', member.email);
 
   before(() => {
@@ -34,7 +29,7 @@ describe('Group admin', () => {
   it('opens the admin page from the group page', () => {
     visitAs(admin, `/groups/${group._id}`);
 
-    // only shown to an admin of this group
+    // admins only
     cy.contains('a', 'Manage this group').click();
     cy.url().should('include', adminPage);
     cy.contains('h2', 'Group Settings').should('be.visible');
@@ -49,8 +44,7 @@ describe('Group admin', () => {
     cy.get('#edit-age').clear().type('16');
     cy.contains('button', 'Save Changes').click();
 
-    // the spec says raising the age limit boots members who no longer meet it. the server
-    // sends back who went, and the page says so.
+    // raising the age limit removes under-age members, and the page says who
     cy.get('[role="status"]')
       .should('contain', '1 member(s) removed')
       .and('contain', minor.email);
@@ -66,21 +60,18 @@ describe('Group admin', () => {
     cy.contains('button', 'Add Room').click();
     cy.get('[role="status"]').should('contain', 'Room "Planning" created.');
 
-    // not inside .within(): the row is found by its name, and clicking Rename swaps the name for
-    // an input, so the row stops matching. only one room is ever being renamed, so the input
-    // and its buttons are unique on the page anyway.
+    // not .within(): Rename swaps the name for an input, so the row stops matching
     cy.contains('.room-row', 'Planning').contains('button', 'Rename').click();
     cy.get('input[name="rename"]').clear().type('Planning 2');
     cy.get('.rename-room').contains('button', 'Save').click();
     cy.get('[role="status"]').should('contain', 'Room renamed to "Planning 2".');
 
-    // deleting takes every message with it, so it asks first. focus lands on Cancel, so pressing
-    // Enter straight away backs out rather than deleting.
+    // asks first, with focus on Cancel
     cy.contains('.room-row', 'Planning 2').contains('button', 'Delete').click();
     cy.get('.confirm-box .confirm-text').should('contain', "This can't be undone");
     cy.focused().should('have.text', 'Cancel');
     cy.get('.confirm-box').contains('button', 'Cancel').click();
-    cy.contains('.room-name', 'Planning 2').should('be.visible');    // cancelled, so still there
+    cy.contains('.room-name', 'Planning 2').should('be.visible');    // still there
 
     cy.contains('.room-row', 'Planning 2').contains('button', 'Delete').click();
     cy.get('.confirm-box').contains('button', 'Delete room').click();
@@ -89,14 +80,14 @@ describe('Group admin', () => {
   });
 
   it("approves a member's room proposal", () => {
-    // a regular member can't create a room, they propose one from the group page
+    // members propose rooms from the group page
     visitAs(member, `/groups/${group._id}`);
     cy.get('input[name="proposed"]').type('Ideas');
     cy.contains('button', 'Propose').click();
     cy.get('[role="status"]').should('contain', 'Proposed "Ideas"');
     cy.contains('.proposed-row', 'Ideas').should('be.visible');
 
-    // and an admin of the group approves it
+    // and an admin approves it
     visitAs(admin, adminPage);
     cy.contains('.admin-side .request-row', 'Ideas').within(() => {
       cy.contains('button', 'Approve').click();
@@ -112,7 +103,7 @@ describe('Group admin', () => {
     cy.get('[role="status"]').should('contain', `${member.email} is now an admin of this group.`);
     memberRow().should('contain', 'Admin');
 
-    // there are two admins now, so demoting one leaves the group with an admin, which is allowed
+    // two admins now, so demoting one is allowed
     memberRow().within(() => cy.contains('button', 'Demote').click());
     memberRow().should('contain', 'Member');
   });
@@ -128,14 +119,14 @@ describe('Group admin', () => {
     cy.contains('.members-table', member.email).should('not.exist');
     cy.contains('.room-row', member.email).should('be.visible');    // in the banned list
 
-    // a group ban isn't permanent, unlike a system wide one
+    // a group ban can be lifted
     cy.contains('.room-row', member.email).within(() => cy.contains('button', 'Lift Ban').click());
     cy.get('[role="status"]').should('contain', `Ban on ${member.email} lifted.`);
     cy.contains('p', 'Nobody is banned from this group.').should('be.visible');
   });
 
   it('reports a member, and the super admin bans them permanently', () => {
-    // lifting the ban doesn't put them back in the group, so they rejoin to be in the table again
+    // lifting a ban doesn't re-add them, so they rejoin
     joinGroup(group._id, member);
 
     visitAs(admin, adminPage);
@@ -148,7 +139,7 @@ describe('Group admin', () => {
     cy.contains('.request-row', `Permanently ban ${member.email}`).within(() => {
       cy.contains('Reported for: Abusive messages').should('be.visible');
 
-      // irreversible, so it asks first and says what will happen
+      // irreversible, so it confirms first
       cy.contains('button', 'Approve').click();
       cy.get('.confirm-text').should('contain', 'can never register again');
       cy.focused().should('have.text', 'Cancel');
@@ -157,7 +148,7 @@ describe('Group admin', () => {
     cy.get('[role="status"]').should('contain', `Approved: Permanently ban ${member.email}`);
     cy.contains('.data-table tr', member.email).should('contain', 'Abusive messages');
 
-    // the account is gone and the email can never be registered again
+    // the email can never register again
     cy.visit('/register');
     cy.get('#email').type(member.email);
     cy.get('#password').type(member.password);
@@ -167,7 +158,7 @@ describe('Group admin', () => {
 
   it('requests the group be deleted, and the super admin approves it', () => {
     visitAs(admin, adminPage);
-    // a group admin can't delete their own group, they ask the super admin
+    // admins ask the super admin to delete a group
     cy.contains('button', 'Request Group Deletion').click();
     cy.get('[role="status"]').should('contain', 'Deletion requested.');
 
@@ -179,7 +170,7 @@ describe('Group admin', () => {
     });
     cy.get('[role="status"]').should('contain', `Approved: Delete group "${groupName}"`);
 
-    // gone for the admin too, and its page says so rather than showing an empty group
+    // gone, and its page says so
     visitAs(admin, '/user-dashboard');
     cy.contains('.my-groups .group-row', groupName).should('not.exist');
     cy.request(`${API}/groups`).its('body').then(groups => {

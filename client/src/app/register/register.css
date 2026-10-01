@@ -1,5 +1,4 @@
-/* the register form has four fields now rather than two, so it doesn't need the extra push
-   that was here to line the button up with the login card */
+/* four fields, so no extra spacing needed to line up with the login card */
 button {
   margin-top: 12px;
 }

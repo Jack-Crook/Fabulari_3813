@@ -1,6 +1,5 @@
-// the socket.io layer: joining a room, presence, join/leave notices, sending text and image
-// messages, and history replay. real socket.io-client connections to the real server, the same
-// library the Angular ChatService uses, so two clients here behave like two browser tabs.
+// the socket.io layer: joining, presence, join/leave notices, text and image messages, history.
+// real socket.io-client connections, so two clients behave like two browser tabs.
 
 const { describe, it, before, after, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
@@ -10,7 +9,7 @@ const { startServer, reset, uploadImage } = require('./helpers');
 
 let ctx;
 let ids;
-let open = [];      // every client a test connected, so afterEach can disconnect them all
+let open = [];      // every client a test opened, disconnected in afterEach
 
 before(async () => {
     ctx = await startServer('fabulari_test_sockets');
@@ -24,8 +23,7 @@ afterEach(() => {
     open = [];
 });
 
-// a connected client. forceNew stops socket.io-client sharing one connection between them,
-// otherwise "two clients" would secretly be one
+// a connected client. forceNew stops two clients sharing one connection
 async function client() {
     const socket = connect(ctx.base, { forceNew: true, transports: ['websocket'] });
     open.push(socket);
@@ -36,13 +34,12 @@ async function client() {
     return socket;
 }
 
-// emit with an ack and wait for it. the server always answers through the ack, success or error
+// emit and wait for the ack
 function emit(socket, event, payload) {
     return new Promise(resolve => socket.emit(event, payload, resolve));
 }
 
-// the next time this socket receives `event`. a timeout turns "never arrived" into a clear
-// failure instead of a test that hangs until the runner kills it
+// the next `event` on this socket, with a timeout so a missing event fails instead of hanging
 function next(socket, event, ms = 2000) {
     return new Promise((resolve, reject) => {
         const timer = setTimeout(() => reject(new Error(`no "${event}" within ${ms}ms`)), ms);
@@ -53,9 +50,8 @@ function next(socket, event, ms = 2000) {
     });
 }
 
-// the first `event` whose payload passes the check, ignoring any before it. presence is
-// broadcast to the whole room on every join and leave, the joiner included, so a client can have
-// several in flight at once and "the next one" isn't necessarily the one a test is waiting for
+// the first `event` whose payload passes the check. presence is sent on every join and leave,
+// so the next one isn't always the one the test wants
 function waitFor(socket, event, check, ms = 2000) {
     return new Promise((resolve, reject) => {
         const timer = setTimeout(() => {
@@ -73,7 +69,7 @@ function waitFor(socket, event, check, ms = 2000) {
     });
 }
 
-// the reverse: passes only if `event` does NOT arrive within the window
+// passes only if `event` does NOT arrive in time
 function nothing(socket, event, ms = 300) {
     return new Promise((resolve, reject) => {
         const handler = data => reject(new Error(`unexpected "${event}": ${JSON.stringify(data)}`));
@@ -202,8 +198,7 @@ describe('sendMessage', () => {
 describe('leaveRoom and disconnect', () => {
     it('leaving tells the others and updates the presence list', async () => {
         const alice = await joined('alice@test.com');
-        // alice has to have seen bob arrive first, or the ['alice'] list from her own join could
-        // be mistaken for the one that comes from bob leaving
+        // wait for bob's arrival first, or alice's own ['alice'] list could be mistaken for the leave
         const bobArrived = waitFor(alice.socket, 'presence', list => list.includes('bob@test.com'));
         const bob = await joined('bob@test.com');
         await bobArrived;
@@ -228,7 +223,7 @@ describe('leaveRoom and disconnect', () => {
     it('someone joining afterwards doesn\'t see a ghost of who left', async () => {
         const bob = await joined('bob@test.com');
         bob.socket.emit('leaveRoom');
-        await new Promise(resolve => setTimeout(resolve, 100));     // leaveRoom has no ack, give it a moment
+        await new Promise(resolve => setTimeout(resolve, 100));     // leaveRoom has no ack
         const { ack } = await joined('alice@test.com');
         assert.deepEqual(ack.present, ['alice@test.com']);
     });

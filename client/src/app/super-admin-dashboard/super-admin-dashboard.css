@@ -13,7 +13,7 @@ h2 {
   margin: 0 0 16px;
 }
 
-/* the feedback bar across the top, same pattern as the other two dashboards */
+/* the feedback bar, same as the other dashboards */
 .banner {
   margin: 0;
   padding: 12px 24px;
@@ -31,8 +31,7 @@ h2 {
   color: #15803D;
 }
 
-/* the short explanation under a panel heading. these carry the spec rules that would
-   otherwise only exist as an absence: no unban button, no join requests, and so on. */
+/* the short note under a panel heading, explaining spec rules like no unban */
 .side-note {
   font-size: 13px;
   color: #6B7280;
@@ -58,7 +57,7 @@ h2 {
   padding: 6px 10px;
 }
 
-/* pending requests, same row/button pattern as admin-dashboard's proposals panel */
+/* pending requests, same pattern as the admin page's proposals */
 .request-row {
   background: #FFFFFF;
   border: 1px solid #E2E4E9;
@@ -72,8 +71,7 @@ h2 {
   flex-wrap: wrap;
 }
 
-/* the detail column takes the leftover width so the buttons stay on the right until the row
-   genuinely runs out of room */
+/* details take the spare width, buttons stay on the right */
 .request-body {
   flex: 1;
   min-width: 200px;
@@ -90,16 +88,14 @@ h2 {
   color: #6B7280;
 }
 
-/* the reason a group admin gave when reporting someone. it's the whole basis for a permanent
-   ban, so it's shown in red rather than as grey metadata. */
+/* the report reason, in red since it's the basis for the ban */
 .request-reason {
   margin: 6px 0 0;
   font-size: 13px;
   color: #B91C1C;
 }
 
-/* the requested group's colour, shown next to its description so the super admin can see what
-   they're approving without opening anything */
+/* the requested group's colour */
 .theme-dot {
   display: inline-block;
   width: 10px;
@@ -107,10 +103,10 @@ h2 {
   border-radius: 3px;
   vertical-align: middle;
   margin-right: 4px;
-  box-shadow: inset 0 0 0 1px rgba(26, 29, 35, 0.2);   /* an edge so a near-white theme is still visible, same as the dashboard swatch */
+  box-shadow: inset 0 0 0 1px rgba(26, 29, 35, 0.2);   /* an edge so a white theme still shows */
 }
 
-/* the reason box, which has to be filled in before a rejection is accepted */
+/* the reason box, required before rejecting */
 .reject-box {
   width: 100%;
 }
@@ -147,8 +143,7 @@ h2 {
   background: #F3F4F6;
 }
 
-/* the button that actually carries out an irreversible approval. solid red rather than the
-   usual approve colour, so it can't be mistaken for an everyday approval */
+/* solid red for an irreversible approval, so it isn't mistaken for a normal one */
 .request-actions .confirm-danger {
   background: #B91C1C;
   color: #FFFFFF;
@@ -163,9 +158,9 @@ h2 {
   color: #6B7280;
 }
 
-/* members list scrolls instead of growing the panel, matches the scrollbar drawn in the wireframe */
+/* the members list scrolls instead of growing the panel */
 .scroll-list {
-  max-height: 260px;             /* without a height, overflow-y: auto has nothing to scroll, it just grows */
+  max-height: 260px;             /* needs a height for overflow to scroll */
   overflow-y: auto;
   border: 1px solid #E2E4E9;
   border-radius: 6px;
@@ -194,7 +189,7 @@ h2 {
   border-bottom: none;
 }
 
-/* shared table style for banned list + audit log, same pattern as admin-dashboard's members-table */
+/* shared table style for the banned list and audit log */
 .data-table {
   width: 100%;
   border-collapse: collapse;
@@ -219,8 +214,7 @@ h2 {
   border-top: 1px solid #E2E4E9;
 }
 
-/* the audit log grows without limit, so it scrolls inside its panel rather than stretching
-   the page. the header stays put while the rows move. */
+/* the audit log scrolls inside its panel, header fixed */
 .scroll-list .data-table th {
   position: sticky;
   top: 0;

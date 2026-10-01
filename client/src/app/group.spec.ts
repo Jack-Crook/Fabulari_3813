@@ -24,7 +24,7 @@ describe('GroupService', () => {
     service.getChannels('g1').subscribe();
 
     const req = mock.expectOne(r => r.url === 'http://localhost:3000/channels');
-    // /channels lists them all, /channels?groupId=g1 lists just one group's
+    // all rooms, or one group's with ?groupId=
     expect(req.request.params.get('groupId')).toBe('g1');
     req.flush([]);
   });
@@ -41,8 +41,7 @@ describe('GroupService', () => {
   it('url encodes the email when removing a member', () => {
     service.removeMember('g1', 'a+b@test.com', 'admin@test.com').subscribe();
 
-    // the email is in the path rather than the body, and + and # would otherwise change what
-    // the path means
+    // the email is in the path, and + and # would change its meaning
     const req = mock.expectOne(r => r.url === 'http://localhost:3000/groups/g1/members/a%2Bb%40test.com');
     expect(req.request.method).toBe('DELETE');
     req.flush(makeGroup());

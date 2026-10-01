@@ -1,7 +1,6 @@
 import { contrastRatio, readableInk, DARK_INK, LIGHT_INK } from './theme';
 
-// plain functions, so no TestBed and no providers. the colours are the real ones from the seed
-// data and the app's own fallbacks, the same four the contrast fix was measured against.
+// plain functions, no TestBed. real colours from the seed data and the app's fallback.
 describe('theme', () => {
   it('gives the WCAG end points: 21 for black on white, 1 for a colour on itself', () => {
     expect(contrastRatio('#000000', '#FFFFFF')).toBeCloseTo(21, 5);
@@ -17,8 +16,7 @@ describe('theme', () => {
   });
 
   it('picks dark text on the light and middle themes', () => {
-    // the default theme is the case a luminance-midpoint shortcut gets wrong: it looks mid-blue,
-    // but dark text beats white on it by a long way
+    // looks mid-blue, but dark text beats white on it easily
     expect(readableInk('#5FA8D3')).toBe(DARK_INK);
     expect(readableInk('#7FDBC4')).toBe(DARK_INK);
     expect(readableInk('#E8EDFB')).toBe(DARK_INK);
@@ -38,6 +36,6 @@ describe('theme', () => {
   it('falls back safely on a value that isn\'t a colour', () => {
     expect(readableInk('not a colour')).toBe(DARK_INK);
     expect(readableInk('')).toBe(DARK_INK);
-    expect(contrastRatio('nope', '#FFFFFF')).toBe(1);     // unknown claims the worst, never a false pass
+    expect(contrastRatio('nope', '#FFFFFF')).toBe(1);     // unknown assumes the worst
   });
 });

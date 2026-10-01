@@ -1,6 +1,6 @@
 <app-navbar></app-navbar>
 
-<!-- one message bar for every action, same pattern as the other two dashboards -->
+<!-- one message bar for the page -->
 @if (actionError()) {
   <p class="banner error" role="alert">{{ actionError() }}</p>
 }
@@ -12,9 +12,7 @@
 
   <section class="panel">
     <h2>Pending Requests</h2>
-    <!-- the spec says the super admin only actions requests: they can't create a group
-         directly, can't ban anyone without a group admin's report first, and can't approve a
-         request they raised, which is moot here because they're blocked from raising any. -->
+    <!-- the super admin only actions requests: no direct group creation, no ban without a report -->
     <p class="side-note">
       Everything the super admin does starts as someone else's request. Room proposals aren't
       here, they go to the group's own admin.
@@ -28,13 +26,11 @@
             {{ labelFor(request.type) }} · requested by {{ request.requestedBy }} ·
             {{ request.createdAt | date:'d MMM yyyy' }}
           </p>
-          <!-- a ban report carries the reason the group admin gave, and that's the whole basis
-               for the ban, so it's shown rather than hidden in the payload -->
+          <!-- the group admin's reason, the basis for the ban -->
           @if (request.type === 'user-ban') {
             <p class="request-reason">Reported for: {{ request.payload.reason }}</p>
           }
-          <!-- a group request supplies its own title, description, age limit and colour, so
-               there is nothing left for the super admin to fill in on approval -->
+          <!-- the requester supplies all the group's details -->
           @if (request.type === 'group-create') {
             <p class="request-meta">
               <span class="theme-dot" [style.background]="request.payload.theme"></span>
@@ -47,8 +43,7 @@
         @if (rejectingId() === request._id) {
           <div class="reject-box">
             <label [attr.for]="'reject-' + request._id">Reason for rejection</label>
-            <!-- required by the spec and enforced by the server with a 400. the requester
-                 reads it back on their own profile page. -->
+            <!-- required, 400 without. the requester sees it on their profile. -->
             <input [id]="'reject-' + request._id" name="reject-reason" type="text"
                    [(ngModel)]="rejectReason" placeholder="Required" />
             <div class="request-actions">
@@ -57,9 +52,7 @@
             </div>
           </div>
         } @else if (confirmingId() === request._id) {
-          <!-- a permanent ban or a group deletion can't be undone, so approving one asks first and
-               says what it will do. focus lands on Cancel, and aria-describedby reads the
-               question out to a screen reader when it does. -->
+          <!-- bans and group deletions can't be undone, so they ask first. focus goes to Cancel, and aria-describedby reads the question out. -->
           <div class="reject-box">
             <p class="confirm-text" [id]="'confirm-' + request._id">
               {{ request.summary }}? {{ consequenceOf(request) }}
@@ -97,8 +90,7 @@
           <span class="member-email">{{ user.email }}</span>
           <span class="member-meta">
             {{ user.username }} ·
-            <!-- 'user' or 'super'. group admin isn't in here, because it's held on the group
-                 rather than the account, so it's counted separately. -->
+            <!-- group admin is stored on groups, so it's counted separately -->
             {{ user.role === 'super' ? 'super admin' : 'user' }} ·
             {{ groupCountFor(user.email) }} group(s)
             @if (adminCountFor(user.email)) {
@@ -115,9 +107,7 @@
 
   <section class="panel">
     <h2>Permanently Banned</h2>
-    <!-- permanent means permanent: the account is deleted, the email goes on this list, and
-         /register refuses it forever. that's why there's no Un Ban button here even though the
-         original wireframe drew one. -->
+    <!-- the account is deleted and the email can never register again, so there's no unban -->
     <p class="side-note">
       A permanent ban deletes the account and blocks the email from ever registering again.
       There is no unban.
@@ -145,10 +135,8 @@
   <section class="panel">
     <div class="section-head">
       <h2>Audit Log</h2>
-      <!-- the spec asks for a log filterable by type and in date order. both happen on the
-           server, and the options come from the log itself so they can't drift out of date. -->
-      <!-- aria-label because otherwise a screen reader only hears "All types, combo box" with
-           no idea what's being filtered -->
+      <!-- filtered and sorted on the server. the options come from the log itself. -->
+      <!-- aria-label so a screen reader knows what is filtered -->
       <select class="audit-filter" aria-label="Filter the audit log by type" [value]="auditFilter()"
               (change)="onFilterAudit($any($event.target).value)">
         <option value="">All types</option>
@@ -164,7 +152,7 @@
           <tr><th>Date</th><th>Type</th><th>Actor</th><th>Detail</th></tr>
         </thead>
         <tbody>
-          <!-- newest first, sorted on the server -->
+          <!-- newest first -->
           @for (entry of auditLog(); track entry._id) {
             <tr>
               <td>{{ entry.at | date:'d MMM yyyy, HH:mm' }}</td>

@@ -2,11 +2,10 @@
 
 <div class="chat-body">
 
-  <!-- left, the other rooms in this group so you can switch without going back -->
+  <!-- left: the group's other rooms -->
   <aside class="rooms-sidebar">
     <h2>Rooms</h2>
 
-    <!-- signals are read by calling them, so channels() and channel() -->
     @for (item of channels(); track item._id) {
       <a class="room-link"
          [class.selected]="item._id === channel()?._id"
@@ -17,28 +16,21 @@
       </a>
     }
 
-    <!-- back out to the group's room list -->
     <a class="back-link" [routerLink]="['/groups', group()?._id]">Back to group</a>
   </aside>
 
-  <!-- middle, the conversation itself -->
+  <!-- middle: the conversation -->
   <section class="chat-main">
-    <!-- the spec says the group's theme colour extends into its chat rooms, so the room header,
-         the selected room in the sidebar and the message bar below all take their colour from
-         the group record rather than the palette -->
+    <!-- the group's theme colour carries into its rooms: header, selected room and message bar -->
     <header class="chat-banner" [style.background]="theme()" [style.color]="ink()">
-      <!-- the phone version of "Back to group". that link lives in the rooms sidebar, which is
-           hidden under 768px, so without this a phone had no way out of the room but the navbar.
-           hidden on desktop by the css. it takes the banner's text colour so it's readable on any theme. -->
+      <!-- phone only Back link, since the sidebar with "Back to group" is hidden under 768px -->
       <a class="banner-back" [routerLink]="['/groups', group()?._id]" [style.color]="ink()"
          aria-label="Back to the group's rooms">‹ Back</a>
       <h1>{{ channel()?.name }}</h1>
       <span class="chat-group">{{ group()?.name }}</span>
     </header>
 
-    <!-- the same live list as the "Currently In" sidebar, for phones. the sidebar is hidden under
-         768px to give the messages the width, and without this the spec's "who else is in the
-         room" list would never be visible on a phone. hidden on desktop by the css. -->
+    <!-- phone only presence list, since the "Currently In" sidebar is hidden under 768px -->
     <p class="presence-strip">
       <span class="presence-label">In the room:</span>
       @for (person of present(); track person) {
@@ -54,24 +46,20 @@
       }
     </p>
 
-    <!-- the join/leave notification the spec asks for, on top of the live list on the right.
-         role="status" makes a screen reader announce it without moving focus. -->
+    <!-- join/leave notice. role="status" is read out without moving focus. -->
     <p class="notice" role="status">{{ notice() }}</p>
 
     @if (error()) {
       <p class="chat-error" role="alert">{{ error() }}</p>
     }
 
-    <!-- #scroller is how the component finds this element to keep the newest message in view -->
+    <!-- #scroller lets the component keep the newest message in view -->
     <div class="messages" #scroller>
-      <!-- tracked by _id now the messages are real, so angular reuses the existing rows and only
-           adds the new one when a message arrives -->
+      <!-- tracked by _id, so only new messages are added -->
       @for (message of messages(); track message._id) {
-        <!-- my own messages sit on the right, everyone else's on the left. the avatar is beside
-             the bubble, and row-reverse in the css puts mine on the right-hand side of it. -->
+        <!-- mine on the right, others on the left (row-reverse in the css) -->
         <div class="message-row" [class.mine]="message.sender === me">
-          <!-- alt="" because the sender's name is written right next to it, so a screen reader
-               would otherwise read the name twice -->
+          <!-- alt="" since the name is right next to it -->
           @if (avatarFor(message.sender); as src) {
             <img class="chat-avatar" [src]="src" alt="" />
           } @else {
@@ -79,18 +67,17 @@
           }
 
           <div class="message" [class.mine]="message.sender === me">
-            <!-- the display name, with the email on hover, since the email is still what identifies them -->
+            <!-- display name, email on hover -->
             <p class="message-sender" [title]="message.sender">
               {{ nameFor(message.sender) }}
-              <!-- the spec asks for an indicator when the sender is that group's admin -->
+              <!-- the spec's admin indicator -->
               @if (isAdmin(message.sender)) {
                 <span class="admin-tag">Admin</span>
               }
               <span class="message-time">{{ message.at | date: timeFormat(message.at) }}</span>
             </p>
             @if (message.imageUrl) {
-              <!-- opens the full size image in a new tab. rel="noopener" stops that tab getting a
-                   handle back to this page. (load) re-scrolls once the image has a height. -->
+              <!-- opens full size in a new tab. noopener stops that tab reaching back. (load) re-scrolls once it has a height. -->
               <a [href]="imageSrc(message.imageUrl)" target="_blank" rel="noopener">
                 <img class="message-image" [src]="imageSrc(message.imageUrl)"
                      [alt]="'Image from ' + message.sender" (load)="scrollToBottom()" />
@@ -108,9 +95,9 @@
       }
     </div>
 
-    <!-- the input bar. enter or the button submits the form, which sends over the socket -->
+    <!-- enter or the button submits, which sends over the socket -->
     @if (canPost()) {
-      <!-- the attached image, before it's sent. it's already on the server at this point. -->
+      <!-- the attached image, already uploaded -->
       @if (pendingImage()) {
         <div class="pending-image">
           <img [src]="imageSrc(pendingImage())" alt="Image to send" />
@@ -122,8 +109,7 @@
       }
 
       <form class="composer" (ngSubmit)="onSend()">
-        <!-- the real file input is hidden because it can't be styled. the button below clicks it.
-             #picker names it so the button can reach it without any component code. -->
+        <!-- the file input is hidden (it can't be styled), the button clicks it via #picker -->
         <input #picker type="file" hidden accept="image/png,image/jpeg,image/gif,image/webp"
                (change)="onImageChosen($event)" />
         <button type="button" class="attach" (click)="picker.click()"
@@ -137,13 +123,13 @@
                [class.on-dark]="onDark()"
                [(ngModel)]="draft"
                placeholder="Message {{ channel()?.name }}" />
-        <!-- needs text or an image, and waits for an upload in progress to finish -->
+        <!-- needs text or an image, and no upload in progress -->
         <button type="submit" [disabled]="(!draft.trim() && !pendingImage()) || uploading()">Send</button>
       </form>
     }
   </section>
 
-  <!-- right, who else is in the room, live from the server's presence event -->
+  <!-- right: who is in the room, live -->
   <aside class="presence-sidebar">
     <h2>Currently In</h2>
 

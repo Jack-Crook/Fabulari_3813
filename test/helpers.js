@@ -1,10 +1,5 @@
-// shared setup for the server tests. each test file calls startServer() with its own database
-// name, gets back a real running server on a spare port, and calls reset() before each test so
-// every test starts from the same known state.
-//
-// these are integration tests rather than unit tests: requests go over real http to the real
-// express app, which talks to a real mongo. nothing is mocked, so a passing test means the
-// route actually works end to end, not just that its logic works in isolation.
+// shared setup for the server tests: a real server on a spare port against its own test
+// database, reset to the same state before each test. nothing is mocked.
 
 const fs = require('fs');
 const path = require('path');
@@ -12,36 +7,32 @@ const bcrypt = require('bcrypt');
 
 const PASSWORD = 'password1';     // every fixture account's password
 
-// hashed once when the file loads rather than once per test. cost 4 is bcrypt's minimum, which
-// keeps the fixtures fast. that's fine because compare() reads the cost out of the hash itself,
-// so login checks these exactly the same way it checks a real cost 10 hash.
+// hashed once, at cost 4 (bcrypt's minimum) for speed. compare() reads the cost from the hash,
+// so login treats it the same as a cost 10 hash.
 const HASH = bcrypt.hashSync(PASSWORD, 4);
 
 async function startServer(dbName) {
-    // reset() deletes every document in the database it's pointed at. a seed run once wiped
-    // real data it wasn't meant to touch, so this refuses to go anywhere near a database whose
-    // name doesn't say it's for testing.
+    // reset() wipes the database, so only run against one named as a test database
     if (!/test/.test(dbName)) {
         throw new Error(`Refusing to run tests against "${dbName}", the name must contain "test"`);
     }
-    // server.js reads DB_NAME once, when it's first required, so this has to be set before that
+    // server.js reads DB_NAME when first required, so set it before
     process.env.DB_NAME = dbName;
     const { server, io, start, UPLOAD_DIR } = require('../server');
 
-    const client = await start(0);      // 0 = any free port, so a running dev server on 3000 doesn't matter
+    const client = await start(0);      // 0 = any free port, doesn't clash with a dev server on 3000
     const db = client.db(dbName);
     const base = `http://localhost:${server.address().port}`;
 
-    // uploads made during the tests go into the real uploads/ folder, so they're tracked here
-    // and removed at the end rather than left behind
+    // test uploads land in the real uploads/ folder, so they're tracked and removed at the end
     const uploaded = [];
 
     async function stop() {
         await Promise.all(uploaded.map(url =>
             fs.promises.rm(path.join(UPLOAD_DIR, path.basename(url)), { force: true })));
         await db.dropDatabase();
-        server.closeAllConnections();   // fetch keeps connections open for reuse, which would stop close() finishing
-        await new Promise(resolve => io.close(resolve));   // closes socket.io and the http server under it
+        server.closeAllConnections();   // fetch keeps connections alive, which would stop close() finishing
+        await new Promise(resolve => io.close(resolve));   // closes socket.io and its http server
         await client.close();
     }
 
@@ -82,11 +73,11 @@ async function reset(db) {
     });
     const { insertedId: channelId } = await db.collection('channels').insertOne({ groupId, name: 'General' });
 
-    // ids go back as strings, the same form a client sends them in
+    // ids as strings, the way a client sends them
     return { groupId: String(groupId), channelId: String(channelId) };
 }
 
-// fetch plus the parsed json body, so each test reads as one line: status and body together
+// fetch that returns status and parsed body together
 function api(base) {
     return async (method, url, body) => {
         const res = await fetch(base + url, {
@@ -99,18 +90,18 @@ function api(base) {
         try {
             json = JSON.parse(text);
         } catch {
-            json = text;        // GET / answers with plain text, not json
+            json = text;        // GET / answers with plain text
         }
         return { status: res.status, body: json, headers: res.headers };
     };
 }
 
-// a real 1x1 png, so multer and the type check see an actual image rather than a label on nothing
+// a real 1x1 png
 const PNG = Buffer.from(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
     'base64');
 
-// multipart upload the same way the browser's FormData does it in ChatService
+// multipart upload, the same as ChatService's FormData
 async function uploadImage(base, { email, channelId, bytes = PNG, type = 'image/png', name = 'pic.png' }) {
     const form = new FormData();
     form.append('email', email);
@@ -120,7 +111,7 @@ async function uploadImage(base, { email, channelId, bytes = PNG, type = 'image/
     return { status: res.status, body: await res.json() };
 }
 
-// a profile picture upload, the same shape as Auth.uploadAvatar: actorEmail first, then the file
+// profile picture upload, the same as Auth.uploadAvatar: actorEmail first, then the file
 async function uploadAvatar(base, { email, actorEmail = email, bytes = PNG, type = 'image/png', name = 'me.png' }) {
     const form = new FormData();
     form.append('actorEmail', actorEmail);

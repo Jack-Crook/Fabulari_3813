@@ -10,8 +10,7 @@ describe('Navbar', () => {
   let fixture: ComponentFixture<Navbar>;
   let mock: HttpTestingController;
 
-  // the navbar reads the signed in user in its field initialisers, so who is signed in has to
-  // be decided before the component is built rather than after
+  // sign in before the component is built, it reads the user straight away
   async function build() {
     fixture = TestBed.createComponent(Navbar);
     mock = TestBed.inject(HttpTestingController);
@@ -41,8 +40,7 @@ describe('Navbar', () => {
     mock.expectOne('http://localhost:3000/groups').flush([]);
     await fixture.whenStable();
 
-    // super admin authority is system wide rather than tied to one group, so the link is
-    // always there for them rather than depending on which page they're on
+    // super admin is system wide, so the link is always there
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('Super Admin');
   });
 
@@ -60,8 +58,7 @@ describe('Navbar', () => {
     await build();
     mock.expectOne('http://localhost:3000/groups').flush([makeGroup()]);
 
-    // it's a computed over the group in the url. no group in the url, no link, even for
-    // someone who admins a group elsewhere.
+    // no group in the url, no link
     expect(fixture.componentInstance.currentGroupId()).toBe('');
     expect(fixture.componentInstance.isGroupAdmin()).toBe(false);
   });
@@ -71,8 +68,7 @@ describe('Navbar', () => {
     await build();
     mock.expectOne('http://localhost:3000/groups').flush([makeGroup()]);
 
-    // group admin isn't a role on the account, it's whether this email is in that group's
-    // adminEmails, which is why the check needs the group as well as the user
+    // group admin is stored on the group, so the check needs the group too
     fixture.componentInstance.currentGroupId.set('g1');
     expect(fixture.componentInstance.isGroupAdmin()).toBe(true);
   });
@@ -86,7 +82,7 @@ describe('Navbar', () => {
     expect(fixture.componentInstance.isGroupAdmin()).toBe(false);
   });
 
-  // the account menu replaced the name, Profile and Logout that used to sit on the bar itself
+  // the account menu holds the name, Profile and Logout
 
   it('shows the initial in the avatar and keeps the menu closed until it is clicked', async () => {
     signIn('member@test.com', 'user', 'jack');
@@ -134,7 +130,7 @@ describe('Navbar', () => {
     expect(navbar.menuOpen()).toBe(false);
 
     navbar.toggleMenu();
-    document.body.click();          // the body is outside the navbar's own element
+    document.body.click();          // outside the navbar
     expect(navbar.menuOpen()).toBe(false);
   });
 

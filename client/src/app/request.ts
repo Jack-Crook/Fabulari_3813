@@ -1,40 +1,37 @@
 import { Service, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 
-// four things in the spec can't be done directly and have to be asked for. they share one
-// record shape and one requests collection, because approve/reject/reason work identically for
-// all of them and only the action taken on approval differs.
-//   group-create    a user asks the super admin for a group, supplying the details up front
-//   group-delete    a group admin asks the super admin to delete or disband their group
-//   channel-create  a member proposes a room, the group's admin approves or rejects it
-//   user-ban        a group admin reports a user, the super admin actions the permanent ban
+// the four actions that need a request:
+//   group-create    user -> super admin
+//   group-delete    group admin -> super admin
+//   channel-create  member -> group admin
+//   user-ban        group admin reports -> super admin bans permanently
 export type RequestType = 'group-create' | 'group-delete' | 'channel-create' | 'user-ban';
 
 export interface AppRequest {
-  _id: string;                // mongo generates this, it arrives as a 24 character hex string
+  _id: string;
   type: RequestType;
-  status: 'pending' | 'approved' | 'rejected';   // there's no 'cancelled', the spec says a pending request can't be withdrawn
-  summary: string;          // the wording is built once on the server so every queue renders the same sentence
+  status: 'pending' | 'approved' | 'rejected';   // no cancelling
+  summary: string;          // the sentence every queue shows, built on the server
   requestedBy: string;
-  groupId: string | null;   // null on group-create, because the group doesn't exist yet
-  payload: any;             // the type specific detail: a group's fields, a room name, or the reported email + reason
-  createdAt: string;        // ISO, so sorting the strings and sorting the dates agree
+  groupId: string | null;   // null on group-create, the group doesn't exist yet
+  payload: any;             // per type: group fields, room name, or reported email + reason
+  createdAt: string;        // ISO
   resolvedAt: string;
   resolvedBy: string;
-  reason: string;           // only filled in on a rejection, which the spec requires a reason for
+  reason: string;           // set on rejection
 }
 
 // one row of the super admin's audit log
 export interface AuditEntry {
-  _id: string;                // mongo generates this, it arrives as a 24 character hex string
+  _id: string;
   at: string;
   type: string;
   actor: string;
   detail: string;
 }
 
-// a permanently banned account. the user record itself is deleted, this is what's left, and
-// it's what stops the email ever being registered again.
+// a permanently banned account. the user is deleted, this record blocks the email forever.
 export interface BannedUser {
   email: string;
   reason: string;
@@ -48,11 +45,9 @@ export class RequestService {
   private http = inject(HttpClient);
   private apiUrl = 'http://localhost:3000';
 
-  // GET /requests with any combination of filters. scope is the useful one: 'super' returns the
-  // three types the super admin actions, 'group' returns the ones a group admin actions, so
-  // neither page has to know which types belong in which queue.
+  // GET /requests with filters. scope 'super' or 'group' picks the right queue's types.
   getRequests(filters: { status?: string; type?: string; groupId?: string; requestedBy?: string; scope?: string } = {}) {
-    // undefined values would be sent as the string "undefined", so they're dropped first
+    // drop empty values, or they'd be sent as "undefined"
     const params: Record<string, string> = {};
     Object.entries(filters).forEach(([key, value]) => {
       if (value) {
@@ -62,34 +57,31 @@ export class RequestService {
     return this.http.get<AppRequest[]>(`${this.apiUrl}/requests`, { params });
   }
 
-  // POST /requests. the server validates per type: a duplicate group name, a room that already
-  // exists, a ban report with no reason and a report against a group's only admin are all refused.
+  // POST /requests, validated per type on the server
   raise(type: RequestType, requestedBy: string, payload: any, groupId = '') {
     return this.http.post<AppRequest>(`${this.apiUrl}/requests`, { type, requestedBy, groupId, payload });
   }
 
-  // POST /requests/:id/approve. carrying out the request happens on the server, so approving a
-  // group-create really creates the group and approving a user-ban really deletes the account.
+  // POST /requests/:id/approve. the server carries the request out.
   approve(requestId: string, actorEmail: string) {
     return this.http.post<AppRequest>(`${this.apiUrl}/requests/${requestId}/approve`, { actorEmail });
   }
 
-  // POST /requests/:id/reject. reason isn't optional, because the server answers 400 without one.
+  // POST /requests/:id/reject. reason required (400 without).
   reject(requestId: string, actorEmail: string, reason: string) {
     return this.http.post<AppRequest>(`${this.apiUrl}/requests/${requestId}/reject`, { actorEmail, reason });
   }
 
-  getBans() {                       // GET /bans, every permanently banned account system wide
+  getBans() {                       // GET /bans
     return this.http.get<BannedUser[]>(`${this.apiUrl}/bans`);
   }
 
-  // GET /audit?type=... the filtering and the newest-first ordering both happen on the server
+  // GET /audit?type=, filtered and sorted on the server
   getAudit(type = '') {
     return this.http.get<AuditEntry[]>(`${this.apiUrl}/audit`, { params: type ? { type } : {} });
   }
 
-  // GET /audit/types, the distinct types actually in the log. the filter dropdown is built from
-  // this rather than a hardcoded list, so it can't drift out of date as new actions are logged.
+  // GET /audit/types, the types in the log, for the filter dropdown
   getAuditTypes() {
     return this.http.get<string[]>(`${this.apiUrl}/audit/types`);
   }

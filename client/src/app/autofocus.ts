@@ -1,21 +1,15 @@
 import { Directive, ElementRef, afterNextRender, inject } from '@angular/core';
 
-// Puts keyboard focus on the element it's on as soon as that element appears on the page.
-//
-// Used on the Cancel button of every "are you sure?" box. The box replaces the button that was
-// just clicked, so without this a keyboard user's focus would be lost with the button that
-// disappeared. Cancel rather than the destructive button, so pressing Enter straight away backs
-// out instead of deleting something.
-//
-// The HTML autofocus attribute can't do this job: browsers only honour it when the page first
-// loads, not on an element added later, which is what an @if block does.
+// focuses its element as soon as it appears. used on Cancel in every confirm box, so keyboard
+// focus isn't lost and Enter backs out. the html autofocus attribute only works on page load,
+// not on elements an @if adds later.
 @Directive({
   selector: '[appAutofocus]',
 })
 export class Autofocus {
   constructor() {
     const element = inject<ElementRef<HTMLElement>>(ElementRef);
-    // after the render, because before it the element isn't attached to the page and can't take focus
+    // after render, once the element is on the page
     afterNextRender(() => element.nativeElement.focus());
   }
 }

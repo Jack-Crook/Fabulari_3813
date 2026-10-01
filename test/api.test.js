@@ -1,5 +1,4 @@
-// every REST route in server.js, each with its success path and the rules it enforces.
-// run with `npm test` from the repo root. needs mongod running, same as `npm start`.
+// every REST route, success path and rules. `npm test` from the repo root, needs mongod.
 
 const { describe, it, before, after, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
@@ -29,8 +28,7 @@ async function raise(by, type, extra = {}) {
     return res.body._id;
 }
 
-// a second group straight into the database. there's no route that creates a group directly,
-// only approving a group-create request, so tests that just need one to exist insert it.
+// inserts a group directly, since there's no route that creates one without a request
 async function addGroup(name, adminEmail) {
     await ctx.db.collection('groups').insertOne({
         name, description: '', ageLimit: 0, theme: '#5FA8D3',

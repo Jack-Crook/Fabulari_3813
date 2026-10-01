@@ -1,8 +1,8 @@
 import { Component, inject, signal, computed, DestroyRef, ElementRef, viewChild, afterRenderEffect } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { FormsModule } from '@angular/forms';       // lets the html use [(ngModel)] on the message box
+import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
-import { DatePipe } from '@angular/common';         // formats each message's ISO timestamp as a time
+import { DatePipe } from '@angular/common';         // formats message times
 import { Navbar } from '../navbar/navbar';
 import { Auth } from '../auth';
 import { GroupService, Group, Channel, GroupMember } from '../group';
@@ -21,62 +21,50 @@ export class ChatRoom {
   private auth = inject(Auth);
   private chat = inject(ChatService);
 
-  // signals because the app is zoneless, same reason as the dashboard and group view
+  // signals, since they're set in subscribe and the app is zoneless
   group = signal<Group | undefined>(undefined);
-  channels = signal<Channel[]>([]);                 // every room in this group, listed down the left
-  channel = signal<Channel | undefined>(undefined); // the room actually open
+  channels = signal<Channel[]>([]);                 // the group's rooms, for the sidebar
+  channel = signal<Channel | undefined>(undefined); // the open room
 
-  // the name and picture for each member, keyed by email because a message's sender is an email.
-  // a Map so each message looks its sender up directly instead of searching a list.
+  // each member's name and picture, keyed by email (a message's sender)
   members = signal(new Map<string, GroupMember>());
 
-  me = this.auth.email;   // used to work out which messages are mine
+  me = this.auth.email;   // to mark my own messages
 
-  // the group's colour, with a fallback for the moment before the fetch comes back. the spec
-  // says the theme is the group's customisation and that it extends into its chat rooms, so
-  // the banner, the selected room and the message bar all read from this.
+  // the group's theme carries into its rooms. fallback until the group loads.
   theme = computed(() => this.group()?.theme ?? '#5FA8D3');
 
-  // and the readable text colour for anything sitting on that theme. the banner used to
-  // hardcode white, which failed even against the fallback colour above at 2.6:1, well under
-  // the 4.5:1 WCAG asks for. worked out from the colour now instead. see theme.ts.
+  // readable text on that theme (theme.ts). hardcoded white only managed 2.6:1.
   ink = computed(() => readableInk(this.theme()));
 
-  // the message box's placeholder is a pseudo element, so it can't be given an inline colour
-  // and needs a class to style against instead
+  // a class for the placeholder colour, which can't be set inline
   onDark = computed(() => this.ink() === LIGHT_INK);
 
-  // the live state lives in ChatService, not here. these are the service's own signals handed
-  // straight to the template, not copies, so when a socket event updates one the page redraws.
+  // ChatService's own signals, not copies, so socket updates redraw the page
   messages = this.chat.messages;
-  present = this.chat.present;      // who is in the room right now, from the server
-  notice = this.chat.notice;        // "someone joined" / "someone left"
+  present = this.chat.present;
+  notice = this.chat.notice;        // "x joined" / "x left"
   error = this.chat.error;
 
-  // only members get the message box. the server refuses a non member's join anyway, which is
-  // what happens to the super admin, but there's no point offering a box that can't send.
+  // members only get the message box (the server refuses others anyway)
   canPost = computed(() => this.group()?.memberEmails.includes(this.me) ?? false);
 
-  draft = '';   // plain property, [(ngModel)] writes it from a DOM event
+  draft = '';   // plain, [(ngModel)] writes it
 
-  // an image that's been uploaded and is waiting to go out with the next send. signals, because
-  // they're set inside the upload's subscribe callback.
-  pendingImage = signal('');       // the path the server gave back, '' when nothing is attached
+  // an uploaded image waiting to be sent
+  pendingImage = signal('');       // its path, '' when none
   uploading = signal(false);
   uploadError = signal('');
 
-  // the same limits server.js enforces. checking here first means a 20 MB photo is refused
-  // straight away instead of after uploading all of it. the server still checks, because this
-  // code runs in the browser and can be bypassed.
+  // the server's limits, checked first to avoid a pointless upload. the server still checks.
   private readonly imageTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
   private readonly maxImageBytes = 5 * 1024 * 1024;
 
-  // the scrolling message list in the template, marked #scroller
+  // the message list (#scroller)
   private scroller = viewChild<ElementRef<HTMLElement>>('scroller');
 
   constructor() {
-    // subscribed rather than read once, because clicking another room in the sidebar reuses
-    // this component and only swaps the :channelId in the url
+    // subscribed, because switching rooms reuses this component
     this.route.paramMap.subscribe(params => {
       const groupId = params.get('groupId') ?? '';
       const channelId = params.get('channelId') ?? '';
@@ -85,7 +73,7 @@ export class ChatRoom {
         this.group.set(groups.find(g => g._id === groupId));
       });
 
-      // fetched once per room rather than once per message
+      // once per room, not per message
       this.groupService.getMembers(groupId).subscribe(members => {
         this.members.set(new Map(members.map(m => [m.email, m])));
       });
@@ -95,26 +83,21 @@ export class ChatRoom {
         this.channel.set(channels.find(c => c._id === channelId));
       });
 
-      // joining a new room also leaves the old one on the server, so switching rooms in the
-      // sidebar needs nothing extra. the server checks membership before letting us in.
+      // joining also leaves the old room. the server checks membership.
       this.chat.joinRoom(channelId, this.me);
     });
 
-    // keep the newest message in view. afterRenderEffect runs after angular has drawn the page,
-    // so the new message is already in the DOM and scrollHeight includes it. reading messages()
-    // inside is what makes this re-run every time the list changes.
+    // scroll to the newest message after each render. reading messages() makes it re-run.
     afterRenderEffect(() => {
       this.messages();
       this.scrollToBottom();
     });
 
-    // navigating away inside the app doesn't close the socket, it's shared app wide, so without
-    // this you'd still be listed in the room after going back to the dashboard
+    // the socket is shared, so leave the room explicitly when the page goes
     inject(DestroyRef).onDestroy(() => this.chat.leaveRoom());
   }
 
-  // also called when an image finishes loading. an image has no height until it has downloaded,
-  // so the scroll that ran when the message arrived stops short, and this finishes the job.
+  // also called when an image loads, since it has no height until then
   scrollToBottom() {
     const list = this.scroller()?.nativeElement;
     if (list) {
@@ -122,12 +105,11 @@ export class ChatRoom {
     }
   }
 
-  // step one of sending an image: upload it as soon as it's picked, so Send is instant and the
-  // preview shows the file the server actually stored
+  // image step one: upload as soon as it's picked
   onImageChosen(event: Event) {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
-    input.value = '';      // reset, so picking the same file again still fires (change)
+    input.value = '';      // so picking the same file again still fires (change)
     if (!file) {
       return;
     }
@@ -166,18 +148,16 @@ export class ChatRoom {
   onSend() {
     const body = this.draft.trim();
     const image = this.pendingImage();
-    if (!body && !image) {        // text, an image, or both, but not neither
+    if (!body && !image) {        // needs text or an image
       return;
     }
-    // no email sent with it. the server takes the sender from this socket's join, so a message
-    // can't be posted as somebody else. step two of an image message is this send carrying the path.
+    // no email sent, the server uses the socket's join. image step two.
     this.chat.send(body, image);
     this.draft = '';
     this.pendingImage.set('');
   }
 
-  // what a message shows for its sender. someone who has since left or been banned isn't in the
-  // members list any more, and their old messages fall back to the email and its first letter.
+  // the sender's name. someone who has left falls back to their email.
   nameFor(email: string) {
     return this.members().get(email)?.username || email;
   }
@@ -186,21 +166,18 @@ export class ChatRoom {
     return (this.nameFor(email).charAt(0) || '?').toUpperCase();
   }
 
-  // the full address of their picture, or '' so the template shows the initial instead
+  // their picture's address, or '' to show the initial
   avatarFor(email: string) {
     const url = this.members().get(email)?.avatarUrl;
     return url ? this.auth.avatarSrc(url) : '';
   }
 
-  // today's messages just show the time. anything older gets the date as well, otherwise last
-  // week's message reads "3:15 PM" and looks like it was sent this afternoon.
+  // time only for today, date and time for older messages
   timeFormat(at: string) {
     return new Date(at).toDateString() === new Date().toDateString() ? 'shortTime' : 'd MMM, h:mm a';
   }
 
-  // group admins get an indicator next to their name in chat, the spec asks for this.
-  // it's a lookup in the group's adminEmails rather than a check on the user's role, because
-  // that's where group admin actually lives.
+  // the spec's admin indicator. group admin is stored on the group.
   isAdmin(email: string) {
     return this.group()?.adminEmails.includes(email) ?? false;
   }

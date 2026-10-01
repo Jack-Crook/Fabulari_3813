@@ -39,8 +39,7 @@ describe('Login', () => {
       username: 'ab', dob: '', bio: '', avatarUrl: '/uploads/me.png', createdAt: '',
     });
 
-    // localStorage is what every other page reads to work out who is signed in. it's state,
-    // not security, because the server never checks it. the avatar goes in too, for the navbar.
+    // localStorage tells every other page who is signed in, avatar included for the navbar
     expect(TestBed.inject(Auth).getUser()).toEqual({
       email: 'a@b.com', role: 'user', username: 'ab', avatarUrl: '/uploads/me.png',
     });
@@ -50,12 +49,12 @@ describe('Login', () => {
   it('shows the server\'s message when the credentials are wrong', () => {
     component.onSubmit();
 
-    // express sends its errors as { error: '...' }, and that body arrives on err.error
+    // the server's { error } body
     mock.expectOne('http://localhost:3000/login')
       .flush({ error: 'Invalid email or password' }, { status: 401, statusText: 'Unauthorized' });
 
     expect(component.errormessage()).toBe('Invalid email or password');
-    // the button unlocks again so they can retry, otherwise a wrong password would end the session
+    // the button unlocks so they can retry
     expect(component.submitting()).toBe(false);
   });
 
@@ -63,7 +62,7 @@ describe('Login', () => {
     component.onSubmit();
     component.onSubmit();   // a double click on the button
 
-    // one request, not two. without the guard both would fire, and both would redirect.
+    // one request, not two
     mock.expectOne('http://localhost:3000/login').flush({
       message: 'ok', email: 'a@b.com', role: 'user', username: 'ab', dob: '', bio: '', createdAt: '',
     });

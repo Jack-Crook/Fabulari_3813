@@ -7,8 +7,7 @@
   box-sizing: border-box;
 }
 
-/* the profile card and the requests card stack in one 400px column, matching the width the
-   login and register cards already use */
+/* both cards in one 400px column, like login and register */
 .profile-column {
   display: flex;
   flex-direction: column;
@@ -24,8 +23,7 @@
   margin-bottom: 24px;
 }
 
-/* the uploaded picture, or the first letter of the display name when there isn't one. the same
-   class does both, so the circle is the same size either way. */
+/* the picture or the initial, same size either way */
 .avatar {
   width: 64px;
   height: 64px;
@@ -35,7 +33,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #1A1D23;       /* dark, not white: white on this blue is 2.6:1, under the 4.5:1 WCAG asks for */
+  color: #1A1D23;       /* dark text: white on this blue is only 2.6:1 (WCAG wants 4.5:1) */
   font-size: 28px;
   font-weight: 700;
   font-family: 'Fraunces Variable', Georgia, serif;
@@ -47,7 +45,7 @@
   font-weight: 600;
 }
 
-/* 'user' or 'super'. group admin isn't shown here because it isn't a role on the account */
+/* 'user' or 'super' */
 .role-tag {
   margin: 4px 0 0;
   font-size: 13px;
@@ -75,15 +73,14 @@
   word-break: break-word;     /* a long email or bio wraps instead of widening the card */
 }
 
-/* the grey note next to a value that can't be edited, or that isn't set yet */
+/* grey note for an uneditable or unset value */
 .locked {
   display: block;
   font-size: 12px;
   color: #9CA3AF;
 }
 
-/* Cancel sits under Save. outlined rather than blue so it doesn't compete with the action
-   that actually saves. */
+/* Cancel is outlined so it doesn't compete with Save */
 .secondary {
   background: #FFFFFF;
   color: #6B7280;
@@ -114,7 +111,7 @@
   margin-bottom: 8px;
 }
 
-/* a rejected one is marked in red instead, so the two lists read differently at a glance */
+/* rejected ones in red */
 .request-card.rejected {
   border-left-color: #B91C1C;
 }
@@ -158,7 +155,7 @@
   }
 }
 
-/* object-fit: cover crops a photo to fill the circle instead of squashing it */
+/* cover crops the photo to the circle instead of squashing it */
 img.avatar {
   object-fit: cover;
   background: #E2E4E9;
@@ -170,7 +167,7 @@ img.avatar {
   margin-top: 8px;
 }
 
-/* the global button is full width and 16px, far too big next to an avatar */
+/* smaller than the global button */
 .avatar-actions button.small {
   width: auto;
   margin: 0;

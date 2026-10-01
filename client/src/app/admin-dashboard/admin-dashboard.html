@@ -1,6 +1,6 @@
 <app-navbar></app-navbar>
 
-<!-- one message bar for every action on this page, same idea as the user dashboard -->
+<!-- one message bar for the page -->
 @if (actionError()) {
   <p class="banner error" role="alert">{{ actionError() }}</p>
 }
@@ -10,7 +10,7 @@
 
 <div class="admin-body">
 
-  <!-- left hand column, everything about the group this admin runs -->
+  <!-- left column: the group -->
   <section class="admin-main">
     <div class="section-head">
       <h2>Group Settings</h2>
@@ -19,8 +19,7 @@
       }
     </div>
 
-    <!-- read only pills. editing them needs no request at all, because the spec only sends group
-         creation and deletion to the super admin. -->
+    <!-- read only. editing needs no request. -->
     @if (!editingSettings()) {
       <div class="settings-row">
         <div class="setting-pill">Name: {{ group()?.name }}</div>
@@ -49,8 +48,7 @@
         <div class="field">
           <label for="edit-age">Age limit (0 for no limit)</label>
           <input id="edit-age" name="edit-age" type="number" min="0" [(ngModel)]="formAgeLimit" />
-          <!-- the spec says raising it boots members who no longer qualify, so the admin is
-               warned before they save rather than after -->
+          <!-- warned before saving, since raising it removes under-age members -->
           <span class="hint">Raising this removes members who are now under the limit.</span>
         </div>
 
@@ -65,7 +63,7 @@
       </form>
     }
 
-    <!-- the one group level action an admin can't carry out themself -->
+    <!-- an admin can't delete their own group, they ask the super admin -->
     <div class="danger-zone">
       <p class="danger-text">
         A group admin can't delete their own group. This asks the super admin to do it, and is
@@ -76,33 +74,27 @@
 
     <h2>Rooms</h2>
 
-    <!-- adding a room posts to /channels, the same records the group view reads back.
-         the server rejects a duplicate name inside this group with a 409. -->
+    <!-- 409 for a duplicate name in this group -->
     <form class="add-room" (ngSubmit)="onAddRoom()">
-      <!-- aria-label names the box for a screen reader, since the placeholder vanishes on typing -->
+      <!-- aria-label, since a placeholder isn't a label -->
       <input id="new-room" name="new-room" type="text" placeholder="New room name" aria-label="New room name"
              [(ngModel)]="newRoomName" required />
       <button type="submit">Add Room</button>
     </form>
 
-    <!-- signals are read by calling them, hence channels() -->
     @for (channel of channels(); track channel._id) {
       <div class="room-row">
-        <!-- only one room is ever being renamed, so the open row is the one whose id matches -->
+        <!-- only one room is renamed at a time -->
         @if (renamingChannelId() === channel._id) {
           <form class="rename-room" (ngSubmit)="onRenameRoom(channel)">
-            <!-- this box had no label or placeholder at all. the label names the room being
-                 renamed, so it still makes sense when read out on its own -->
+            <!-- the label names the room being renamed -->
             <input name="rename" type="text" [(ngModel)]="renameValue" required
                    [attr.aria-label]="'New name for ' + channel.name" />
             <button type="submit" class="inline">Save</button>
             <button type="button" class="inline secondary" (click)="renamingChannelId.set('')">Cancel</button>
           </form>
         } @else if (confirmingDeleteId() === channel._id) {
-          <!-- deleting a room can't be undone and takes every message with it, so it asks first.
-               the question says exactly what will happen rather than just "are you sure?".
-               focus lands on Cancel (appAutofocus), and aria-describedby makes a screen reader
-               read the question out when it gets there. -->
+          <!-- deleting takes every message, so it asks first and says so. focus goes to Cancel, and aria-describedby reads the question out. -->
           <div class="confirm-box">
             <p class="confirm-text" [id]="'confirm-delete-' + channel._id">
               Delete "{{ channel.name }}" and every message in it? This can't be undone.
@@ -138,7 +130,7 @@
         </tr>
       </thead>
       <tbody>
-        <!-- members are stored as emails on the group, so that's what the table lists -->
+        <!-- members are stored as emails on the group -->
         @for (email of group()?.memberEmails ?? []; track email) {
           <tr>
             <td>{{ email }}</td>
@@ -149,11 +141,9 @@
               }
             </td>
             <td class="actions-cell">
-              <!-- promotion and demotion are the same pair of buttons for everyone, including
-                   yourself: an admin stepping down uses exactly the same endpoint. -->
+              <!-- the same buttons for everyone, stepping down uses the demote endpoint -->
               @if (isAdmin(email)) {
-                <!-- disabled on the last admin, because a group must always keep one. the
-                     server returns 409 for this too, the disabled state just says so first. -->
+                <!-- disabled on the last admin (the server also answers 409) -->
                 <button type="button" class="inline secondary"
                         [disabled]="isLastAdmin(email)"
                         (click)="onDemote(email)">
@@ -163,14 +153,12 @@
                 <button type="button" class="inline" (click)="onPromote(email)">Promote</button>
               }
 
-              <!-- removes them from this group only, the account still exists. trying this on
-                   the last remaining admin comes back as a 409 and shows in the bar up top. -->
+              <!-- this group only, the account still exists -->
               <button type="button" class="danger"
                       [disabled]="isLastAdmin(email)"
                       (click)="startRemoving(email)">Remove</button>
 
-              <!-- opens the box below, which offers both a group ban and a report to the super
-                   admin. you can't ban or report yourself. -->
+              <!-- opens the ban/report box below. not shown for yourself. -->
               @if (email !== me) {
                 <button type="button" class="danger"
                         [disabled]="isLastAdmin(email)"
@@ -179,7 +167,7 @@
             </td>
           </tr>
 
-          <!-- the removal confirm drops in under the row, the same way the ban box does -->
+          <!-- the remove confirm, under the row -->
           @if (confirmingRemoveEmail() === email) {
             <tr class="ban-row">
               <td colspan="3">
@@ -199,7 +187,7 @@
             </tr>
           }
 
-          <!-- the ban box drops in under the row it belongs to, so it's obvious who it's about -->
+          <!-- the ban box, under the row -->
           @if (banningEmail() === email) {
             <tr class="ban-row">
               <td colspan="3">
@@ -207,14 +195,11 @@
                 <input [id]="'ban-reason-' + email" name="ban-reason" type="text"
                        placeholder="Why is this happening?" [(ngModel)]="banReason" />
                 <div class="row-actions">
-                  <!-- group level: they lose this group and can't rejoin it, but the account
-                       and their other groups are untouched, and this can be lifted later -->
+                  <!-- group ban: they lose this group only, and it can be lifted -->
                   <button type="button" class="danger" (click)="onBanFromGroup(email)">
                     Ban from this group
                   </button>
-                  <!-- system wide: only the super admin can actually do it, and only from a
-                       report like this one. the ban is permanent and the email can never be
-                       registered again, so it's a request rather than an action. -->
+                  <!-- permanent system ban: only the super admin can do it, so this is a report -->
                   <button type="button" class="danger" (click)="onReportUser(email)">
                     Report for permanent ban
                   </button>
@@ -228,13 +213,12 @@
 
     </table>
 
-    <!-- the spec says a group admin sees the member list and the banned list for their own
-         group. this is the second half of that. -->
+    <!-- the group's banned list -->
     <h2>Banned From This Group</h2>
     @for (email of group()?.bannedEmails ?? []; track email) {
       <div class="room-row">
         <span class="room-name">{{ email }}</span>
-        <!-- a group level ban isn't permanent, unlike a system wide one, so it can be undone -->
+        <!-- a group ban can be lifted, unlike a system ban -->
         <button type="button" class="inline secondary" (click)="onLiftBan(email)">Lift Ban</button>
       </div>
     }
@@ -243,7 +227,7 @@
     }
   </section>
 
-  <!-- right hand column, the requests this admin is the one who actions -->
+  <!-- right column: requests this admin actions -->
   <aside class="admin-side">
     <h2>Room Proposals</h2>
     <p class="side-note">
@@ -257,8 +241,7 @@
         <p class="request-meta">by {{ request.requestedBy }} · {{ request.createdAt | date:'d MMM' }}</p>
 
         @if (rejectingId() === request._id) {
-          <!-- the spec requires a reason on a rejection, and the server enforces it with a 400,
-               so the box appears before the rejection rather than after -->
+          <!-- a reason is required (400 without) -->
           <div class="reject-box">
             <label [attr.for]="'reject-' + request._id">Reason for rejection</label>
             <input [id]="'reject-' + request._id" name="reject-reason" type="text"
@@ -270,7 +253,7 @@
           </div>
         } @else {
           <div class="request-actions">
-            <!-- you can't approve your own proposal, the server answers 403 -->
+            <!-- approving your own proposal gets a 403 -->
             <button type="button" class="approve" (click)="onApproveProposal(request)">Approve</button>
             <button type="button" class="reject" (click)="startRejecting(request)">Reject</button>
           </div>
@@ -278,7 +261,6 @@
       </div>
     }
 
-    <!-- so the panel isn't just blank when there's nothing waiting -->
     @if (proposals().length === 0) {
       <p class="empty">No pending proposals.</p>
     }

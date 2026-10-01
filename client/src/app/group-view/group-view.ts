@@ -1,6 +1,6 @@
 import { Component, inject, signal, computed } from '@angular/core';
-import { FormsModule } from '@angular/forms';                    // lets the html use [(ngModel)] on the propose form
-import { ActivatedRoute, RouterLink } from '@angular/router';   // ActivatedRoute = details about the url that opened this component
+import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, RouterLink } from '@angular/router';   // ActivatedRoute = the current url's details
 import { HttpErrorResponse } from '@angular/common/http';
 import { Navbar } from '../navbar/navbar';
 import { Auth } from '../auth';
@@ -24,45 +24,35 @@ export class GroupView {
   me = this.auth.email;
   isSuper = this.auth.isSuper;
 
-  // signals, because this app is zoneless. angular only knows to redraw when a signal changes,
-  // so setting a plain property inside a subscribe would leave the page showing nothing.
-  groups = signal<Group[]>([]);            // every group, used for the sidebar down the left
-  group = signal<Group | undefined>(undefined);   // just the one whose id is in the url, shown in the banner
-  channels = signal<Channel[]>([]);        // the rooms inside that group
-  proposals = signal<AppRequest[]>([]);    // rooms proposed for this group and not yet actioned
+  // signals, since they're set in subscribe and the app is zoneless
+  groups = signal<Group[]>([]);            // for the sidebar
+  group = signal<Group | undefined>(undefined);   // the one in the url
+  channels = signal<Channel[]>([]);
+  proposals = signal<AppRequest[]>([]);    // pending room proposals
 
-  // the propose-a-room form. a plain property, because [(ngModel)] writes it from a DOM event
-  proposedName = '';
+  proposedName = '';      // plain, [(ngModel)] writes it from a DOM event
   formError = signal('');
   formSuccess = signal('');
-  joining = signal(false);     // stops a double click sending two joins
+  joining = signal(false);     // stops a double join
 
-  // group admin is a relationship with this group rather than a role on the account, so it's
-  // read out of the group's adminEmails. a computed, because the group arrives asynchronously.
+  // group admin is stored on the group, not the user
   isGroupAdmin = computed(() => this.group()?.adminEmails.includes(this.me) ?? false);
 
-  // the super admin oversees every group without being a member of any, so the propose form
-  // is for actual members only
   isMember = computed(() => this.group()?.memberEmails.includes(this.me) ?? false);
 
-  // a group admin picks the theme colour, so nothing about it is known when this is written.
-  // the banner text colour is worked out from whatever they chose instead of being fixed, or
-  // a dark theme would put near black text on a near black background. see theme.ts.
+  // readable banner text for whatever theme the admin picked (theme.ts)
   ink = computed(() => readableInk(this.group()?.theme ?? ''));
 
-  // the pills sit on top of the banner and use a translucent overlay, which has to flip the
-  // same way the text does. a class, because a background can't be derived in the template.
+  // flips the pills' overlay to match the text
   onDark = computed(() => this.ink() === LIGHT_INK);
 
-  // the sidebar shows every group at once, each in its own colour, so they can't share the
-  // banner's single computed value
+  // per sidebar tile, each has its own colour
   inkFor(theme: string) {
     return readableInk(theme);
   }
 
   constructor() {
-    // paramMap is subscribed to rather than read once, because clicking a different group in
-    // the sidebar reuses this same component and only changes the :id. a one off read wouldn't rerun.
+    // subscribed, because switching groups in the sidebar reuses this component
     this.route.paramMap.subscribe(params => {
       this.groupId = params.get('id') ?? '';
       this.loadGroup();
@@ -70,7 +60,7 @@ export class GroupView {
   }
 
   private loadGroup() {
-    this.groupService.getGroups().subscribe(groups => {   // fill the sidebar, and pick out the one being viewed
+    this.groupService.getGroups().subscribe(groups => {
       this.groups.set(groups);
       this.group.set(groups.find(g => g._id === this.groupId));
     });
@@ -79,15 +69,12 @@ export class GroupView {
       this.channels.set(channels);
     });
 
-    // so a member can see the room they proposed is still waiting, rather than it vanishing
-    // until an admin gets to it
+    // so members can see their proposal is waiting
     this.requestService.getRequests({ groupId: this.groupId, status: 'pending', scope: 'group' })
       .subscribe(requests => this.proposals.set(requests));
   }
 
-  // the same direct join as the Discover list on the dashboard, offered here too so someone who
-  // opens a group they aren't in can join it from the page they're looking at. the server does
-  // the age limit and group ban checks, and its reason shows in the bar at the top.
+  // join from the group page. the server checks age limit and bans.
   onJoin() {
     const group = this.group();
     if (!group || this.joining()) {
@@ -101,7 +88,7 @@ export class GroupView {
       next: () => {
         this.formSuccess.set(`Joined ${group.name}. You can chat in its rooms now.`);
         this.joining.set(false);
-        this.loadGroup();       // isMember flips to true and the rooms become links
+        this.loadGroup();       // rooms become links
       },
       error: (err: HttpErrorResponse) => {
         this.formError.set(err.error?.error ?? 'Something went wrong, please try again.');
@@ -110,8 +97,7 @@ export class GroupView {
     });
   }
 
-  // the spec says regular users propose a room and the group admin approves or rejects it.
-  // an admin doesn't need this, because they create rooms outright from the admin dashboard.
+  // members propose rooms, a group admin approves them
   onPropose() {
     this.formError.set('');
     this.formSuccess.set('');

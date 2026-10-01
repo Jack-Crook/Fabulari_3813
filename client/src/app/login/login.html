@@ -4,11 +4,10 @@
     <h2>Welcome Back!</h2>
     
 
-    <!-- runs onSubmit() when the form is submitted -->
+    <!-- runs onSubmit() on submit -->
   <form (ngSubmit)="onSubmit()">
     <div class="field">
     <label for="email">Email</label>
-    <!-- keeps this box in sync with the email variable -->
     <input id="email" name="email" type="email" [(ngModel)]="email" required />
   </div>
 
@@ -17,18 +16,15 @@
     <input id="password" name="password" type="password" [(ngModel)]="password" required />
   </div>
 
-  <!-- just text from the wireframe, doesn't do anything yet -->
+  <!-- from the wireframe, does nothing yet -->
   <a class="forgot" href="#">Forgot your password?</a>
 
-  <!-- disabled while a request is in flight so a double click can't fire two logins -->
+  <!-- disabled during a login so a double click can't send two -->
   <button type="submit" [disabled]="submitting()">{{ submitting() ? 'Logging in…' : 'Log In' }}</button>
 </form>
 
 
-    <!-- shows this only if there's an error message. role="alert" makes a screen reader read it
-         out the moment it appears, otherwise a failed login is silent unless you go looking.
-         the success line uses role="status" instead, which waits for a pause rather than
-         interrupting. same pattern as the chat room. -->
+    <!-- role="alert" is read out straight away by screen readers, role="status" at the next pause -->
     @if (errormessage()) {
   <p class="error" role="alert">{{ errormessage() }}</p>
 }

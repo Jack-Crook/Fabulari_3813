@@ -3,44 +3,40 @@
     <img class="brand" src="/fabulari-logo.png" alt="Fabulari">
     <h2>Create Account</h2>
 
-    <!-- ngSubmit fires onSubmit() in register.ts when the form is submitted -->
+    <!-- runs onSubmit() on submit -->
     <form (ngSubmit)="onSubmit()">
       <div class="field">
         <label for="email">Email</label>
-        <!-- [(ngModel)] keeps this input in sync with the email property on the Register class -->
+        <!-- [(ngModel)] keeps the input and the email property in sync -->
         <input id="email" name="email" type="email" [(ngModel)]="email" required />
       </div>
 
       <div class="field">
         <label for="username">Display name <span class="optional">optional</span></label>
-        <!-- blank is fine, the server falls back to the part of the email before the @ -->
+        <!-- blank defaults to the part of the email before the @ -->
         <input id="username" name="username" type="text" [(ngModel)]="username" />
       </div>
 
       <div class="field">
         <label for="dob">Date of birth <span class="optional">optional</span></label>
-        <!-- groups carry an age limit, and this is what it gets checked against. it can be
-             left blank now and filled in on the profile page later, but joining an age
-             restricted group is refused until it's set. -->
+        <!-- needed to join an age limited group, can be added later on the profile page -->
         <input id="dob" name="dob" type="date" [(ngModel)]="dob" />
       </div>
 
       <div class="field">
         <label for="password">Password</label>
         <input id="password" name="password" type="password" [(ngModel)]="password" required minlength="6" />
-        <!-- the server enforces this too, the hint is just so it isn't a surprise -->
+        <!-- the server checks this too -->
         <span class="hint">At least 6 characters.</span>
       </div>
 
       <button type="submit" [disabled]="submitting()">{{ submitting() ? 'Registering…' : 'Register' }}</button>
     </form>
 
-    <!-- only shown when errorMessage is a non-empty string -->
     @if (errormessage()) {
       <p class="error" role="alert">{{ errormessage() }}</p>
     }
 
-    <!-- only shown when successMessage is a non-empty string -->
     @if (successmessage()) {
       <p class="success" role="status">{{ successmessage() }}</p>
     }

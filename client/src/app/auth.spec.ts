@@ -16,7 +16,7 @@ describe('Auth', () => {
   });
 
   afterEach(() => {
-    mock.verify();  // fails the test if a request was made that no expectation answered
+    mock.verify();  // fails if a request went unanswered
     signOut();
   });
 
@@ -29,8 +29,7 @@ describe('Auth', () => {
 
     const req = mock.expectOne('http://localhost:3000/register');
     expect(req.request.method).toBe('POST');
-    // the email is sent as typed. normalising it is the server's job, so that one rule lives
-    // in one place rather than being half enforced on each side.
+    // sent as typed, the server normalises it
     expect(req.request.body).toEqual({
       email: 'New@Test.com ', password: 'pw1234', username: 'Newbie', dob: '2000-01-01',
     });
@@ -48,7 +47,7 @@ describe('Auth', () => {
   it('url encodes the email when fetching one user', () => {
     service.fetchUser('a+b@test.com').subscribe();
 
-    // + means a space in a url, so an unencoded email would ask for the wrong account
+    // + means a space in a url, so it must be encoded
     const req = mock.expectOne('http://localhost:3000/users/a%2Bb%40test.com');
     expect(req.request.method).toBe('GET');
     req.flush({});
@@ -59,8 +58,7 @@ describe('Auth', () => {
 
     const req = mock.expectOne('http://localhost:3000/users/a%40b.com');
     expect(req.request.method).toBe('PUT');
-    // email identifies the account and role is what makes someone the super admin, so neither
-    // is editable from here
+    // email and role aren't editable
     expect(req.request.body.email).toBeUndefined();
     expect(req.request.body.role).toBeUndefined();
     req.flush({});
@@ -96,7 +94,7 @@ describe('Auth', () => {
 
     const req = mock.expectOne('http://localhost:3000/users/a%2Bb%40test.com/avatar');
     expect(req.request.method).toBe('POST');
-    // multer reads the form in order, so actorEmail has to be there before the file arrives
+    // multer reads the form in order, so actorEmail comes before the file
     const fields = [...(req.request.body as FormData).keys()];
     expect(fields).toEqual(['actorEmail', 'image']);
     req.flush({});
@@ -116,7 +114,7 @@ describe('Auth', () => {
     service.saveUser({ email: 'a@b.com', role: 'user', username: 'a' });
     expect(service.session()?.username).toBe('a');
 
-    // this is what lets the navbar redraw straight after a profile change
+    // lets the navbar redraw after a profile change
     service.saveUser({ email: 'a@b.com', role: 'user', username: 'renamed', avatarUrl: '/uploads/x.png' });
     expect(service.session()?.username).toBe('renamed');
     expect(service.session()?.avatarUrl).toBe('/uploads/x.png');

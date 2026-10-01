@@ -1,4 +1,4 @@
-/* You can add global styles to this file, and also import other style files */
+/* global styles */
 @import '@fontsource-variable/fraunces';
 
 body {
@@ -76,8 +76,7 @@ button:hover {
   background: #0A56B5;
 }
 
-/* every submit button in the app disables itself while its request is in flight, so the
-   disabled look is defined once here rather than per page */
+/* the disabled look for every submit button during a request */
 button:disabled {
   background: #9CA3AF;
   cursor: not-allowed;
@@ -88,9 +87,7 @@ button:disabled:hover {
 }
 
 
-/* the feedback lines under the login, register and profile forms. these were being rendered
-   as plain unstyled paragraphs, so a failed login read the same as ordinary body text.
-   :not(.banner) keeps this off the full width bars the dashboards use, which style themselves. */
+/* feedback lines under the login, register and profile forms. :not(.banner) skips the dashboards' bars. */
 .error:not(.banner), .success:not(.banner) {
   margin: 16px 0 0;
   padding: 10px 12px;
@@ -116,7 +113,7 @@ button:disabled:hover {
   color: #6B7280;
 }
 
-/* the grey "optional" tag next to a label on a field that can be left blank */
+/* the "optional" tag next to a label */
 .optional {
   font-weight: 400;
   font-size: 12px;
@@ -140,8 +137,7 @@ textarea {
   min-height: 80px;
 }
 
-/* keyboard users need to be able to see where they are, and the browser default outline is
-   removed by some of the custom backgrounds below */
+/* a visible focus outline for keyboard users */
 a:focus-visible, button:focus-visible, input:focus-visible,
 select:focus-visible, textarea:focus-visible {
   outline: 2px solid #0b68db;
@@ -185,7 +181,7 @@ label {
 }
 
 
-/* phones and narrow windows. the desktop layout above is the default, this reduces it */
+/* phones and narrow windows */
 @media (max-width: 768px) {
   .page {
     align-items: flex-start;    /* stop centering vertically, the form should start at the top */
@@ -193,7 +189,7 @@ label {
   }
 
   .card {
-    width: 100%;                /* 400px is wider than a phone screen, which caused sideways scrolling */
+    width: 100%;                /* 400px is wider than a phone */
     max-width: 100%;
     box-sizing: border-box;
   }
@@ -203,9 +199,7 @@ label {
   }
 }
 
-/* the question in an "are you sure?" box, before an action that can't be undone. both admin
-   dashboards use it, so it's defined once here. width: 100% makes it take its own line inside
-   the flex rows it sits in. */
+/* the question in a confirm box, used by both admin dashboards. full width so it gets its own line. */
 .confirm-text {
   width: 100%;
   margin: 0 0 8px;

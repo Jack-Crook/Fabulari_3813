@@ -1,8 +1,6 @@
 <app-navbar></app-navbar>
 
-<!-- one message bar for the whole page, so requesting a group and joining one both report
-     back in the same place instead of each panel having its own. the roles make a screen
-     reader announce it: alert straight away for an error, status at the next pause. -->
+<!-- one message bar for the page. alert is read out straight away, status at the next pause. -->
 @if (formError()) {
   <p class="banner error" role="alert">{{ formError() }}</p>
 }
@@ -13,11 +11,10 @@
 <div class="dashboard-body">
   <section class="my-groups">
     <div class="section-head">
-      <!-- the super admin isn't a member of anything, they oversee every group instead -->
+      <!-- the super admin is in no groups, they see them all -->
       <h2>{{ isSuper ? 'ALL GROUPS' : 'MY GROUPS' }}</h2>
 
-      <!-- the spec says the super admin only actions requests and never raises one, so they
-           don't get the button. server.js refuses it as well. -->
+      <!-- the super admin can't raise requests (the server refuses too) -->
       @if (!isSuper) {
         <button type="button" class="new-group" (click)="toggleForm()">
           {{ showForm() ? 'Cancel' : 'Request Group' }}
@@ -26,9 +23,7 @@
     </div>
 
     @if (showForm()) {
-      <!-- a group isn't created here, it's requested. the spec says the requesting user
-           supplies the title, description, age limit and colour up front and the super admin
-           just approves or rejects, so all four fields are collected now rather than after. -->
+      <!-- groups are requested, with all four details up front, and the super admin approves -->
       <form class="create-group" (ngSubmit)="onRequestGroup()">
         <p class="form-note">
           New groups are approved by the super admin. If yours is approved you become its first admin.
@@ -51,7 +46,7 @@
 
         <div class="field">
           <label for="new-theme">Theme colour</label>
-          <!-- a colour picker because theme is a hex string, and it carries into this group's rooms -->
+          <!-- theme is a hex colour, carried into the group's rooms -->
           <input id="new-theme" name="new-theme" type="color" [(ngModel)]="newTheme" />
         </div>
 
@@ -61,17 +56,15 @@
       </form>
     }
 
-    <!-- a signal is read by calling it, so it's myGroups() and not myGroups -->
+    <!-- signals are read by calling them: myGroups() -->
     @for (group of myGroups(); track group._id) {
       <div class="group-row-wrap">
-        <!-- clicking a group opens its room list -->
         <a class="group-row" [routerLink]="['/groups', group._id]">
           <div class="group-swatch" [style.background]="group.theme"></div>
           <div>
             <p class="group-name">
               {{ group.name }}
-              <!-- group admin is a relationship with this group, not a role on the account,
-                   so it's read straight off the group's adminEmails -->
+              <!-- group admin is stored on the group (adminEmails) -->
               @if (amAdminOf(group)) {
                 <span class="admin-badge">Admin</span>
               }
@@ -83,10 +76,8 @@
           </div>
         </a>
 
-        <!-- the super admin is never a member of a group, so there's nothing for them to leave -->
         @if (!isSuper) {
-          <!-- the same endpoint an admin uses to remove someone. leaving is refused with a 409
-               if you're the group's last admin, and disbanding goes through the super admin. -->
+          <!-- same endpoint as an admin removing someone. 409 if you're the last admin. -->
           <button type="button" class="leave" (click)="onLeave(group)">Leave</button>
         }
       </div>
@@ -96,8 +87,7 @@
       <p class="group-desc">You aren't in any groups yet. Find one in Discover.</p>
     }
 
-    <!-- their own pending requests, so a group they just asked for doesn't just vanish.
-         the full list, including past rejections and their reasons, is on the profile page. -->
+    <!-- your pending requests. rejections and reasons are on the profile page. -->
     @if (myPending().length) {
       <h3 class="pending-head">Awaiting approval</h3>
       @for (request of myPending(); track request._id) {
@@ -106,20 +96,15 @@
     }
   </section>
 
-  <!-- nothing to discover as the super admin, they can already see everything above -->
   @if (!isSuper) {
     <section class="discover">
       <h2>Discover</h2>
-      <!-- writes straight into the signal the filtered list is computed from, so the list
-           narrows as you type. the placeholder isn't a label, it disappears as soon as you type
-           and screen readers don't reliably read it, so aria-label names the box instead. -->
+      <!-- sets the signal directly, so the list filters as you type. aria-label, since a placeholder isn't a label. -->
       <input type="text" placeholder="Search groups" class="discover-search" aria-label="Search groups"
              [value]="searchTerm()"
              (input)="searchTerm.set($any($event.target).value)">
 
-      <!-- groups the user isn't in yet. the spec says every group is visible whatever your age,
-           and the age check happens when you try to join. the server answers 403 and the
-           reason appears in the bar at the top of the page. -->
+      <!-- groups you're not in. all are visible, the age check happens on join (403 shown at the top). -->
       @for (group of filteredDiscover(); track group._id) {
         <div class="discover-row">
           <div class="group-swatch" [style.background]="group.theme"></div>

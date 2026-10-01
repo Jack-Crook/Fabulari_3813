@@ -17,7 +17,7 @@ describe('GroupView', () => {
     await fixture.whenStable();
   }
 
-  // the test router has no :id, so the component looks for a group whose id is ''
+  // the test router has no :id, so the group id is ''
   function load(group = makeGroup({ _id: '' }), proposals: any[] = []) {
     flushByUrl(mock, { '/groups': [group], '/channels': [makeChannel()], '/requests': proposals });
   }
@@ -42,8 +42,7 @@ describe('GroupView', () => {
     await build('admin@test.com');
     load();
 
-    // the same check the route guard on the admin page makes: is my email in this group's
-    // adminEmails
+    // same check as the admin page's guard
     expect(component.isGroupAdmin()).toBe(true);
     expect(component.isMember()).toBe(true);
   });
@@ -60,8 +59,7 @@ describe('GroupView', () => {
     await build('stranger@test.com');
     load();
 
-    // every group is visible to everyone, so a non-member can open this page, and they just
-    // can't propose a room in it
+    // non-members can see the page but can't propose rooms
     expect(component.isMember()).toBe(false);
   });
 
@@ -72,13 +70,13 @@ describe('GroupView', () => {
     component.proposedName = 'Spoilers';
     component.onPropose();
 
-    // the spec says a regular user proposes a room and the group admin approves or rejects it
+    // members propose rooms, admins approve them
     const req = mock.expectOne('http://localhost:3000/requests');
     expect(req.request.body.type).toBe('channel-create');
     expect(req.request.body.payload.name).toBe('Spoilers');
     req.flush(makeRequest());
 
-    load();   // the page reloads after a successful proposal
+    load();   // reload after proposing
     expect(component.formSuccess()).toContain('Spoilers');
   });
 
@@ -100,8 +98,7 @@ describe('GroupView', () => {
     await build('member@test.com');
     load(makeGroup({ _id: '' }), [makeRequest({ payload: { name: 'Spoilers' } })]);
 
-    // shown so a member can see their proposal is queued rather than lost, but not as a
-    // clickable room, because the channel doesn't exist yet
+    // shown as queued, not as a clickable room
     expect(component.proposals().length).toBe(1);
     expect(component.channels().length).toBe(1);
   });

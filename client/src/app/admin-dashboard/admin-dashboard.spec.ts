@@ -17,8 +17,7 @@ describe('AdminDashboard', () => {
     await fixture.whenStable();
   }
 
-  // the route has no :groupId in the test router, so paramMap gives '' and the component
-  // fetches with an empty id. what matters here is the behaviour once the data arrives.
+  // the test router has no :groupId, so the id is ''. what matters is the behaviour after the data arrives.
   function load(group = makeGroup(), proposals = [makeRequest()]) {
     flushByUrl(mock, { '/groups': [group], '/channels': [makeChannel()], '/requests': proposals });
   }
@@ -43,8 +42,7 @@ describe('AdminDashboard', () => {
     await build();
     load(makeGroup({ _id: '', adminEmails: ['admin@test.com'], memberEmails: ['admin@test.com', 'member@test.com'] }));
 
-    // there is no per-member role stored anywhere. an admin is just an email that appears in
-    // the group's adminEmails
+    // an admin is an email in adminEmails, there's no per-member role
     expect(component.roleOf('admin@test.com')).toBe('Admin');
     expect(component.roleOf('member@test.com')).toBe('Member');
   });
@@ -53,8 +51,7 @@ describe('AdminDashboard', () => {
     await build();
     load(makeGroup({ _id: '', adminEmails: ['admin@test.com'] }));
 
-    // a group must always keep at least one admin. the server returns 409 either way, this
-    // just disables the buttons first.
+    // the server answers 409, this just disables the buttons first
     expect(component.isLastAdmin('admin@test.com')).toBe(true);
     expect(component.isLastAdmin('member@test.com')).toBe(false);
   });
@@ -74,8 +71,7 @@ describe('AdminDashboard', () => {
     component.formAgeLimit = 18;
     component.onSaveSettings();
 
-    // no request needed to edit a group, because the spec only sends creation and deletion to the
-    // super admin. the server still checks the caller really is an admin here.
+    // no request needed to edit. the server still checks the caller is an admin.
     const req = mock.expectOne(r => r.method === 'PATCH');
     expect(req.request.body.actorEmail).toBe('admin@test.com');
     req.flush({ group: makeGroup(), booted: [] });
@@ -89,8 +85,7 @@ describe('AdminDashboard', () => {
     mock.expectOne(r => r.method === 'PATCH')
       .flush({ group: makeGroup({ ageLimit: 18 }), booted: ['kid@test.com'] });
 
-    // raising the limit automatically removes members who no longer meet it, so the admin is
-    // told rather than finding out later
+    // raising the limit removes under-age members, and the admin is told
     expect(component.actionSuccess()).toContain('kid@test.com');
   });
 
@@ -100,8 +95,7 @@ describe('AdminDashboard', () => {
 
     component.onRequestDeletion();
 
-    // a group admin can't delete their own group. this is also how a group with no working
-    // admin gets disbanded.
+    // an admin can't delete their own group, they ask the super admin
     const req = mock.expectOne('http://localhost:3000/requests');
     expect(req.request.body.type).toBe('group-delete');
     req.flush(makeRequest({ type: 'group-delete' }));
@@ -115,8 +109,7 @@ describe('AdminDashboard', () => {
     component.banReason = 'harassment';
     component.onReportUser('bad@test.com');
 
-    // only the super admin can ban system wide, and only from a group admin's report, so an
-    // admin can't ban directly without a prior report
+    // system bans need a report to the super admin
     const req = mock.expectOne('http://localhost:3000/requests');
     expect(req.request.body.type).toBe('user-ban');
     expect(req.request.body.payload).toEqual({ email: 'bad@test.com', reason: 'harassment' });
@@ -130,8 +123,7 @@ describe('AdminDashboard', () => {
     component.banReason = 'spam';
     component.onBanFromGroup('bad@test.com');
 
-    // a group level ban is the admin's own call: the account still exists and keeps its
-    // other groups, and this ban can be lifted later
+    // a group ban is the admin's call, and can be lifted
     const req = mock.expectOne(r => r.url.includes('/bans') && r.method === 'POST');
     expect(req.request.body.reason).toBe('spam');
     req.flush(makeGroup());
@@ -157,8 +149,7 @@ describe('AdminDashboard', () => {
     component.rejectReason = 'We already have a room for that';
     component.onRejectProposal(proposal);
 
-    // the spec requires a reason on every rejection, and the requester reads it back on their
-    // own profile page
+    // a rejection needs a reason
     const req = mock.expectOne(r => r.url.includes('/reject'));
     expect(req.request.body.reason).toBe('We already have a room for that');
     req.flush(makeRequest({ status: 'rejected' }));
@@ -170,13 +161,13 @@ describe('AdminDashboard', () => {
     await fixture.whenStable();
     const page = fixture.nativeElement as HTMLElement;
 
-    // the first click only opens the confirm box, nothing is sent
+    // the first click only opens the confirm box
     const deleteButton = [...page.querySelectorAll('button')].find(b => b.textContent?.trim() === 'Delete')!;
     deleteButton.click();
     await fixture.whenStable();
     mock.expectNone(r => r.method === 'DELETE');
     expect(page.querySelector('.confirm-text')?.textContent).toContain('every message');
-    // focus goes to Cancel, so pressing Enter straight away backs out rather than deleting
+    // focus goes to Cancel, so Enter backs out
     expect(document.activeElement?.textContent?.trim()).toBe('Cancel');
 
     component.onDeleteRoom(makeChannel());

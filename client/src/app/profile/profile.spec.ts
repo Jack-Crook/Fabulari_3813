@@ -4,8 +4,7 @@ import { HttpTestingController } from '@angular/common/http/testing';
 import { Profile } from './profile';
 import { testProviders, signIn, signOut, makeGroup, makeUser, makeRequest, flushByUrl } from '../testing';
 
-// the event a file input's (change) hands the component. size can be faked so the 5 MB test
-// doesn't need a real 5 MB file.
+// a fake (change) event. the size can be faked for the 5 MB test.
 function pick(type = 'image/png', size?: number) {
   const file = new File(['fake image bytes'], 'me', { type });
   if (size !== undefined) {
@@ -45,8 +44,7 @@ describe('Profile', () => {
 
   it('reads the profile from the server rather than localStorage', async () => {
     await build();
-    // localStorage only holds email, role and username, and goes stale the moment the profile
-    // is edited, so the page fetches the stored record instead
+    // loaded from the server, localStorage goes stale
     flushByUrl(mock, { '/users/': makeUser({ username: 'Stored Name', bio: 'from the server' }), '/groups': [], '/requests': [] });
 
     expect(component.user()?.username).toBe('Stored Name');
@@ -63,8 +61,7 @@ describe('Profile', () => {
       '/groups': [], '/requests': [],
     });
 
-    // age isn't stored, it's derived using the same calculation the server does when it checks a
-    // group's age limit
+    // worked out from the date of birth, like the server does
     expect(component.age()).toBe(20);
   });
 
@@ -79,8 +76,7 @@ describe('Profile', () => {
       ],
     });
 
-    // the spec gives a user exactly two views of their own requests: what's pending, and what
-    // was rejected and why. approved ones aren't listed.
+    // only pending and rejected requests are listed
     expect(component.pendingRequests().map(r => r._id)).toEqual(['r1']);
     expect(component.rejectedRequests().map(r => r._id)).toEqual(['r2']);
     expect(component.rejectedRequests()[0].reason).toBe('Duplicate');
@@ -94,8 +90,7 @@ describe('Profile', () => {
       '/requests': [],
     });
 
-    // group admin is a relationship with a group, not a role on the account, and this user is an
-    // admin of one group and a plain member of the other
+    // admin of one group, plain member of the other
     expect(component.myGroups().length).toBe(2);
     expect(component.adminOf().map(g => g._id)).toEqual(['g1']);
   });
@@ -109,7 +104,7 @@ describe('Profile', () => {
     component.onSave();
 
     const req = mock.expectOne(r => r.method === 'PUT');
-    // omitting it means "leave the password alone", because sending an empty one would blank it
+    // no password field means unchanged
     expect(req.request.body.password).toBeUndefined();
     expect(req.request.body.username).toBe('New Name');
     req.flush(makeUser({ username: 'New Name' }));

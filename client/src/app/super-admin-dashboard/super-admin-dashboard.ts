@@ -19,10 +19,9 @@ export class SuperAdminDashboard {
   private groupService = inject(GroupService);
   private requestService = inject(RequestService);
 
-  me = this.auth.email;   // sent as actorEmail on every approve and reject so the server can check the role
+  me = this.auth.email;   // sent as actorEmail so the server can check the role
 
-  // all four panels are signals, because every one is filled from a subscribe callback and the
-  // app is zoneless, so a plain array would be set but never drawn
+  // signals, since they're set in subscribe and the app is zoneless
   pendingRequests = signal<AppRequest[]>([]);
   users = signal<AppUser[]>([]);
   groups = signal<Group[]>([]);
@@ -30,29 +29,25 @@ export class SuperAdminDashboard {
   auditLog = signal<AuditEntry[]>([]);
   auditTypes = signal<string[]>([]);
 
-  // the spec asks for an audit log filterable by type. the filtering happens on the server, so
-  // changing this refetches rather than hiding rows the client already has.
+  // filtering happens on the server, so changing this refetches
   auditFilter = signal('');
 
   actionError = signal('');
   actionSuccess = signal('');
 
-  // only one request has its reject box open at a time, so this holds that request's id
+  // the request with its reject box open
   rejectingId = signal('');
 
-  // the request whose approval is waiting on "are you sure?". only the two that can't be undone
-  // ask: a permanent ban deletes the account for good, and a group deletion takes every room and
-  // message with it. approving a new group doesn't ask, because nothing is lost by it.
+  // the request waiting on "are you sure?". only bans and group deletions ask, they can't be undone.
   confirmingId = signal('');
-  rejectReason = '';        // plain property, [(ngModel)] writes it from a DOM event
+  rejectReason = '';        // plain, [(ngModel)] writes it
 
   constructor() {
     this.load();
   }
 
   private load() {
-    // scope: 'super' returns only the three types the super admin actions: group creations,
-    // group deletions and ban reports. room proposals go to the group's own admin instead.
+    // only the super admin's request types. room proposals go to group admins.
     this.requestService.getRequests({ status: 'pending', scope: 'super' })
       .subscribe(requests => this.pendingRequests.set(requests));
 
@@ -81,9 +76,7 @@ export class SuperAdminDashboard {
     this.actionError.set(err.error?.error ?? 'Something went wrong, please try again.');
   }
 
-  // how many groups this account is a member of, shown next to them in the members panel.
-  // group admin isn't a role on the user, so this is the only way to say anything about their
-  // relationship to groups from a user record.
+  // group and admin counts for the members panel (stored on groups, not users)
   groupCountFor(email: string) {
     return this.groups().filter(g => g.memberEmails.includes(email)).length;
   }
@@ -96,16 +89,14 @@ export class SuperAdminDashboard {
     return request.type === 'user-ban' || request.type === 'group-delete';
   }
 
-  // what the confirm box says will happen. spelled out, because "are you sure?" on its own
-  // doesn't tell anyone what they're agreeing to.
+  // what the confirm box says will happen
   consequenceOf(request: AppRequest) {
     return request.type === 'user-ban'
       ? `This deletes ${request.payload.email}'s account and their email can never register again.`
       : 'This deletes the group, all of its rooms and every message in them.';
   }
 
-  // the Approve button. the two irreversible types open the confirm box, everything else goes
-  // straight through.
+  // Approve: irreversible types confirm first, the rest go straight through
   onApproveClicked(request: AppRequest) {
     if (this.needsConfirm(request)) {
       this.confirmingId.set(request._id);
@@ -116,9 +107,7 @@ export class SuperAdminDashboard {
     this.onApprove(request);
   }
 
-  // approving is what actually carries the request out: a group-create really creates the
-  // group with the requester as its first admin, a group-delete removes the group and its
-  // rooms, and a user-ban deletes the account and blacklists the email permanently.
+  // the server carries the request out (creates the group, deletes it, or bans the user)
   onApprove(request: AppRequest) {
     this.clearMessages();
 
@@ -143,8 +132,7 @@ export class SuperAdminDashboard {
     this.rejectingId.set('');
   }
 
-  // a rejection must carry a reason. the server answers 400 without one, and the requester
-  // reads that reason on their own profile page.
+  // a reason is required (400 without), the requester sees it on their profile
   onReject(request: AppRequest) {
     this.clearMessages();
 
@@ -158,7 +146,7 @@ export class SuperAdminDashboard {
     });
   }
 
-  // request types are stored as slugs, this is the readable label for the queue
+  // readable label for a request type
   labelFor(type: string) {
     const labels: Record<string, string> = {
       'group-create': 'New group',

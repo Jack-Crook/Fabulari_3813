@@ -16,8 +16,7 @@
   border-bottom: 1px solid #E2E4E9;
 }
 
-/* the row is a link to the group, but Leave is a button that must not navigate, so the two
-   sit side by side in a wrapper rather than nesting a button inside an anchor */
+/* the row is a link and Leave is a button, so they sit side by side instead of a button inside a link */
 .group-row-wrap {
   display: flex;
   align-items: center;
@@ -31,7 +30,7 @@
   border-bottom: none;        /* the wrapper draws the divider now */
 }
 
-/* leaving is a step down from Remove on the admin page, so it's the same outlined red */
+/* outlined red, like Remove on the admin page */
 .leave {
   width: auto;
   min-height: 0;
@@ -53,12 +52,10 @@
   height: 80px;
   flex-shrink: 0;
   border-radius: 8px;      /* softens the flat colour block a little */
-  /* the colour is whatever the admin picked, so a white or near-white theme would vanish into
-     the white card. a faint inset outline gives it an edge on any colour. inset box-shadow
-     rather than border, so the swatch stays exactly 80px and nothing next to it moves */
+  /* a faint inset outline so a white theme still shows. inset shadow, not border, so the size doesn't change. */
   box-shadow: inset 0 0 0 1px rgba(26, 29, 35, 0.2);
 }
-/* the group rows are links now, so the anchor styling has to be undone */
+/* undo link styling on the group rows */
 a.group-row {
   text-decoration: none;
   color: #1A1D23;
@@ -82,7 +79,7 @@ a.group-row:hover {
   color: #6B7280;
 }
 
-/* the global button style is a full width blue block, too big for a row like this */
+/* smaller than the global button */
 .discover-row button {
   width: auto;
   min-height: 0;
@@ -97,8 +94,7 @@ a.group-row:hover {
   min-width: 0;
 }
 
-/* small tags on a group's name. Admin is read off the group's adminEmails rather than the
-   user's role, because that's where group admin actually lives. */
+/* tags on a group's name. Admin comes from the group's adminEmails. */
 .admin-badge, .age-badge {
   display: inline-block;
   margin-left: 8px;
@@ -114,8 +110,7 @@ a.group-row:hover {
   color: #0b68db;
 }
 
-/* every group is visible whatever your age, so this is a label rather than a lock, because the
-   check happens on the server when you try to join */
+/* a label, not a lock: the age check happens on join */
 .age-badge {
   background: #FEF3C7;
   color: #92400E;
@@ -144,14 +139,14 @@ a.group-row:hover {
 
 /* create group form */
 
-/* explains why the button says Request rather than Create, which is the spec's rule */
+/* explains why it's Request, not Create */
 .form-note {
   margin: 0 0 8px;
   font-size: 13px;
   color: #6B7280;
 }
 
-/* puts the heading and the New Group button on one line, button pushed to the right */
+/* heading and button on one line */
 .section-head {
   display: flex;
   align-items: center;
@@ -159,7 +154,7 @@ a.group-row:hover {
   gap: 16px;
 }
 
-/* same reset as the discover row buttons, the global style is far too big for a header */
+/* smaller than the global button */
 .new-group {
   width: auto;
   min-height: 0;
@@ -169,8 +164,7 @@ a.group-row:hover {
   font-size: 13px;
 }
 
-/* the global form rule already stacks the fields, this just boxes the form off from the
-   group list underneath it */
+/* boxes the form off from the list below */
 .create-group {
   background: #FFFFFF;
   border: 1px solid #E2E4E9;
@@ -179,7 +173,7 @@ a.group-row:hover {
   margin-bottom: 8px;
 }
 
-/* the colour picker is the one input that shouldn't stretch the full width */
+/* the colour picker doesn't stretch */
 .create-group input[type="color"] {
   width: 60px;
   height: 40px;

@@ -6,8 +6,7 @@ import { firstValueFrom, isObservable } from 'rxjs';
 import { authGuard, superAdminGuard, groupAdminGuard } from './guards';
 import { testProviders, signIn, signOut, makeGroup } from './testing';
 
-// a guard is a plain function, so it's called through runInInjectionContext rather than being
-// constructed. these two stand in for the arguments the router would pass.
+// guards are functions, run with runInInjectionContext. these stand in for the router's arguments.
 const emptyRoute = { paramMap: convertToParamMap({}) } as unknown as ActivatedRouteSnapshot;
 const emptyState = {} as RouterStateSnapshot;
 
@@ -51,13 +50,10 @@ describe('route guards', () => {
     signIn('admin@test.com');
     const result = TestBed.runInInjectionContext(() => groupAdminGuard(routeWithGroup('g1'), emptyState));
 
-    // group admin isn't a role on the user, so the guard has to fetch the group before it can
-    // answer, which is why this one returns an observable and the other two don't
+    // group admin is stored on the group, so this guard fetches it and returns an observable
     expect(isObservable(result)).toBe(true);
 
-    // HttpClient's observables are cold: nothing is sent until something subscribes, and
-    // firstValueFrom is what subscribes here. so the promise is started before the request is
-    // answered, not after, or there'd be no request waiting to answer.
+    // the request is only sent once firstValueFrom subscribes, so start the promise before answering
     const answer = firstValueFrom(result as any);
     TestBed.inject(HttpTestingController).expectOne('http://localhost:3000/groups').flush([makeGroup()]);
     expect(await answer).toBe(true);

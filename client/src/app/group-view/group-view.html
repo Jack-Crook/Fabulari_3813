@@ -9,11 +9,10 @@
 
 <div class="group-body">
 
-  <!-- every group the user can see, down the left. the one being viewed is outlined -->
+  <!-- every group down the left, the current one outlined -->
   <aside class="group-sidebar">
     <h2>Groups</h2>
 
-    <!-- signals are read by calling them, hence groups() rather than groups -->
     @for (item of groups(); track item._id) {
       <a class="group-tile"
          [class.selected]="item._id === group()?._id"
@@ -27,7 +26,7 @@
 
   <section class="group-main">
 
-    <!-- banner across the top in the group's own theme colour -->
+    <!-- banner in the group's theme colour -->
     @if (group(); as current) {
       <header class="group-banner" [style.background]="current.theme"
               [style.color]="ink()" [class.on-dark]="onDark()">
@@ -36,23 +35,18 @@
           <p class="banner-desc">{{ current.description }}</p>
         </div>
         <div class="banner-meta">
-          <!-- the age limit lives on the group and covers every room inside it, so it belongs
-               here rather than on any individual room -->
+          <!-- the age limit belongs to the group and covers all its rooms -->
           <span class="banner-pill">{{ current.ageLimit ? current.ageLimit + '+' : 'All ages' }}</span>
           <span class="banner-pill">{{ current.memberEmails.length }} member(s)</span>
         </div>
       </header>
 
-      <!-- only shown on a group this user admins, and it's the same check the route guard on
-           the admin page makes: is my email in this group's adminEmails -->
+      <!-- only for an admin of this group, the same check as the admin page's guard -->
       @if (isGroupAdmin()) {
         <a class="manage-link" [routerLink]="['/admin-dashboard', current._id]">Manage this group →</a>
       }
 
-      <!-- the rooms are visible to everyone, the spec says any group can be seen, but only a
-           member can chat in them. someone who isn't in it gets the join button here instead of
-           room links that would only answer "you are not a member". the super admin oversees
-           groups without joining them, and the server refuses to add them, so no button for them. -->
+      <!-- anyone can see a group, only members can chat. non-members get a join button instead of room links. the super admin can't join. -->
       @if (!isMember() && !isSuper) {
         <div class="join-bar">
           <p>You aren't a member of this group yet. Join it to chat in its rooms.</p>
@@ -67,15 +61,12 @@
 
         @for (channel of channels(); track channel._id) {
           @if (isMember()) {
-            <!-- clicking a room opens the chat room view for it -->
             <a class="room-row" [routerLink]="['/groups', group()?._id, 'channels', channel._id]">
               <span class="room-name">{{ channel.name }}</span>
-              <!-- who's in each room is shown once you're inside it, live from the socket -->
               <span class="room-count">Open</span>
             </a>
           } @else {
-            <!-- not a link, because the chat would refuse them. still listed, so they can see
-                 what the group talks about before joining. -->
+            <!-- not a link, the chat would refuse them. still listed so they can see the rooms. -->
             <div class="room-row locked">
               <span class="room-name">{{ channel.name }}</span>
               <span class="room-count">{{ isSuper ? 'Members only' : 'Join to chat' }}</span>
@@ -87,8 +78,7 @@
           <p class="empty">This group has no rooms yet.</p>
         }
 
-        <!-- rooms already proposed and waiting on an admin, so a member can see theirs is in
-             the queue instead of it disappearing until someone actions it -->
+        <!-- pending proposals, so members can see theirs is waiting -->
         @if (proposals().length) {
           <h3 class="proposed-head">Proposed, awaiting an admin</h3>
           @for (request of proposals(); track request._id) {
@@ -96,12 +86,10 @@
           }
         }
 
-        <!-- the spec says a regular user proposes a room and the group admin approves it. an
-             admin doesn't need this, they create rooms outright from the admin dashboard, and
-             the super admin isn't a member of any group. -->
+        <!-- members propose rooms. admins create them on the admin page, and the super admin isn't a member. -->
         @if (isMember() && !isGroupAdmin() && !isSuper) {
           <form class="propose-room" (ngSubmit)="onPropose()">
-            <!-- aria-label names the box for a screen reader, since the placeholder vanishes on typing -->
+            <!-- aria-label, since a placeholder isn't a label -->
             <input name="proposed" type="text" placeholder="Propose a new room" aria-label="Name of the room to propose"
                    [(ngModel)]="proposedName" required />
             <button type="submit">Propose</button>
@@ -109,7 +97,7 @@
         }
       </div>
     } @else {
-      <!-- a bad/stale :id in the url, and without this it silently looked the same as a real group with zero rooms -->
+      <!-- a bad or old :id in the url -->
       <div class="rooms">
         <p class="empty">Group not found.</p>
       </div>

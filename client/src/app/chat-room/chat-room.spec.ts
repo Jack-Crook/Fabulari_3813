@@ -10,10 +10,7 @@ import { ChatService, ChatMessage } from '../chat';
 import { GroupMember } from '../group';
 import { testProviders, signIn, signOut, makeGroup, makeChannel, flushByUrl } from '../testing';
 
-// A stand-in for ChatService. The real one opens a socket to localhost:3000 the moment a room is
-// joined, which a unit test must not do, for the same reason provideHttpClientTesting stops the
-// http services reaching the server. The fake has the same signals, so the component reads it
-// exactly as it reads the real one, and its methods are vi.fn() so a test can ask what was called.
+// a fake ChatService, so no real socket is opened. same signals, and vi.fn() methods to check calls.
 function fakeChat() {
   return {
     messages: signal<ChatMessage[]>([]),
@@ -28,8 +25,7 @@ function fakeChat() {
   };
 }
 
-// what the browser hands (change) when a file is picked. size can be overridden, because a test
-// shouldn't have to build a real 6 MB file to check the size limit.
+// a fake (change) event. the size can be overridden for the size limit test.
 function pick(type = 'image/png', size?: number) {
   const file = new File(['fake image bytes'], 'photo', { type });
   if (size !== undefined) {
@@ -64,8 +60,7 @@ describe('ChatRoom', () => {
     await fixture.whenStable();
   }
 
-  // '/members' goes first: the members url also contains '/groups', and flushByUrl answers the
-  // first pattern that matches, so otherwise it would be handed the list of groups
+  // '/members' first, since its url also contains '/groups'
   function load(group = makeGroup(), members: GroupMember[] = []) {
     flushByUrl(mock, { '/members': members, '/groups': [group], '/channels': [makeChannel()] });
   }
@@ -103,8 +98,7 @@ describe('ChatRoom', () => {
     await build();
     load();
 
-    // the spec asks for an indicator when the sender is that group's admin. it's a lookup in
-    // adminEmails, not a check on the user's role, because that's where group admin lives.
+    // the admin indicator comes from the group's adminEmails
     expect(component.isAdmin('admin@test.com')).toBe(true);
     expect(component.isAdmin('member@test.com')).toBe(false);
   });
@@ -113,8 +107,7 @@ describe('ChatRoom', () => {
     await build();
     load(makeGroup({ theme: '#7B3FF2' }));
 
-    // the spec says the theme colour is the group's customisation and that it extends into
-    // that group's chat rooms
+    // the group's theme carries into its rooms
     expect(component.theme()).toBe('#7B3FF2');
   });
 
@@ -146,7 +139,7 @@ describe('ChatRoom', () => {
     component.draft = '  hello room  ';
     component.onSend();
 
-    // no email goes with it, the server takes the sender from the socket's join. '' = no image
+    // no email sent, the server uses the socket's join. '' = no image
     expect(chat.send).toHaveBeenCalledWith('hello room', '');
     expect(component.draft).toBe('');
   });
@@ -180,7 +173,7 @@ describe('ChatRoom', () => {
     component.draft = 'look at this';
     component.onSend();
 
-    // step two of an image message: the path from the upload goes out over the socket
+    // image step two: the uploaded path goes over the socket
     expect(chat.send).toHaveBeenCalledWith('look at this', '/uploads/abc.png');
     expect(component.pendingImage()).toBe('');
     expect(component.draft).toBe('');
@@ -244,7 +237,7 @@ describe('ChatRoom', () => {
   });
 
   it('only offers the message box to members', async () => {
-    // the super admin isn't a member of any group, and the server would refuse their join
+    // the super admin is in no groups
     await build('super@test.com');
     load();
 
@@ -257,7 +250,7 @@ describe('ChatRoom', () => {
 
     fixture.destroy();
 
-    // the socket is shared app wide and stays open, so leaving has to be said explicitly
+    // the socket is shared, so leaving is explicit
     expect(chat.leaveRoom).toHaveBeenCalled();
   });
 
